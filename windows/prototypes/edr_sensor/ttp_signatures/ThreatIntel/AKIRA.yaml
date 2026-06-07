@@ -1,0 +1,94 @@
+# =============================================================================
+# AKIRA (Megazord / Storm-1567 / Gold Sahara / Howling Scorpius)
+# =============================================================================
+
+- ttp_signature:
+    name: "Akira Megazord (Rust) Encryptor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "Execution of the Megazord Rust-based encryptor, appending the .powerranges or .akira extension"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "Megazord.exe --encryption_percent" # Or Akira.exe
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Akira BYOVD EDR Neutralization (rwdrv.sys / hlpdrv.sys)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify Tools (T1562.001)"
+      procedure: "Loading vulnerable drivers (rwdrv.sys, hlpdrv.sys, or TrueSight.sys) to disable or quarantine EDR/AV monitoring callbacks"
+    match:
+      actor: "**"
+      type: "MODULE_LOAD"
+      target:
+        - "rwdrv.sys"
+        - "hlpdrv.sys"
+        - "TrueSight.sys"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\drivers\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "Akira Shadow Copy Deletion (WMI/PowerShell)"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Inhibit System Recovery (T1490)"
+      procedure: "Using WMI or PowerShell to sequentially delete all volume shadow copies to prevent file recovery"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Get-WmiObject Win32_ShadowCopy | ForEach-Object { $_.Delete() }"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Akira Rclone Cloud Exfiltration Staging"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567.002)"
+      procedure: "Using Rclone with specific thread counts to exfiltrate data to actor-controlled S3 or Mega storage"
+    match:
+      actor: "rclone.exe"
+      type: "PROCESS_START"
+      target: "copy --threads 7 --max-age 24h"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Akira SoftPerfect Network Scanner (Discovery)"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Network Service Discovery (T1046)"
+      procedure: "Execution of SoftPerfect (netscan.exe) to map the local network and identify file servers/VMware ESXi hosts"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "netscan.exe"
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\SoftPerfect\\*"
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Akira Persistence via Fake 'itadm' Account"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Create Account: Local Account (T1136.001)"
+      procedure: "Creating highly privileged local or domain accounts (often named 'itadm' or 'helpdesk') for backdoor access"
+    match:
+      actor: "net.exe"
+      type: "PROCESS_START"
+      target: "user add itadm /add"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"

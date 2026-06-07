@@ -1,0 +1,4 @@
+pyarrow>=14.0.0
+pywin32>=306; sys_platform == "win32"
+requests>=2.31.0
+boto3>=1.34.0

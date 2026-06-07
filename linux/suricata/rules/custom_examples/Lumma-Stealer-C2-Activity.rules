@@ -1,0 +1,18 @@
+alert http any any -> any any (msg:"Lumma Stealer C2 Communication - HTTP POST with Specific User-Agent and URI"; \
+flow:established,to_server; http.method; content:"POST"; http.uri; content:"/api"; content:"act=life"; http.user_agent; \
+content:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"; \
+http.header; content:"Content-Type: application/x-www-form-urlencoded"; fast_pattern; sid:7272018; rev:1; \
+reference:url,labs.withsecure.com/publications/reverse-engineering-a-lumma-infection; classtype:trojan-activity; \
+metadata:mitre_attack_id T1071.001, kill_chain_phases Command_and_Control, threat Lumma_Stealer;)
+
+alert http any any -> any any (msg:"Lumma Stealer C2 Communication - Broad Match for HTTP POST"; \
+flow:established,to_server; http.method; content:"POST"; http.uri; content:"act=life"; http.user_agent; \
+content:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"; fast_pattern; sid:7272019; rev:1; \
+reference:url,labs.withsecure.com/publications/reverse-engineering-a-lumma-infection; classtype:trojan-activity; \
+metadata:mitre_attack_id T1071.001, kill_chain_phases Command_and_Control, threat Lumma_Stealer;)
+
+alert http any any -> any any (msg:"Lumma Stealer Delivery - Suspicious PowerShell Download via HTTP"; \
+flow:established,from_server; file_data; content:"powershell"; content:"Invoke-WebRequest"; content:"-Uri"; \
+content:"-OutFile"; http.header; content:"Content-Type: application/octet-stream"; sid:7272020; rev:1; \
+reference:url,labs.withsecure.com/publications/reverse-engineering-a-lumma-infection; classtype:trojan-activity; \
+metadata:mitre_attack_id T1105, kill_chain_phases Delivery, threat Lumma_Stealer;)

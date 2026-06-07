@@ -1,0 +1,16 @@
+[package]
+name = "active_defender"
+version = "0.7.0"
+edition = "2024"
+authors = ["Robert Weber"]
+description = "Automated threat containment via XDP map mutation and POSIX signals"
+
+[dependencies]
+shared_models = { path = "../shared_models" }
+libbpf-rs.workspace = true
+nix.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+mimalloc.workspace = true

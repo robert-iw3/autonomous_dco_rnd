@@ -1,0 +1,310 @@
+schemas:
+  - name: cloud_network_flows_vpc
+    match_field: event_type
+    match_value: vpc_flow
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"network"'
+      'event.dataset': '"nexus.vpc_flow"'
+      'observer.name': process_name
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'threat.tactic.name': mitre_tactic
+      'event.risk_score': score
+
+  - name: cloud_nsg_flows
+    match_field: event_type
+    match_value: nsg_flow
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"network"'
+      'event.dataset': '"nexus.nsg_flow"'
+      'observer.name': process_name
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'event.risk_score': score
+
+  - name: cloud_control_plane
+    match_field: event_type
+    match_value: cloudtrail_api
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"iam"'
+      'event.dataset': '"nexus.cloudtrail"'
+      'event.action': process_name
+      'user.id': process_hash
+      'source.ip': dst_ip
+      'threat.tactic.name': mitre_tactic
+      'threat.technique.id': mitre_technique
+      'event.risk_score': score
+
+  - name: azure_activity
+    match_field: event_type
+    match_value: azure_activity
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"iam"'
+      'event.dataset': '"nexus.azure_activity"'
+      'event.action': process_name
+      'user.id': process_hash
+      'source.ip': dst_ip
+      'event.risk_score': score
+
+  - name: entraid_signin
+    match_field: event_type
+    match_value: entraid_signin
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"authentication"'
+      'event.dataset': '"nexus.entraid_signin"'
+      'event.action': process_name
+      'user.name': process_hash
+      'source.ip': dst_ip
+      'event.risk_score': score
+      'event.reason': reasons
+
+  - name: guardduty_finding
+    match_field: event_type
+    match_value: guardduty_finding
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"threat"'
+      'event.dataset': '"nexus.guardduty"'
+      'rule.name': process_name
+      'destination.ip': dst_ip
+      'event.risk_score': score
+      'event.reason': reasons
+      'message': description
+
+  - name: network_tap
+    match_field: sensor_type
+    match_value: network_tap
+    fields:
+      '@timestamp': timestamp_start
+      'event.category': '"network"'
+      'event.dataset': '"nexus.network_tap"'
+      'event.duration': session_duration_ms
+      'source.ip': src_ip
+      'source.port': src_port
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'network.protocol': protocol_name
+      'source.bytes': bytes_src
+      'destination.bytes': bytes_dst
+      'source.packets': packets_src
+      'destination.packets': packets_dst
+      'tls.client.ja3': tls_ja3
+      'tls.server.ja3s': tls_ja3s
+      'http.request.method': http_method
+      'url.original': http_uri
+      'user_agent.original': http_useragent
+      'tls.server.x509.subject.common_name': cert_cn
+      'tls.server.x509.issuer.common_name': cert_issuer_cn
+      'destination.geo.country_name': dst_geo_country
+      'destination.as.organization.name': dst_asn_org
+
+  - name: linux_c2_sensor
+    match_field: sensor_type
+    match_value: linux-c2-sensor
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"network"'
+      'event.dataset': '"nexus.linux_c2"'
+      'process.name': process_name
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'threat.tactic.name': mitre_tactic
+      'event.risk_score': score
+      'dns.question.name': dns_query
+      'network.bytes': packet_size_mean
+
+  - name: sysmon_sensor
+    match_field: sensor_type
+    match_value: sysmon_sensor
+    fields:
+      '@timestamp': timestamp
+      'event.code': sysmon_event_id
+      'event.category': '"process"'
+      'event.dataset': '"nexus.sysmon"'
+      'process.executable': Image
+      'process.command_line': CommandLine
+      'process.parent.executable': ParentImage
+      'process.parent.command_line': ParentCommandLine
+      'process.pid': ProcessId
+      'process.parent.pid': ParentProcessId
+      'user.name': User
+      'host.name': sensor_id
+      'destination.ip': DestinationIp
+      'destination.port': DestinationPort
+      'network.protocol': Protocol
+      'file.path': TargetFilename
+      'registry.path': TargetObject
+      'registry.value': Details
+      'pe.imphash': Hashes
+      'dll.path': ImageLoaded
+      'tls.established': Signed
+      'dns.question.name': QueryName
+      'dns.answers.name': QueryResults
+      'pipe.name': PipeName
+      'threat.enrichments.matched.type': TamperingType
+      'event.risk_score': anomaly_score
+
+  - name: macos_sensor
+    match_field: sensor_type
+    match_value: macos_sensor
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"process"'
+      'event.dataset': '"nexus.macos"'
+      'process.name': process_name
+      'file.path': file_path
+      'dll.path': plist_path
+      'code_signature.status': code_signature
+      'event.risk_score': anomaly_score
+
+  - name: windows_deepsensor
+    match_field: sensor_type
+    match_value: windows_deepsensor
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"process"'
+      'event.dataset': '"nexus.deepsensor"'
+      'process.executable': path
+      'process.parent.executable': parent_image
+      'process.command_line': command_line
+      'user.name': event_user
+      'destination.ip': destination_ip
+      'destination.port': port
+      'rule.name': signature_name
+      'threat.tactic.name': tactic
+      'threat.technique.id': technique
+      'event.severity': severity
+      'event.risk_score': score
+
+  - name: windows_c2sensor
+    match_field: sensor_type
+    match_value: c2sensor
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"network"'
+      'event.dataset': '"nexus.windows_c2"'
+      'host.ip': host_ip
+      'user.name': user
+      'process.name': process
+      'destination.address': destination
+      'rule.name': alert_reason
+      'event.severity': severity
+      'event.risk_score': score
+
+  - name: linux_sentinel
+    match_field: sensor_type
+    match_value: Linux-Sentinel
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"process"'
+      'event.dataset': '"nexus.linux_sentinel"'
+      'event.action': mitre_tactic
+      'event.severity': level
+      'event.risk_score': anomaly_score
+      'process.name': comm
+      'process.command_line': command_line
+      'process.pid': pid
+      'process.parent.name': parent_comm
+      'process.parent.pid': ppid
+      'user.name': user_name
+      'user.id': uid
+      'destination.ip': dest_ip
+      'destination.port': dest_port
+      'file.path': target_file
+      'threat.tactic.name': mitre_tactic
+      'threat.technique.id': mitre_technique
+      'container.name': container_name
+      'message': message
+
+  - name: gcp_audit
+    match_field: event_type
+    match_value: gcp_audit
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"iam"'
+      'event.dataset': '"nexus.gcp_audit"'
+      'event.action': process_name
+      'user.id': process_hash
+      'source.ip': dst_ip
+      'threat.technique.id': mitre_technique
+      'event.risk_score': score
+      'message': description
+
+  - name: gcp_scc
+    match_field: event_type
+    match_value: gcp_scc
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"threat"'
+      'event.dataset': '"nexus.gcp_scc"'
+      'rule.name': process_name
+      'destination.ip': dst_ip
+      'event.risk_score': score
+      'event.reason': reasons
+
+  - name: gcp_vpc_flow
+    match_field: event_type
+    match_value: gcp_vpc_flow
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"network"'
+      'event.dataset': '"nexus.gcp_vpc_flow"'
+      'observer.name': process_name
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'threat.tactic.name': mitre_tactic
+      'event.risk_score': score
+      'network.bytes': packet_size_mean
+
+  - name: vmware_syslog
+    match_field: event_type
+    match_value: vmware_syslog
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"host"'
+      'event.dataset': '"nexus.vmware_syslog"'
+      'observer.name': process_name
+      'destination.ip': dst_ip
+      'destination.port': dst_port
+      'threat.tactic.name': mitre_tactic
+      'threat.technique.id': mitre_technique
+      'event.risk_score': score
+      'message': description
+
+  - name: trellix_ens
+    match_field: sensor_type
+    match_value: trellix_ens
+    fields:
+      '@timestamp':            timestamp
+      'event.category':        event_category
+      'event.kind':            event_kind
+      'event.action':          action
+      'event.dataset':         '"trellix_ens.endpoint"'
+      'event.module':          '"trellix_ens"'
+      'host.name':             host
+      'host.hostname':         sensor_id
+      'process.name':          process
+      'process.pid':           pid
+      'user.name':             user
+      'file.path':             file_path
+      'file.name':             file_name
+      'threat.software.name':  detection_name
+      'threat.software.type':  threat_type
+      'log.level':             severity
+      'log.logger':            source_component
+      'message':               message
+
+  - name: generic_telemetry
+    match_field: ""
+    match_value: ""
+    fields:
+      '@timestamp': timestamp
+      'event.category': '"process"'
+      'event.dataset': '"nexus.generic"'
+      'destination.ip': dst_ip
+      'event.risk_score': score

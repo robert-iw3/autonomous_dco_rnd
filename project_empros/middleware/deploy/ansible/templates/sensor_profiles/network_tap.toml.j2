@@ -1,0 +1,12 @@
+[transmission]
+middleware_url = "{{ 'https' if middleware_tls_enabled else 'http' }}://{{ hostvars[groups['ingress'][0]]['ansible_default_ipv4']['address'] }}:{{ middleware_ingress_port }}/api/v1/telemetry"
+auth_token = "{{ vault_middleware_auth_token }}"
+sensor_type = "network_tap"
+integrity_secret = "{{ vault_middleware_integrity_secret }}"
+max_backoff_sec = 60
+spool_dir = "/app/data/spool"
+
+[tls]
+enabled = {{ middleware_tls_enabled | lower }}
+ca_path = "/app/certs/ca.pem"
+verify = true

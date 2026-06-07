@@ -1,0 +1,56 @@
+{
+  "_comment": "Trellix ENS transmission container config. Sensitive values must come from environment variables -- do NOT put credentials here.",
+
+  "sql": {
+    "driver":           "ODBC Driver 18 for SQL Server",
+    "database":         "ConsolidatedEventsENS",
+    "port":             1433,
+    "encrypt":          true,
+    "trust_server_cert": true,
+    "connection_timeout": 30,
+    "command_timeout":   120
+  },
+
+  "transmission": {
+    "batch_size":           1000,
+    "interval_seconds":     60,
+    "max_retries":          3,
+    "retry_backoff_secs":   10,
+    "streams":              ["ens", "appcontrol"],
+    "parquet_compression":  "zstd"
+  },
+
+  "ueba": {
+    "isolation_forest": {
+      "n_estimators":    50,
+      "contamination":   0.01,
+      "random_state":    42
+    },
+    "refit_interval":    500,
+    "max_feature_window": 5000,
+    "entropy_max":       4.0,
+    "db_path":           "/app/ueba_state/state.db"
+  },
+
+  "nexus": {
+    "format":           "parquet",
+    "content_type":     "application/octet-stream",
+    "hmac_algorithm":   "sha256",
+    "timeout_seconds":  30,
+    "stream_name_ens":       "trellix_ens",
+    "stream_name_appcontrol": "trellix_appcontrol"
+  },
+
+  "schema": {
+    "vector_name":      "trellix_math",
+    "vector_dimensions": 6,
+    "vector_layout": [
+      "[0] severity_score   -- ThreatSeverity 1-5 → [0.2, 1.0]",
+      "[1] threat_score     -- ThreatType malice weight",
+      "[2] action_score     -- ActionTaken response weight",
+      "[3] anomaly_score    -- IsolationForest UEBA score",
+      "[4] entropy_score    -- Shannon entropy FilePath+ProcessName",
+      "[5] frequency_score  -- inverse novelty ThreatName+ThreatType"
+    ]
+  }
+}

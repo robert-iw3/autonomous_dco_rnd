@@ -1,0 +1,30 @@
+# Detects WebVPN authentication requests with partial PKCS7 certificates or specific XML elements (client-cert-auth-signature) in Cisco ASA logs, indicating potential LINE VIPER shellcode delivery.
+alert http any any -> any 443 (msg:"Anomalous WebVPN Auth Request - PKCS7 Certificate"; \
+flow:established,to_server; content:"POST"; http_method; content:"<config-auth"; http_request_body; \
+content:"cert-format=\"pkcs7\""; http_request_body; nocase; reference:cve,2025-20333; classtype:attempted-admin; sid:7777001; rev:1;)
+
+alert http any any -> any 443 (msg:"Anomalous WebVPN Auth Request - Client Cert Signature"; \
+flow:established,to_server; content:"POST"; http_method; content:"<config-auth"; http_request_body; \
+content:"<client-cert-auth-signature"; http_request_body; nocase; reference:cve,2025-20333; classtype:attempted-admin; sid:7777002; rev:1;)
+
+# Detects WebVPN XML patterns with blank device-id attributes but populated unique-id, indicating LINE VIPER’s AAA bypass.
+alert http any any -> any 443 (msg:"AAA Bypass Activity - LINE VIPER WebVPN Pattern"; \
+flow:established,to_server; content:"POST"; http_method; content:"<device-id"; http_request_body; \
+content:"computer-name=\"\""; http_request_body; content:"device-type=\"\""; http_request_body; \
+content:"platform-version=\"\""; http_request_body; content:"unique-id=\""; http_request_body; \
+pcre:"/unique-id=\"[^\"]+\"/"; nocase; reference:cve,2025-20333; classtype:attempted-admin; sid:7777003; rev:1;)
+
+# These rules detect high-volume RADIUS, LDAP, or TACACS traffic, which could indicate a packet capture initiated by LINE VIPER.
+# The threshold limits FPs by alerting only on significant activity.
+# The app-layer-protocol keyword requires Suricata’s protocol parsing.
+alert ip any any -> any 1812:1813 (msg:"Suspicious RADIUS Traffic - Potential LINE VIPER Packet Capture"; \
+flow:established; app-layer-protocol:radius; threshold:type both, track by_src, count 100, seconds 60; \
+reference:cve,2025-20333; classtype:suspicious-traffic; sid:7777004; rev:1;)
+
+alert ip any any -> any 389 (msg:"Suspicious LDAP Traffic - Potential LINE VIPER Packet Capture"; \
+flow:established; app-layer-protocol:ldap; threshold:type both, track by_src, count 100, seconds 60; \
+reference:cve,2025-20333; classtype:suspicious-traffic; sid:7777005; rev:1;)
+
+alert ip any any -> any 49 (msg:"Suspicious TACACS Traffic - Potential LINE VIPER Packet Capture"; \
+flow:established; app-layer-protocol:tacacs; threshold:type both, track by_src, count 100, seconds 60; \
+reference:cve,2025-20333; classtype:suspicious-traffic; sid:7777006; rev:1;)

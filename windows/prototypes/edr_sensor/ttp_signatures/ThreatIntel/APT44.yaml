@@ -1,0 +1,112 @@
+# =============================================================================
+# APT44 (Sandworm / Voodoo Bear / Seashell Blizzard / UNC757 / UAC-0145)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT44 UAC-0145 Trojanized KMS Activator"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "System Binary Proxy Execution: Rundll32 (T1218.011)"
+      procedure: "APT44 executing backdoored KMS activation script (BACKORDER loader)"
+    match:
+      actor: "rundll32.exe"
+      type: "PROCESS_START"
+      target: "Microsoft-Activation-Scripts\\stream.x86.x.dll,ExportedFunction"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "APT44 Sandworm Tor C2 Communication"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy: Multi-hop Proxy (T1090.003)"
+      procedure: "Sandworm routing curl traffic through local Tor SOCKS5 proxy to .onion C2"
+    match:
+      actor: "curl.exe"
+      type: "PROCESS_START"
+      target: "socks5h://127.0.0.1:9050"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+      exclude_actor_cmd:
+        - "curl.exe -h"
+
+- ttp_signature:
+    name: "APT44 Industroyer2 SCADA Attack Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Service Stop (T0881)"
+      procedure: "Sandworm executing MicroSCADA SCIL-API commands to disrupt substation OT"
+    match:
+      actor: "scilc.exe"
+      type: "PROCESS_START"
+      target: "-do pack\\scil\\s1.txt"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT44 CaddyWiper Deployment Script"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: Visual Basic (T1059.005)"
+      procedure: "Wscript launching VBS loader for CaddyWiper or Industroyer2 payloads"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "d:\\pack\\lun.vbs"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "APT44 Destructive Shadow Copy Deletion"
+    severity: "High"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Inhibit System Recovery (T1490)"
+      procedure: "APT44 deleting volume shadow copies prior to wiping with CaddyWiper"
+    match:
+      actor: "vssadmin.exe"
+      type: "PROCESS_START"
+      target: "delete shadows /all /quiet"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT44 OpenSSH Backdoor Firewall Modification"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify System Firewall (T1562.004)"
+      procedure: "APT44 creating inbound firewall rule for silently installed OpenSSH backdoor"
+    match:
+      actor: "netsh.exe"
+      type: "PROCESS_START"
+      target: "advfirewall firewall add rule name=\"OpenSSH Server (sshd)\""
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT44 Remote Desktop Backdoor User Creation"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Create Account: Local Account (T1136.001)"
+      procedure: "APT44 creating hidden WGUtilityOperator account for RDP backdoor access"
+    match:
+      actor: "net.exe"
+      type: "PROCESS_START"
+      target: "user WGUtilityOperator"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"

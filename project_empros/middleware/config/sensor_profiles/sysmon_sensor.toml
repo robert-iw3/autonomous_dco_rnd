@@ -1,0 +1,15 @@
+[TRANSMISSION]
+; ── Nexus Sysmon Sensor Profile ────────────────────────────────────────────
+; Deployed to Windows endpoints running SysmonSensor.py.
+; The sensor reads from Microsoft-Windows-Sysmon/Operational and ships
+; Hive-partitioned Parquet to the middleware ingress.
+;
+; SensorType must match [schema_mappings.sysmon_sensor] in nexus.toml.
+
+MiddlewareEndpoint  = https://middleware.internal:8443/api/v1/telemetry
+AuthToken           = ChangeMe-Rotate-In-Production
+SensorType          = sysmon_sensor
+IntegritySecret     = Nexus-Integrity-SharedKey-Rotate-Me
+MaxBatchSize        = 500
+QueueDbPath         = C:\ProgramData\NexusSysmonSensor\Data\TransmissionQueue.db
+TrustSelfSignedCert = False

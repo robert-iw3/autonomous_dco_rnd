@@ -1,0 +1,31 @@
+# GCP Cloud Connector -- server-side pull connector
+# Pulls from GCP Cloud Audit Logs, Security Command Center, and VPC Flow Logs.
+# Each source is pushed to middleware with a distinct sensor_type header so
+# CIM/ECS schema matching and NATS subject routing work correctly.
+
+[transmission]
+middleware_url = "https://middleware.internal:8443/api/v1/telemetry"
+auth_token = "ChangeMe-Rotate-In-Production"
+integrity_secret = "Nexus-Integrity-SharedKey-Rotate-Me"
+max_backoff_sec = 60
+spool_dir = "/app/data/spool"
+
+[tls]
+enabled = true
+ca_path = "/app/certs/ca.pem"
+verify = true
+
+[gcp]
+project_id = "your-gcp-project-id"
+credentials_file = "/app/secrets/gcp-credentials.json"
+
+# Each source maps to its own sensor_type header (must match nexus.toml schema_mappings keys)
+[gcp.sources]
+audit_logs_enabled = true
+audit_sensor_type = "gcp_audit"
+
+scc_findings_enabled = true
+scc_sensor_type = "gcp_scc"
+
+vpc_flow_enabled = true
+vpc_sensor_type = "gcp_vpc_flow"

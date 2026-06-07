@@ -1,0 +1,39 @@
+alert dns any any -> any 53 (msg:"Potential DNS Tunneling - Large TXT Record Payload"; \
+  flow:established,to_server; \
+  dns.query; content:"TXT"; \
+  dns.response; content:"|00|"; bsize>255; \
+  classtype:trojan-activity; \
+  sid:6969012; \
+  rev:1; \
+  metadata:tactic TA0010, technique T1048.003, created_by RW, created_at 2025-07-27;)
+alert dns any any -> any 53 (msg:"Potential DNS Tunneling - High Query Volume"; \
+  flow:established,to_server; \
+  dns.query; \
+  threshold:type threshold, track by_dst, count 100, seconds 60; \
+  classtype:trojan-activity; \
+  sid:6969013; \
+  rev:1; \
+  metadata:tactic TA0010, technique T1048.003, created_by RW, created_at 2025-07-27;)
+alert dns any any -> any 53 (msg:"Potential DNS Tunneling - Unusual Subdomain Patterns"; \
+  flow:established,to_server; \
+  dns.query; content:"|2e|"; pcre:"/^[a-z0-9\-]{20,}\./"; \
+  classtype:trojan-activity; \
+  sid:6969014; \
+  rev:1; \
+  metadata:tactic TA0010, technique T1048.003, created_by RW, created_at 2025-07-27;)
+alert http any any -> any any (msg:"Potential HTTP/HTTPS Data Exfiltration - Large POST Request"; \
+  flow:established,to_server; \
+  http.method; content:"POST"; \
+  http.request_body; bsize>1048576; \
+  classtype:trojan-activity; \
+  sid:6969015; \
+  rev:1; \
+  metadata:tactic TA0010, technique T1048.001, created_by RW, created_at 2025-07-27;)
+alert http any any -> any any (msg:"Potential HTTP/HTTPS Beaconing - Frequent Connections"; \
+  flow:established,to_server; \
+  http.method; content:"GET"; content:"POST"; bsize:0; \
+  threshold:type threshold, track by_dst, count 50, seconds 300; \
+  classtype:command-and-control; \
+  sid:6969016; \
+  rev:1; \
+  metadata:tactic TA0011, technique T1071.001, created_by RW, created_at 2025-07-27;)

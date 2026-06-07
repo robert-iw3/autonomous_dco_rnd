@@ -1,0 +1,19 @@
+# =============================================================================
+# AUTHENTICANTICS
+# =============================================================================
+
+- ttp_signature:
+    name: "AUTHENTICANTICS COM Hijacking Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Component Object Model Hijacking (T1546.015)"
+      procedure: "Writing malicious Microsoft.Identity64.dll to CLSID {1299CF18-C4F5-4B6A-BB0F-2299F0398E27} InprocServer32 key"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "Microsoft.Identity64.dll"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_target: "Microsoft.Identity64.dll"
+      exclude_actor: "reg.exe"

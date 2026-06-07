@@ -1,0 +1,90 @@
+# =============================================================================
+# APT17 (Deputy Dog / Aurora Panda / Elderwood Group / Axiom)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT17 BLACKCOFFEE TechNet C2 Resolver"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Web Service: Dead Drop Resolver (T1102.001)"
+      procedure: "BLACKCOFFEE backdoor fetching encoded C2 IP addresses from legitimate forum profile tags (@MICROSOFT / CORPORATION)"
+    match:
+      actor: "browser_process"
+      type: "NETWORK_EVENT"
+      target: "social.technet.microsoft.com/Profile/*"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT17 HiKit Rootkit Kernel Load"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Rootkit (T1014)"
+      procedure: "Loading the HiKit kernel-mode rootkit to hide network connections and files from the OS"
+    match:
+      actor: "system"
+      type: "MODULE_LOAD"
+      target: "hikit.sys"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\drivers\\*"
+
+- ttp_signature:
+    name: "APT17 DLL Side-Loading (BLACKCOFFEE Loader)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Hijack Execution Flow: DLL Side-Loading (T1574.002)"
+      procedure: "Sideloading malicious DLLs (e.g., mscms.dll, oledlg.dll) into legitimate signed binaries like Adobe or Chrome"
+    match:
+      actor: "AcroRd32.exe"
+      type: "MODULE_LOAD"
+      target: "mscms.dll"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT17 ZoxRPC Reverse Shell Activity"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter (T1059)"
+      procedure: "Execution of the ZoxRPC backdoor to establish an interactive reverse shell via the Elderwood platform"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "zoxrpc.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT17 WMI-Based Lateral Movement"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "Using WMIC to remotely execute staged payloads on internal defense workstations"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target:
+        - "/node:"
+        - "process call create"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\wbem\\*"
+
+- ttp_signature:
+    name: "APT17 Browser Profile & Email Harvesting"
+    severity: "High"
+    meta:
+      tactic: "Collection (TA0009)"
+      technique: "Email Collection: Local Email Storage (T1114.001)"
+      procedure: "2026-variant scripts targeting Outlook OST/PST files and browser 'Local State' for identity harvesting"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "*.pst"
+    filter:
+      exclude_path: "C:\\Windows\\*"

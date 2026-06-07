@@ -1,0 +1,15 @@
+# ==============================================================================
+# Windows DeepSensor -- Transmission Profile
+# Managed by Ansible -- middleware deployment (middleware/deploy/ansible/main.yml)
+# Deployed to: {{ config_dir }}/sensor_profiles/windows_sensor.toml
+# INI-style format consumed by the Windows DeepSensor agent.
+# ==============================================================================
+
+[TRANSMISSION]
+MiddlewareEndpoint = {{ 'https' if middleware_tls_enabled else 'http' }}://{{ hostvars[groups['ingress'][0]]['ansible_default_ipv4']['address'] }}:{{ middleware_ingress_port }}/api/v1/telemetry
+AuthToken = {{ vault_middleware_auth_token }}
+SensorType = windows_deepsensor
+IntegritySecret = {{ vault_middleware_integrity_secret }}
+MaxBatchSize = 500
+QueueDbPath = C:\ProgramData\DeepSensor\Data\TransmissionQueue.db
+TrustSelfSignedCert = {{ 'False' if middleware_tls_enabled else 'True' }}

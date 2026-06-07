@@ -1,0 +1,71 @@
+[global]
+nats_url = "nats://nats:4222"
+stream_name = "Middleware_Lab5"
+telemetry_subject = "middleware.telemetry"
+dlq_subject_prefix = "middleware.dlq"
+
+[ingress]
+bind_addr = "0.0.0.0:8080"
+auth_token = "lab5-bearer-token"
+max_payload_bytes = 10485760
+tls_enabled = false
+integrity_secret = "lab5-integrity-secret"
+integrity_ban_threshold = 3
+
+[destinations]
+nexus_enabled = true
+splunk_enabled = true
+elastic_enabled = true
+sql_enabled = false
+
+[nexus]
+gateway_url = "http://mock-endpoints:8089/api/v1/telemetry"
+auth_token = "lab5-nexus-token"
+integrity_secret = "lab5-nexus-integrity-secret"
+verify_tls = false
+max_backoff_sec = 5
+batch_size = 20
+
+[splunk]
+hec_url = "http://mock-endpoints:8088/services/collector/event"
+hec_token = "lab5-splunk-token"
+index_endpoint = "nexus_endpoint"
+index_cloud = "nexus_cloud"
+index_network = "nexus_network"
+index_alerts = "nexus_alerts"
+index_default = "nexus_endpoint"
+alert_score_threshold = 70
+target_sourcetype = "nexus:generic"
+batch_size = 20
+timeout_seconds = 5
+verify_tls = false
+
+[elastic]
+host = "http://mock-endpoints:9201"
+index_endpoint = "nexus-endpoint"
+index_cloud = "nexus-cloud"
+index_network = "nexus-network"
+index_default = "nexus-telemetry"
+auth = ""
+pipeline = ""
+batch_size = 20
+timeout_seconds = 5
+verify_tls = false
+
+[sql]
+host = "localhost"
+port = 1433
+database = "test"
+use_sspi = false
+user = "sa"
+pass = "lab5pass"
+encryption = "NotSupported"
+trust_server_cert = true
+sproc = "EXEC dbo.sp_Test @json = @P1"
+batch_size = 20
+pool_size = 1
+connect_timeout_sec = 5
+
+[schemas]
+cim_mappings_file = "/config/cim_mappings.yaml"
+ecs_mappings_file = "/config/ecs_mappings.yaml"

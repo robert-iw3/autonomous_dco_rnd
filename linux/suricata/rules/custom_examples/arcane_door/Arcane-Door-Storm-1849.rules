@@ -1,0 +1,13 @@
+alert http any any -> any 443 (msg:"Possible CVE-2024-20353/20359 ArcaneDoor Line Dancer Exploit Attempt"; \
+    flow:established,to_server; http.method; content:"POST"; http.header; \
+    content:"Server: NetScaler|Cisco"; nocase; content:"host-scan-reply="; \
+    http.request_body; pcre:"/host-scan-reply=[^&]{500,}/"; http.header; \
+    !content:"Cookie"; classtype:trojan-activity; sid:202420353; rev:1;)
+# inbound exploit action
+alert ip any any -> $HOME_NET any (msg:"ArcaneDoor Line Dancer Exploit Attempt from Known IP"; \
+    dataset:isset, arcane_door_IP_IOCs, type ip; flow:to_server,established; \
+    classtype:bad-unknown; sid:202420354; rev:1;)
+# outbound
+alert ip $HOME_NET any -> any any (msg:"ArcaneDoor Outbound Traffic to Known IP"; \
+    dataset:isset, arcane_door_IP_IOCs, type ip; flow:to_client,established; \
+    classtype:bad-unknown; sid:202420355; rev:1;)

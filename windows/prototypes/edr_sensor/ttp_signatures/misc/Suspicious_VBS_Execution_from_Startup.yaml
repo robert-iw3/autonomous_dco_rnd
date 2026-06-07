@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "Suspicious VBS Execution from Startup"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder (T1547.001)"
+      procedure: "WScript/CScript executing VBS from Startup or Roaming paths (Serpentine Cloud)"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "AppData\\Roaming"

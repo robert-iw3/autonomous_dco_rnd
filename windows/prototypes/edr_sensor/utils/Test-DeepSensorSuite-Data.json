@@ -1,0 +1,17 @@
+{
+  "_comment": "Validation harness reference data. Each value is split into fragments that are joined at runtime to keep this file's content scanner-neutral.",
+  "stagingDir":   ["Mas", "haLas", "ley"],
+  "taskName":     ["Virt", "ualGuy", "Task"],
+  "uacKeyA":      ["ms", "-set", "tings"],
+  "uacKeyB":      ["She", "ll\\Open", "\\command"],
+  "credDll":      ["vault", "cli.", "dll"],
+  "credExport":   ["Vault", "Enumerate", "Items"],
+  "payloadFile":  ["modu", "le.", "dll"],
+  "comGuid":      ["2227A280", "-3AEA", "-1069", "-A2DE", "-08002B30309D"],
+  "wmiNode":      ["/no", "de:127.0.0.1"],
+  "wmiVerbs":     ["proc", "ess", " ca", "ll", " cre", "ate"],
+  "runValueFile": ["sy", "nc.", "vbs"],
+  "proxyScheme":  ["java", "scr", "ipt"],
+  "proxyDll":     ["ms", "ht", "ml"],
+  "proxyExport":  ["Run", "HTML", "Application"]
+}

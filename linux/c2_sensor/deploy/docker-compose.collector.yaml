@@ -1,0 +1,36 @@
+---
+services:
+  c2-sensor-collector:
+    build:
+      context: ../
+      dockerfile: deploy/collector.Dockerfile
+    image: c2-sensor-collector:v0.7.0
+    container_name: c2-sensor-collector
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - SYS_PTRACE
+      - IPC_LOCK
+      - BPF
+      - PERFMON
+    security_opt:
+      - apparmor:unconfined
+    network_mode: "host"
+    pid: "host"
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug:rw
+      - /sys/fs/bpf:/sys/fs/bpf:rw
+      - /sys/kernel/btf/vmlinux:/sys/kernel/btf/vmlinux:ro
+      - ../data:/app/data:rw
+      - ../deploy/config.toml:/app/config.toml:ro
+      - /lib/modules:/lib/modules:ro
+      - /usr/src:/usr/src:ro
+      - /proc:/host/proc:ro
+    environment:
+      - SENSOR_CONFIG_PATH=/app/config.toml
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"

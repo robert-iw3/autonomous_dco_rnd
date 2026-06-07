@@ -1,0 +1,109 @@
+# =============================================================================
+# SCATTERED SPIDER (UNC3944 / Roasted 0ktapus / Muddled Libra / Starfraud)
+# =============================================================================
+
+- ttp_signature:
+    name: "Scattered Spider Tailscale Tunneling"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Using Tailscale to establish persistent, encrypted mesh VPN access"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "tailscale up"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Scattered Spider AD Explorer Snapshot"
+    severity: "Critical"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Domain Trust Discovery (T1482)"
+      procedure: "Using Sysinternals AD Explorer to take silent snapshots of Active Directory"
+    match:
+      actor: "ADExplorer.exe"
+      type: "PROCESS_START"
+      target: "-snapshot"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Scattered Spider FleetDeck RMM Deployment"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Remote Access Software (T1219)"
+      procedure: "Execution of FleetDeck (often renamed) for persistent RMM access"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "fleetdeck"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Scattered Spider RMM Masquerading (AnyDesk)"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Masquerading (T1036)"
+      procedure: "AnyDesk executed from suspicious directories (ProgramData/Public)"
+    match:
+      actor: "AnyDesk.exe"
+      type: "PROCESS_START"
+      target: "--service"
+    filter:
+      exclude_path:
+        - "C:\\Program Files (x86)\\AnyDesk\\*"
+        - "C:\\Program Files\\AnyDesk\\*"
+
+- ttp_signature:
+    name: "Scattered Spider BYOVD EDR Kill (Stonestop)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify Tools (T1562.001)"
+      procedure: "Loading vulnerable drivers (BYOVD) to terminate EDR/AV processes"
+    match:
+      actor: "**"
+      type: "MODULE_LOAD"
+      target: "iocontrol.sys"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\drivers\\"
+
+- ttp_signature:
+    name: "Scattered Spider BitLocker Ransomware Prep"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "Abusing native BitLocker (manage-bde.exe) to encrypt data for extortion"
+    match:
+      actor: "manage-bde.exe"
+      type: "PROCESS_START"
+      target: "-on"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Scattered Spider Rclone Exfiltration"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567.002)"
+      procedure: "Using Rclone to sync sensitive data to actor-controlled cloud storage"
+    match:
+      actor: "rclone.exe"
+      type: "PROCESS_START"
+      target: "copy"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"

@@ -1,0 +1,50 @@
+---
+# Lab 3: Sensor → Ingress → NATS Integrity Pipeline
+# Run from project_empros/tests/lab_nats_ingress/:
+#   docker compose up -d
+#   pytest test_ingress_pipeline.py -v
+
+services:
+  nats:
+    image: docker.io/library/nats:2.10-alpine
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ./nats-test.conf:/etc/nats/nats-server.conf:ro
+      - nats-data:/data
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  core-ingress:
+    build:
+      context: ../../
+      dockerfile: services/core_ingress/Dockerfile
+    environment:
+      - BIND_ADDR=0.0.0.0:8080
+      - NATS_URL=nats://nats:4222
+      - JWT_SECRET=lab3-test-jwt-secret
+      - INTEGRITY_HMAC_SECRET=lab3-test-integrity-secret
+      - INTEGRITY_BAN_THRESHOLD=3
+      - MAX_CONCURRENT_REQUESTS=256
+      - REQUEST_TIMEOUT_SECS=10
+      - NEXUS_BAN_LIST_DIR=/tmp/nexus-ban
+    ports:
+      - "8080:8080"
+    depends_on:
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  nats-data:

@@ -1,0 +1,125 @@
+# =============================================================================
+# Volt Typhoon (UNC757 / Bronze Silhouette)
+# =============================================================================
+
+- ttp_signature:
+    name: "Volt Typhoon Webshell Execution from IIS"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Server Software Component: Web Shell (T1505.003)"
+      procedure: "w3wp.exe spawning cmd.exe or powershell.exe for reconnaissance"
+    match:
+      actor: "w3wp.exe"
+      type: "PROCESS_START"
+      target: "cmd.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor: "w3wp.exe"
+
+- ttp_signature:
+    name: "Volt Typhoon Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "Volt Typhoon using multiple LOLBins (certutil, mshta, rundll32)"
+    match:
+      actor: "certutil.exe"
+      type: "PROCESS_START"
+      target:
+        - "-urlcache"
+        - "-split"
+        - "-decode"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\"
+
+- ttp_signature:
+    name: "Volt Typhoon PowerShell Reconnaissance"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Volt Typhoon using PowerShell for system reconnaissance"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "whoami"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe"
+
+- ttp_signature:
+    name: "Volt Typhoon Scheduled Task Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job (T1053)"
+      procedure: "Creating scheduled tasks for persistence"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "schtasks.exe /create"
+
+- ttp_signature:
+    name: "Volt Typhoon WMI Discovery"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "Using WMI for system and network discovery"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "/node:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe"
+
+- ttp_signature:
+    name: "Volt Typhoon Netsh Portproxy Abuse"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy (T1090)"
+      procedure: "Using netsh interface portproxy for C2 tunneling"
+    match:
+      actor: "netsh.exe"
+      type: "PROCESS_START"
+      target: "interface portproxy"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "netsh.exe"
+
+- ttp_signature:
+    name: "Volt Typhoon Rundll32 Proxy Execution"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218.011)"
+      procedure: "Using rundll32.exe for proxy execution of malicious code"
+    match:
+      actor: "rundll32.exe"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "Volt Typhoon Systeminfo Discovery"
+    severity: "Medium"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "System Information Discovery (T1082)"
+      procedure: "Running systeminfo for environment profiling"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "systeminfo"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "systeminfo"

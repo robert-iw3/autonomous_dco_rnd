@@ -1,0 +1,92 @@
+# =============================================================================
+# APT34 (OilRig / Helix Kitten / Earth Simnavaz / CHRYSENE)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT34 LSA Password Filter Injection"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Steal or Forge Authentication Certificates: Password Filters (T1556.002)"
+      procedure: "Registering psgfilter.dll as an LSA Notification Package to harvest plaintext passwords"
+    match:
+      actor: "reg.exe"
+      type: "REGISTRY_EVENT"
+      target: "Control\\Lsa\\Notification Packages"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target_value:
+        - "scecli"
+        - "capicom"
+
+- ttp_signature:
+    name: "APT34 Menorah / SideTwist Malware Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Execution of Menorah or SideTwist .NET backdoors from LocalAppData"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "SystemFailureReporter.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT34 Saitama DNS Tunneling Ping Probe"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol: DNS (T1071.004)"
+      procedure: "Abusing Win32_PingStatus via WMI to perform DNS-based C2 notifications"
+    match:
+      actor: "WmiPrvSE.exe"
+      type: "PROCESS_START"
+      target: "Win32_PingStatus Where Address="
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT34 Exchange Web Services Exfiltration"
+    severity: "Critical"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567)"
+      procedure: "Using Microsoft.Exchange.WebServices.dll to exfiltrate data via victim's own Exchange infra"
+    match:
+      actor: "**"
+      type: "MODULE_LOAD"
+      target: "Microsoft.Exchange.WebServices.dll"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+        - "C:\\Program Files\\Microsoft\\Exchange Server\\*"
+
+- ttp_signature:
+    name: "APT34 Credential Harvesting (ValueVault / PickPocket)"
+    severity: "High"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Credentials from Password Stores (T1555)"
+      procedure: "Execution of custom browser and vault credential stealers"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "ValueVault"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT34 WDigest Credential Downgrade"
+    severity: "High"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Modify Authentication Process (T1556)"
+      procedure: "Forcing WDigest to store credentials in plaintext by setting UseLogonCredential to 1"
+    match:
+      actor: "reg.exe"
+      type: "PROCESS_START"
+      target: "WDigest /v UseLogonCredential /t REG_DWORD /d 1"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"

@@ -1,0 +1,13 @@
+pytest>=7.4.0
+fakeredis>=2.20.0
+pandas>=2.2.0
+pyarrow>=16.0.0
+duckdb>=0.10.2
+torch>=2.3.0
+pydantic>=2.7.1
+requests>=2.31.0
+safetensors>=0.4.2
+aiohttp>=3.9.0
+nats-py>=2.7.0
+tomli>=2.0.1
+redis>=5.0.0

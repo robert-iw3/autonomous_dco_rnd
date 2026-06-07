@@ -1,0 +1,42 @@
+# Rule 1: Detect Excessive SSH Tunneling Attempts (Amplification Attack)
+
+alert tcp any any -> any 22 (msg:"Potential SSH Tunneling Amplification Attempt"; \
+flow:established,to_server; content:"SSH"; depth:4; threshold: type both, track by_src, count 50, seconds 60; \
+classtype:suspicious-traffic; sid:8888801; rev:1;)
+
+# Rule 2: Detect RDP Tunneling Abuse (Unauthorized Access)
+
+alert tcp any any -> any 3389 (msg:"Potential RDP Tunneling Abuse"; \
+flow:established,to_server; content:"RDP"; depth:4; threshold: type both, track by_src, count 30, seconds 60; \
+classtype:unauthorized-access; sid:8888802; rev:1;)
+
+# Rule 3: Detect HTTP-Based Tunneling via Ngrok
+
+alert http any any -> any any (msg:"Potential Ngrok Tunneling Activity"; \
+http.host; content:".ngrok.io"; nocase; pcre:"/^[a-z0-9]+.ngrok.io$/"; \
+classtype:suspicious-traffic; sid:8888803; rev:1;)
+
+# Rule 4: Detect HTTP-Based Tunneling via Cloudflare Tunnel
+
+alert http any any -> any any (msg:"Potential Cloudflare Tunnel Activity"; \
+http.host; content:".trycloudflare.com"; nocase; pcre:"/^[a-z0-9]+.trycloudflare.com$/"; \
+classtype:suspicious-traffic; sid:8888804; rev:1;)
+
+# Rule 5: Detect Suspicious HTTP Tunneling with Anomalous User-Agent
+
+alert http any any -> any any (msg:"Suspicious HTTP Tunneling with Anomalous User-Agent"; \
+http.user_agent; content:"tunnel-agent"; nocase; threshold: type both, track by_src, count 20, seconds 60; \
+classtype:suspicious-traffic; sid:8888805; rev:1;)
+
+# Rule 6: Detect Tunneling Configuration Changes (Privilege Escalation)
+
+alert tcp any any -> any any (msg:"Potential Tunneling Configuration Change"; \
+content:"|00|tunnel|00|config|00|"; nocase; file_data; threshold: type both, track by_dst, count 10, seconds 300; \
+classtype:policy-violation; sid:8888806; rev:1;)
+
+# Rule 7: Detect Anomalous Tunneling Traffic Volume (Amplification)
+
+alert ip any any -> any any (msg:"Anomalous Tunneling Traffic Volume"; \
+flowbits:set,tunnel_traffic; flowbits:noalert; threshold: type both, track by_src, count 1000, seconds 60; \
+classtype:suspicious-traffic; sid:8888807; rev:1;)
+

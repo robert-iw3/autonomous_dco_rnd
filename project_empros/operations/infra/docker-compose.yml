@@ -1,0 +1,157 @@
+services:
+  # ── Edge Proxy ──
+  traefik:
+    image: docker.io/library/traefik:v3.0
+    container_name: ${NEXUS_STACK_PREFIX:-nexus}-ingress-ephemeral
+    restart: unless-stopped
+    networks:
+      - deepnet
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik/dynamic:ro
+      - ${NEXUS_TLS_DIR:-/etc/ssl/traefik}:/etc/ssl/traefik:ro
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=${NEXUS_NETWORK_NAME:-deepnet}"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--ping=true"
+      - "--log.level=WARN"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${NEXUS_MEM_LIMIT_TRAEFIK:-256m}
+
+  # ── SSO Database (ephemeral tmpfs) ──
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: ${NEXUS_STACK_PREFIX:-nexus}-sso-db
+    restart: unless-stopped
+    networks:
+      - deepnet
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASS:-ephemeral_db_pass}
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+    tmpfs:
+      - /var/lib/postgresql/data:size=256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: ${NEXUS_MEM_LIMIT_POSTGRES:-512m}
+
+  # ── SSO Cache ──
+  redis:
+    image: docker.io/library/redis:alpine
+    container_name: ${NEXUS_STACK_PREFIX:-nexus}-sso-cache
+    restart: unless-stopped
+    networks:
+      - deepnet
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: ${NEXUS_MEM_LIMIT_REDIS:-128m}
+
+  # ── Authentik Server ──
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: ${NEXUS_STACK_PREFIX:-nexus}-sso-server
+    restart: unless-stopped
+    networks:
+      - deepnet
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${JWT_SECRET}
+    volumes:
+      - ./authentik-blueprint.yaml:/blueprints/custom/nexus.yaml:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`${NEXUS_DOMAIN_SSO:-authentik.nexus}`)"
+      - "traefik.http.routers.authentik.entrypoints=websecure"
+      - "traefik.http.routers.authentik.tls=true"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: ${NEXUS_MEM_LIMIT_SSO:-1g}
+
+  # ── Authentik Worker ──
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: ${NEXUS_STACK_PREFIX:-nexus}-sso-worker
+    command: worker
+    restart: unless-stopped
+    networks:
+      - deepnet
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${JWT_SECRET}
+    volumes:
+      - ./authentik-blueprint.yaml:/blueprints/custom/nexus.yaml:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${NEXUS_MEM_LIMIT_SSO_WORKER:-768m}
+
+networks:
+  deepnet:
+    external: true

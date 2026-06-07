@@ -1,0 +1,94 @@
+# =============================================================================
+# APT40 (Gingham Typhoon / Leviathan / TA423 / Kryptonite Panda)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT40 Rapid N-Day Exploitation Shell Spawn"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Exploit Public-Facing Application (T1190)"
+      procedure: "Immediate execution of web shells or reverse shells following N-day exploitation"
+    match:
+      actor:
+        - "w3wp.exe"
+        - "tomcat.exe"
+        - "confluence.exe"
+      type: "PROCESS_START"
+      target:
+        - ".aspx"
+        - ".jsp"
+        - "echo "
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\inetsrv\\*"
+
+- ttp_signature:
+    name: "APT40 SOHO Proxy C2 Communication"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy: SOHO Router (T1090.002)"
+      procedure: "Routing C2 traffic through hijacked SOHO routers (TP-Link, ASUS, Cisco RV) to mask actor origin"
+    match:
+      actor: "**"
+      type: "NETWORK_EVENT"
+      target: "DEST_IP: [SOHO_IP_RANGE]" # Flagged via UEBA if IP has no prior enterprise reputation
+    filter:
+      exclude_path: "C:\\Program Files\\Browser\\*"
+
+- ttp_signature:
+    name: "APT40 Chinachopper Web Shell Persistence"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Server Software Component: Web Shell (T1505.003)"
+      procedure: "Placement of Chinachopper or custom minimal ASPX/PHP web shells in OWA or IIS web roots"
+    match:
+      actor: "w3wp.exe"
+      type: "FILE_EVENT"
+      target: "\\HttpProxy\\owa\\auth\\*.aspx"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT40 Kerberoasting Credential Harvesting"
+    severity: "High"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Steal or Forge Kerberos Tickets: Kerberoasting (T1558.003)"
+      procedure: "Requesting service tickets for high-value SPNs to crack hashes offline"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Add-Type -AssemblyName System.IdentityModel"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT40 Stealthy Host Enumeration (LotL)"
+    severity: "Medium"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Remote System Discovery (T1018)"
+      procedure: "Using native netstat and wmic commands to map internal network architecture"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "netstat -ano | findstr LISTENING"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT40 JavaScript Persistence via Startup"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution (T1547)"
+      procedure: "Creating a JS-based backdoor in the startup folder or registry to maintain long-term access"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\*.js"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"

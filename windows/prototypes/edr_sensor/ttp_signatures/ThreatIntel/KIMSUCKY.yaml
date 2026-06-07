@@ -1,0 +1,89 @@
+# =============================================================================
+# Kimsuky
+# =============================================================================
+
+- ttp_signature:
+    name: "Kimsuky Spearphishing with Malicious Documents"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Spearphishing Attachment (T1566.001)"
+      procedure: "Kimsuky delivering initial access via malicious Office documents"
+    match:
+      actor: "winword.exe"
+      type: "FILE_EVENT"
+      target:
+        - "*.vbs"
+        - "*.ps1"
+        - "*.exe"
+        - "*.dll"
+        - "*.js"
+    filter:
+      exclude_path:
+        - "C:\\Users\\*\\AppData\\Local\\Microsoft\\Office\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "Kimsuky PowerShell Encoded Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Kimsuky using encoded PowerShell for execution"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "Kimsuky Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "Kimsuky abusing multiple LOLBins"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "Kimsuky Registry Run Key Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "Kimsuky establishing persistence via Run key using reg.exe or script-based LotL"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "\\Microsoft\\Windows\\CurrentVersion\\Run"
+    filter:
+      exclude_target_value:
+        - "\\Microsoft\\Teams\\"
+        - "OneDrive.exe"
+        - "LastRunVersion"
+        - "FeatureTimestampOfLatestRun"
+      exclude_path:
+        - "C:\\Windows\\System32\\"
+
+- ttp_signature:
+    name: "Kimsuky WMI Lateral Movement"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "Kimsuky using WMI for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "/node:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe /node:"

@@ -1,0 +1,90 @@
+# =============================================================================
+# UNC6384 / Mustang Panda
+# =============================================================================
+
+- ttp_signature:
+    name: "Mustang Panda PlugX Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "PlugX RAT execution via PowerShell"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "PlugX"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "Mustang Panda Legitimate Tool Abuse"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "Abusing legitimate tools (7-Zip, WinRAR, certutil)"
+    match:
+      actor:
+        - "7z.exe"
+        - "rar.exe"
+      type: "PROCESS_START"
+      target:
+        - " -p"
+        - " a -mhe"
+        - " -taes"
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\"
+
+- ttp_signature:
+    name: "Mustang Panda Persistence via Scheduled Task"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job (T1053)"
+      procedure: "Creating scheduled tasks for PlugX persistence"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "schtasks.exe /create"
+
+- ttp_signature:
+    name: "Mustang Panda Lateral Movement via Net Use"
+    severity: "High"
+    match:
+      actor: "net.exe"
+      type: "PROCESS_START"
+      target:
+        - "use \\\\"
+        - "IPC$"
+        - "ADMIN$"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\"
+
+- ttp_signature:
+    name: "Mustang Panda PlugX Registry Persistence"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "PlugX/Mustang Panda establishing persistence via Run keys using side-loaded binaries"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "*\\Microsoft\\Windows\\CurrentVersion\\Run*"
+    filter:
+      exclude_actor:
+        - "svchost.exe"
+        - "MoUsoCoreWorker.exe"
+        - "SearchIndexer.exe"
+      exclude_target_value:
+        - "*LastRunVersion*"
+        - "*FeatureTimestampOfLatestRun*"
+        - "*Microsoft\\Teams\\*"
+        - "*OneDrive.exe*"
+      exclude_path:
+        - "C:\\Windows\\System32\\*"

@@ -1,0 +1,55 @@
+---
+services:
+  suricata:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: suricata
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN        # bring ifaces up/promisc, ethtool offload, NFQUEUE
+      - NET_RAW          # raw packet capture
+      - SYS_NICE         # scheduling priority for worker threads
+    environment:
+      # ---- Mode ----
+      - IPS_MODE=${IPS_MODE:-ids}
+      - INLINE_METHOD=${INLINE_METHOD:-afpacket_bridge}
+      - RULE_ACTION_POLICY=${RULE_ACTION_POLICY:-balanced}
+      # ---- Network model (env-agnostic; override per environment) ----
+      - HOME_NET=${HOME_NET:-[10.0.0.0/8,172.16.0.0/12,192.168.0.0/16]}
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - BRIDGE_IFACE_B=${BRIDGE_IFACE_B:-eth1}
+      # ---- NFQUEUE tuning ----
+      - NFQUEUE_NUM=${NFQUEUE_NUM:-0}
+      - NFQUEUE_COUNT=${NFQUEUE_COUNT:-4}
+      - NFQ_MODE=${NFQ_MODE:-repeat}
+      - NFQ_FAIL_OPEN=${NFQ_FAIL_OPEN:-no}
+      - NFQUEUE_CHAINS=${NFQUEUE_CHAINS:-FORWARD}
+      - MANAGE_IPTABLES=${MANAGE_IPTABLES:-yes}
+      # ---- Availability vs security ----
+      - EXCEPTION_POLICY=${EXCEPTION_POLICY:-auto}
+      - STREAM_INLINE=${STREAM_INLINE:-auto}
+      # ---- Performance ----
+      - DETECT_PROFILE=${DETECT_PROFILE:-medium}
+      - AF_THREADS=${AF_THREADS:-auto}
+      - CPU_AFFINITY=${CPU_AFFINITY:-no}
+      - SURICATA_UPDATE=${SURICATA_UPDATE:-yes}
+      - DISABLE_OFFLOAD=${DISABLE_OFFLOAD:-yes}
+    volumes:
+      - suricata_logs:/var/log/suricata:rw
+      - suricata_lib:/var/lib/suricata:rw
+      - suricata_etc:/etc/suricata:rw
+      # Mount operator-curated config so changes don't require a rebuild.
+      # Comment these out to use the copies baked into the image instead.
+      - ./templates:/etc/suricata/templates:ro,Z
+      - ./rules:/var/lib/suricata/rules:rw,Z
+      - ./files/threshold.config:/etc/suricata/threshold.config:rw,Z
+      - ./files:/etc/suricata/data:rw,Z
+    restart: unless-stopped
+
+volumes:
+  suricata_logs:
+  suricata_lib:
+  suricata_etc:

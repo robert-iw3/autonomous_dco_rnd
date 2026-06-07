@@ -1,0 +1,64 @@
+# ==============================================================================
+# ARKIME ML GATEWAY -- CONFIGURATION
+# ==============================================================================
+# All secrets (auth_token, integrity_secret, Redis password) MUST be injected
+# via environment variables or a secrets manager -- never committed to source.
+#
+# Required environment variables before deployment:
+#   GATEWAY_NEXUS_TOKEN      → nexus.auth_token
+#   GATEWAY_INTEGRITY_SECRET → nexus.integrity_secret
+#   REDIS_PASSWORD           → part of redis.url
+# ==============================================================================
+
+[global]
+sensor_name = "network-tap-alpha"
+sensor_type = "network_tap"
+log_level   = "info"
+
+[redpanda]
+brokers  = "redpanda:9092"
+topic    = "arkime-spi-raw"
+group_id = "ml-gateway-group"
+# For multi-VM mTLS deployments, set these:
+# ssl_ca_location          = "/data/config/certs/ca.pem"
+# ssl_certificate_location = "/data/config/certs/client.pem"
+# ssl_key_location         = "/data/config/certs/client.key"
+
+[redis]
+# Inject REDIS_PASSWORD via environment; do not hardcode credentials here.
+# Example: redis://:${REDIS_PASSWORD}@redis:6379
+url = "redis://:CHANGE_VIA_ENV@redis:6379"
+
+[extraction]
+small_packet_bytes = 128
+large_packet_bytes = 1400
+
+[storage]
+spool_db_path     = "/data/spool/gateway.db"
+batch_size        = 5000
+flush_interval_sec = 2
+# 50 GB spool cap -- oldest untransmitted rows dropped when exceeded
+max_spool_bytes   = 53687091200
+
+[nexus]
+# MUST be HTTPS -- enforced at startup.
+gateway_url  = "https://nexus-edge.local:443/api/v1/netflow/telemetry"
+# Inject via secrets manager -- do NOT set placeholder values in production.
+auth_token       = "INJECT_FROM_SECRETS_MANAGER"
+integrity_secret = "INJECT_FROM_SECRETS_MANAGER"
+transmit_batch_size   = 10000
+poll_interval_sec     = 5
+max_backoff_sec       = 300
+cache_retention_sec   = 259200
+parquet_row_group_size     = 50000
+transmit_sort_by_timestamp = true
+
+[nexus.tls]
+enabled = false
+ca_path = "/data/config/certs/nexus-ca.pem"
+
+[metrics]
+port = 9090
+
+[runtime]
+tokio_worker_threads = 4

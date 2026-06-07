@@ -1,0 +1,25 @@
+[Unit]
+Description=Middleware Ingress Gateway
+After=network-online.target
+
+[Container]
+Image={{ middleware_image }}:{{ middleware_version }}
+Exec=/app/core_ingress
+Volume={{ config_dir }}/middleware.toml:/config/middleware.toml:ro,Z
+Volume={{ config_dir }}/cim_mappings.yaml:/config/cim_mappings.yaml:ro,Z
+Volume={{ config_dir }}/ecs_mappings.yaml:/config/ecs_mappings.yaml:ro,Z
+Volume={{ cert_dir }}:/config/certs:ro,Z
+Environment=MIDDLEWARE_CONFIG=/config/middleware.toml
+PublishPort={{ middleware_ingress_port | default('8443') }}:{{ middleware_ingress_port | default('8443') }}
+PublishPort=9000:9000
+Network=host
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=all
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

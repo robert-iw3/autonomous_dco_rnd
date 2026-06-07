@@ -1,0 +1,94 @@
+# =============================================================================
+# CYBERAV3NGERS (Shahid Kaveh Group / IRGC-CEC / Sandcat)
+# =============================================================================
+
+- ttp_signature:
+    name: "CyberAv3ngers Rockwell Logix Auth Bypass (CVE-2021-22681)"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Exploit Public-Facing Application (T1190)"
+      procedure: "Bypassing authentication to connect as a legitimate engineering workstation via CVE-2021-22681"
+    match:
+      actor: "LogixDesigner.exe"
+      type: "NETWORK_EVENT"
+      target: "DEST_PORT: 44818" # EtherNet/IP / CIP
+    filter:
+      exclude_path: "C:\\Program Files (x86)\\Rockwell Automation\\*"
+      exclude_actor_cmd:
+        - "Studio 5000"
+
+- ttp_signature:
+    name: "CyberAv3ngers IOCONTROL (OrpaCrab) Deployment"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Non-Application Layer Protocol (T1095)"
+      procedure: "Execution of IOCONTROL malware targeting OT/IoT devices (cameras, routers, PLCs)"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target:
+        - "iocontrol"
+        - "orpacrab"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\"
+        - "C:\\Program Files\\"
+
+- ttp_signature:
+    name: "CyberAv3ngers Politically Motivated Wiper Artifact"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Destructively Erased (T1485)"
+      procedure: "Creation of defacement or wiper marker files on ICS infrastructure"
+    match:
+      actor: "**"
+      type: "FILE_EVENT"
+      target: "down_with_israel"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\Temp\\~*"
+
+- ttp_signature:
+    name: "CyberAv3ngers Unitronics Default Credential Access"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Valid Accounts: Default Accounts (T1078.001)"
+      procedure: "Unauthorized access to Unitronics Vision PLCs via default port 20256 using default PINs (e.g., 1111)"
+    match:
+      actor: "VisiLogic.exe"
+      type: "NETWORK_EVENT"
+      target: "DEST_PORT: 20256"
+    filter:
+      exclude_path: "C:\\Program Files (x86)\\Unitronics\\*"
+
+- ttp_signature:
+    name: "CyberAv3ngers Crucio Ransomware Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "Execution of Crucio ransomware against ICS/SCADA server infrastructure"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "crucio.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "CyberAv3ngers Unauthorized SCADA Data Manipulation"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Destruction (T0809)"
+      procedure: "Malicious interaction with PLC project files to manipulate HMI and SCADA display data"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "echo 0 > *setpoint*"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"

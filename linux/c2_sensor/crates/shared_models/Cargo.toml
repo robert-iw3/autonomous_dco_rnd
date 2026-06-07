@@ -1,0 +1,12 @@
+[package]
+name = "shared_models"
+version = "0.7.0"
+edition = "2024"
+authors = ["Robert Weber"]
+description = "Core CTI structures, eBPF telemetry mappings, and configuration engine"
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+toml.workspace = true
+once_cell.workspace = true

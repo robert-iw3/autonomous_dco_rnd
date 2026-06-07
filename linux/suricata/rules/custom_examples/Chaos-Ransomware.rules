@@ -1,0 +1,14 @@
+# Detect traffic to or from suspicious IP 144.172.103.42
+alert ip $HOME_NET any -> 144.172.103.42 any (msg:"ET MALWARE Traffic to Suspicious Chaos Ransomware IP 144.172.103.42"; \
+flow:to_server; reference:url,blog.talosintelligence.com/new-chaos-ransomware/; classtype:trojan-activity; sid:5656008; \
+rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect traffic to or from suspicious IP 45.61.134.36
+alert ip $HOME_NET any -> 45.61.134.36 any (msg:"ET MALWARE Traffic to Suspicious Chaos Ransomware IP 45.61.134.36"; \
+flow:to_server; reference:url,blog.talosintelligence.com/new-chaos-ransomware/; classtype:trojan-activity; sid:5656009; \
+rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect traffic to or from suspicious IP 107.170.35.225
+alert ip $HOME_NET any -> 107.170.35.225 any (msg:"ET MALWARE Traffic to Suspicious Chaos Ransomware IP 107.170.35.225"; \
+flow:to_server; reference:url,blog.talosintelligence.com/new-chaos-ransomware/; classtype:trojan-activity; sid:5656010; \
+rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)

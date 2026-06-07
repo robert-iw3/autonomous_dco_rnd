@@ -1,0 +1,116 @@
+---
+# ==============================================================================
+# common_hardening role -- configurable defaults
+# Override per host group in group_vars/ or per host in host_vars/.
+# ==============================================================================
+
+# -- SSH -----------------------------------------------------------------------
+hardening_ssh_port: "22"
+hardening_ssh_allowed_groups: "sudo"
+hardening_ssh_max_auth_tries: 3
+hardening_ssh_max_sessions: 3
+hardening_ssh_client_alive_interval: 200
+hardening_ssh_client_alive_count_max: 3
+hardening_ssh_login_grace_time: 20
+hardening_ssh_max_startups: "10:30:60"
+hardening_ssh_rekey_limit: "512M 1h"
+# Minimum DH moduli bit size (filter /etc/ssh/moduli)
+hardening_ssh_moduli_minimum: 3071
+
+hardening_ssh_kex_algorithms: >-
+  curve25519-sha256@libssh.org,
+  ecdh-sha2-nistp521,
+  ecdh-sha2-nistp384,
+  ecdh-sha2-nistp256,
+  diffie-hellman-group-exchange-sha256
+hardening_ssh_ciphers: >-
+  chacha20-poly1305@openssh.com,
+  aes256-gcm@openssh.com,
+  aes256-ctr
+hardening_ssh_macs: >-
+  hmac-sha2-512-etm@openssh.com,
+  hmac-sha2-256-etm@openssh.com,
+  hmac-sha2-512,
+  hmac-sha2-256
+
+# -- Users & PAM --------------------------------------------------------------
+hardening_password_min_days: 1
+hardening_password_max_days: 60
+hardening_password_history: 5
+hardening_password_max_retries: 3
+hardening_faillock_deny: 5
+hardening_faillock_interval: 900
+hardening_umask: "077"
+hardening_home_dir_mode: "0750"
+hardening_inactive_days: 30
+hardening_sha_crypt_min_rounds: 10000
+hardening_sha_crypt_max_rounds: 65536
+hardening_sudo_timestamp_timeout: 5
+hardening_sudo_passwd_timeout: 1
+hardening_lock_root: true
+
+# -- Kernel / Sysctl ----------------------------------------------------------
+# Network stack tuning balances security with telemetry throughput.
+# These values are optimized for 10Gbps+ ingestion nodes.
+hardening_sysctl_ipv4_forwarding: 0       # Set to 1 on routers/gateways
+hardening_sysctl_tcp_syncookies: 1
+hardening_sysctl_accept_redirects: 0
+hardening_sysctl_send_redirects: 0
+hardening_sysctl_rp_filter: 1
+hardening_sysctl_log_martians: 1
+hardening_sysctl_accept_source_route: 0
+hardening_sysctl_disable_ipv6: false      # Set true if IPv6 not needed
+
+# Performance-safe: larger buffers for high-throughput telemetry
+hardening_sysctl_rmem_max: 16777216       # 16MB receive buffer
+hardening_sysctl_wmem_max: 16777216       # 16MB send buffer
+hardening_sysctl_somaxconn: 65535
+hardening_sysctl_tcp_max_syn_backlog: 65535
+hardening_sysctl_netdev_max_backlog: 65535
+
+# Kernel hardening (performance-safe subset)
+hardening_sysctl_randomize_va: 2          # Full ASLR
+hardening_sysctl_dmesg_restrict: 1
+hardening_sysctl_kptr_restrict: 2
+hardening_sysctl_yama_ptrace: 1
+
+# -- Firewall -----------------------------------------------------------------
+hardening_firewall_enabled: true
+hardening_firewall_default_zone: "nexus"
+hardening_firewall_allowed_services:
+  - ssh
+hardening_firewall_allowed_ports:
+  - "4222/tcp"      # NATS
+  - "6333/tcp"      # Qdrant HTTP
+  - "6334/tcp"      # Qdrant gRPC
+  - "6379/tcp"      # Redis
+  - "8080/tcp"      # Axum Ingress
+  - "9000/tcp"      # MinIO
+  - "9090/tcp"      # Prometheus metrics
+hardening_firewall_trusted_subnet: "10.0.0.0/8"
+hardening_firewall_ssh_rate_limit: "3/m"
+
+# -- Audit --------------------------------------------------------------------
+hardening_audit_enabled: true
+hardening_audit_max_log_size: 50          # MB
+hardening_audit_nexus_paths:
+  - /usr/bin/podman
+  - /etc/containers
+  - /var/lib/containers
+  - /etc/nexus
+  - /opt/nexus
+
+# -- Services -----------------------------------------------------------------
+hardening_disable_services:
+  - debug-shell
+  - avahi-daemon
+  - cups
+  - rpcbind
+  - bluetooth
+
+# -- Banner -------------------------------------------------------------------
+motd_banner_text: |
+  By accessing this system, you consent to the following conditions:
+  - This system is for authorized use only.
+  - All uses of this system may be monitored.
+  - Communications using, or data stored on, this system are not private.

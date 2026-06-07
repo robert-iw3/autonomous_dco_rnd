@@ -1,0 +1,7 @@
+# ref: NCSC Malware Analysis Report: AUTHENTIC ANTICS
+# Author: Rob Weber
+alert http any any -> any any (msg:"Possible Outlook SendMail API abuse: SaveToSentItems: false"; \
+    flow:to_server,established; http.method; content:"POST"; http.uri; \
+    content:"/api/v2.0/me/sendMail"; http.client_body; \
+    content:"\"SaveToSentItems\": \"false\""; fast_pattern; \
+    classtype:policy-violation; sid:2024072501; rev:1;)

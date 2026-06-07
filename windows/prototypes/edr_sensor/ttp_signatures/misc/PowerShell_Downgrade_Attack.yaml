@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "PowerShell Downgrade Attack"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Abuse Other Authentication Mechanism (T1556)"
+      procedure: "Executing PowerShell with -Version 2 to bypass modern logging (Salt Typhoon)"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-Version 2"

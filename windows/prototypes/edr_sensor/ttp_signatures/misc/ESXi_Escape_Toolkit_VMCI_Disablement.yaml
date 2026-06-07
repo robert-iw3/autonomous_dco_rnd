@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "ESXi Escape Toolkit VMCI Disablement"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Exploitation of Remote Services (T1210)"
+      procedure: "devcon.exe disabling VMware VMCI device for escape preparation"
+    match:
+      actor: "devcon.exe"
+      type: "PROCESS_START"
+      target: "disable *VMCI*"

@@ -1,0 +1,78 @@
+# =============================================================================
+# Warlock Ransomware / Cloud Group
+# =============================================================================
+
+- ttp_signature:
+    name: "Warlock Cloudflare Tunnel C2"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Execution of Cloudflare tunnel token for persistent C2"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "tunnel run --token"
+    filter:
+      exclude_path: "C:\\Program Files\\*"
+      exclude_actor_cmd: "tunnel run --token"
+
+- ttp_signature:
+    name: "Warlock Rclone ProtonDrive Exfiltration"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service: Exfiltration to Cloud Storage (T1567.002)"
+      procedure: "Rclone exfiltrating data to Proton Drive"
+    match:
+      actor: "rclone.exe"
+      type: "PROCESS_START"
+      target: "--protondrive-username"
+    filter:
+      exclude_path: "C:\\Program Files\\*"
+      exclude_actor_cmd: "rclone.exe"
+
+- ttp_signature:
+    name: "Warlock Defense Evasion Taskkill"
+    severity: "Medium"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Indicator Removal: File Deletion (T1070.004)"
+      procedure: "Forcefully terminating security processes via taskkill"
+    match:
+      actor: "taskkill.exe"
+      type: "PROCESS_START"
+      target: "/f /im"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "taskkill.exe /f /im"
+
+- ttp_signature:
+    name: "Warlock SharePoint GPO Escalation"
+    severity: "High"
+    meta:
+      tactic: "Privilege Escalation (TA0004)"
+      technique: "Domain Policy Modification: Group Policy Modification (T1484.001)"
+      procedure: "IIS worker creating new GPOs or modifying Guest account"
+    match:
+      actor: "w3wp.exe"
+      type: "PROCESS_START"
+      target: "New-GPO"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor: "w3wp.exe"
+
+- ttp_signature:
+    name: "Warlock Rclone General Exfiltration"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567)"
+      procedure: "Rclone being used for data exfiltration"
+    match:
+      actor: "rclone.exe"
+      type: "PROCESS_START"
+      target: ""
+    filter:
+      exclude_path: "C:\\Program Files\\*"
+      exclude_actor_cmd: "rclone.exe"

@@ -1,0 +1,330 @@
+<Sysmon schemaversion="4.90">
+  <!--
+  ============================================================================
+  Nexus Sysmon Sensor Configuration
+  Tuned for adversarial TTP detection training corpus coverage.
+
+  Events captured (matched to training corpus tool classes):
+    Event  1  ProcessCreate        -- recon enum, persistence stagers, C2 launchers,
+                                     bypass tool execution, UAC bypass, LOTL
+    Event  3  NetworkConnect       -- C2 beacons, exfil channels, reverse shells
+    Event  6  DriverLoad           -- BYOVD driver loads, unsigned kernel drivers
+    Event  7  ImageLoad            -- DLL sideloading, reflective DLL, SmartScreen bypass
+    Event  8  CreateRemoteThread   -- process injection (RWX, APC, shellcode)
+    Event 10  ProcessAccess        -- AMSI patch (amsi.dll), LSASS fork dump,
+                                     credential memory access
+    Event 11  FileCreate           -- startup folder LNK, web shell drops,
+                                     scheduled task XML
+    Event 12  RegistryKeyCreate    -- persistence IFEO, COM hijack
+    Event 13  RegistryValueSet     -- Run keys, IFEO Debugger, Defender exclusions,
+                                     AppLocker SrpV2, UAC ms-settings
+    Event 14  RegistryKeyDelete    -- registry cleanup
+    Event 15  FileCreateStreamHash -- Zone.Identifier MOTW tracking (ISO/VHD)
+    Event 17  PipeCreated          -- named pipe C2 beacons
+    Event 18  PipeConnected        -- named pipe C2 connections
+    Event 22  DNSEvent             -- DNS beacon, DoH channel, DGA
+    Event 23  FileDelete           -- BYOVD driver cleanup, payload deletion
+    Event 25  ProcessTampering     -- process hollowing detection
+    Event 26  FileDeleteDetected   -- evidence cleanup
+
+  Excluded events: 2 (file time), 4 (sysmon config), 5 (process terminate),
+                   9 (raw access), 16 (config change), 24 (clipboard)
+                   These are noise for adversarial TTP detection.
+
+  Source: Adapted from arcanaeum/os/windows/logging/events/sysmon/sysmon_config.xml
+  ============================================================================
+  -->
+
+  <HashAlgorithms>MD5,SHA256,IMPHASH</HashAlgorithms>
+  <CheckRevocation/>
+
+  <EventFiltering>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 1: Process Create
+         Captures: Image, CommandLine, ParentImage, ParentCommandLine,
+                   User, IntegrityLevel, ProcessId, ParentProcessId, Hashes
+
+         Exclude: Common noisy system processes with no adversarial signal
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="ProcessCreate" groupRelation="or">
+      <ProcessCreate onmatch="exclude">
+        <!-- System noise -- always benign -->
+        <Image condition="is">C:\Windows\System32\conhost.exe</Image>
+        <Image condition="is">C:\Windows\System32\werfault.exe</Image>
+        <Image condition="is">C:\Windows\System32\WerFaultSecure.exe</Image>
+        <CommandLine condition="begin with">C:\Windows\system32\DllHost.exe /Processid</CommandLine>
+        <!-- Windows Update components -->
+        <Image condition="begin with">C:\Windows\SoftwareDistribution\</Image>
+        <Image condition="begin with">C:\Windows\WinSxS\</Image>
+        <!-- Antivirus signatures (keep EDR-related, exclude AV file scanning) -->
+        <Image condition="begin with">C:\Program Files\Windows Defender\</Image>
+      </ProcessCreate>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 3: Network Connection
+         Captures: Image, DestinationIp, DestinationPort, Protocol,
+                   Initiated, User, ProcessId
+
+         Focus on: processes that should rarely make outbound connections
+         Exclude: Known legitimate beaconing applications
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="NetworkConnect" groupRelation="or">
+      <NetworkConnect onmatch="exclude">
+        <!-- Browser traffic -- too noisy, deduplicate via network_tap sensor -->
+        <Image condition="end with">chrome.exe</Image>
+        <Image condition="end with">firefox.exe</Image>
+        <Image condition="end with">msedge.exe</Image>
+        <!-- Common system services with legitimate outbound -->
+        <Image condition="is">C:\Windows\System32\svchost.exe</Image>
+        <DestinationPort condition="is">443</DestinationPort>
+        <DestinationIp condition="is">127.0.0.1</DestinationIp>
+        <DestinationIp condition="is">::1</DestinationIp>
+      </NetworkConnect>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 6: Driver Load
+         Captures: ImageLoaded, Hashes, Signed, SignatureStatus
+
+         Capture all driver loads -- BYOVD detection requires seeing
+         every driver, including known-vulnerable ones.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="DriverLoad" groupRelation="or">
+      <DriverLoad onmatch="exclude">
+        <!-- Only exclude Microsoft kernel drivers that are always benign -->
+        <Signature condition="is">Microsoft Windows</Signature>
+        <Signature condition="is">Microsoft Corporation</Signature>
+        <SignatureStatus condition="is">Valid</SignatureStatus>
+        <ImageLoaded condition="begin with">C:\Windows\System32\drivers\</ImageLoaded>
+      </DriverLoad>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 7: Image Load (DLL)
+         Captures: Image, ImageLoaded, Hashes, Signed, SignatureStatus,
+                   SignatureIssuer
+
+         Focus on: DLL loads from non-standard paths and unsigned DLLs.
+         This event is high-volume -- filter aggressively.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="ImageLoad" groupRelation="or">
+      <ImageLoad onmatch="include">
+        <!-- Unsigned DLLs loaded by any process -->
+        <Signed condition="is">false</Signed>
+        <!-- DLLs loaded from user-writable paths -->
+        <ImageLoaded condition="begin with">C:\Users\</ImageLoaded>
+        <ImageLoaded condition="begin with">C:\ProgramData\</ImageLoaded>
+        <ImageLoaded condition="begin with">C:\Windows\Temp\</ImageLoaded>
+        <ImageLoaded condition="begin with">C:\Temp\</ImageLoaded>
+        <!-- AMSI / ETW / security DLLs loaded by unexpected processes -->
+        <ImageLoaded condition="end with">amsi.dll</ImageLoaded>
+        <ImageLoaded condition="end with">clrjit.dll</ImageLoaded>
+      </ImageLoad>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 8: CreateRemoteThread
+         Captures: SourceImage, TargetImage, StartAddress, StartModule
+
+         Capture all -- no false-positive exclusions. Every cross-process
+         thread creation is relevant for injection detection.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="CreateRemoteThread" groupRelation="or">
+      <CreateRemoteThread onmatch="exclude">
+        <!-- Only exclude the shell infrastructure injection that is always safe -->
+        <SourceImage condition="is">C:\Windows\System32\csrss.exe</SourceImage>
+      </CreateRemoteThread>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 10: Process Access
+         Captures: SourceImage, TargetImage, GrantedAccess
+
+         Key targets: lsass.exe (credential dump), amsi.dll process contexts
+         GrantedAccess values of interest:
+           0x1fffff -- PROCESS_ALL_ACCESS (process injection, credential dump)
+           0x1010   -- PROCESS_VM_READ + PROCESS_QUERY_LIMITED_INFORMATION
+           0x40     -- PROCESS_DUP_HANDLE
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="ProcessAccess" groupRelation="or">
+      <ProcessAccess onmatch="include">
+        <!-- Always capture LSASS access -- credential theft vector -->
+        <TargetImage condition="end with">lsass.exe</TargetImage>
+        <!-- Capture access with write/inject rights from non-standard processes -->
+        <GrantedAccess condition="is">0x1fffff</GrantedAccess>
+        <GrantedAccess condition="is">0x1f3fff</GrantedAccess>
+        <GrantedAccess condition="is">0x143a</GrantedAccess>
+        <GrantedAccess condition="is">0x40</GrantedAccess>
+      </ProcessAccess>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 11: File Create
+         Captures: Image, TargetFilename, User
+
+         Focus on: startup paths, web roots, task directories, temp drops
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="FileCreate" groupRelation="or">
+      <FileCreate onmatch="include">
+        <!-- Startup folder -- persistence via LNK -->
+        <TargetFilename condition="contains">Start Menu\Programs\Startup\</TargetFilename>
+        <!-- Web roots -- webshell drops -->
+        <TargetFilename condition="begin with">C:\inetpub\</TargetFilename>
+        <TargetFilename condition="begin with">C:\xampp\</TargetFilename>
+        <!-- Scheduled task XML -->
+        <TargetFilename condition="begin with">C:\Windows\System32\Tasks\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\SysWOW64\Tasks\</TargetFilename>
+        <!-- Executables/scripts in temp/public -->
+        <TargetFilename condition="end with">.exe</TargetFilename>
+        <TargetFilename condition="end with">.dll</TargetFilename>
+        <TargetFilename condition="end with">.ps1</TargetFilename>
+        <TargetFilename condition="end with">.bat</TargetFilename>
+        <TargetFilename condition="end with">.vbs</TargetFilename>
+        <TargetFilename condition="end with">.hta</TargetFilename>
+        <TargetFilename condition="end with">.aspx</TargetFilename>
+        <TargetFilename condition="end with">.php</TargetFilename>
+        <!-- Driver files -- BYOVD staging -->
+        <TargetFilename condition="end with">.sys</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 12/13/14: Registry Events
+         Event 12: Key Create/Delete
+         Event 13: Value Set
+         Event 14: Key Rename
+
+         Key paths for adversarial detection:
+           Run/RunOnce -- persistence
+           IFEO        -- debugger hijack
+           Defender Exclusions -- defense evasion
+           AppLocker SrpV2 -- AppLocker block
+           ms-settings/mscfile -- UAC bypass
+           WMI subscriptions -- fileless persistence
+           Services        -- service install
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="RegistryEvent" groupRelation="or">
+      <RegistryEvent onmatch="include">
+        <!-- Persistence via Run keys -->
+        <TargetObject condition="contains">CurrentVersion\Run</TargetObject>
+        <TargetObject condition="contains">CurrentVersion\RunOnce</TargetObject>
+        <TargetObject condition="contains">RunServices</TargetObject>
+        <!-- IFEO debugger hijack -->
+        <TargetObject condition="contains">Image File Execution Options</TargetObject>
+        <TargetObject condition="contains">SilentProcessExit</TargetObject>
+        <!-- Windows Defender exclusions (defense evasion) -->
+        <TargetObject condition="contains">Windows Defender\Exclusions</TargetObject>
+        <!-- AppLocker -- EDR blocking -->
+        <TargetObject condition="contains">SrpV2</TargetObject>
+        <!-- UAC bypass via HKCU COM keys -->
+        <TargetObject condition="contains">ms-settings\Shell\Open\command</TargetObject>
+        <TargetObject condition="contains">mscfile\Shell\Open\command</TargetObject>
+        <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\App Paths\control.exe</TargetObject>
+        <!-- WMI persistence -->
+        <TargetObject condition="contains">SOFTWARE\Microsoft\WBEM\ESS</TargetObject>
+        <!-- Service installation -->
+        <TargetObject condition="contains">CurrentControlSet\Services</TargetObject>
+        <!-- Winlogon hijack -->
+        <TargetObject condition="contains">Winlogon\Userinit</TargetObject>
+        <TargetObject condition="contains">Winlogon\Shell</TargetObject>
+        <!-- COM hijacking -->
+        <TargetObject condition="contains">InprocServer32</TargetObject>
+        <!-- Screensaver persistence -->
+        <TargetObject condition="end with">SCRNSAVE.EXE</TargetObject>
+      </RegistryEvent>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 15: FileCreateStreamHash (Zone.Identifier / MOTW)
+         Captures: Image, TargetFilename, Hash, Contents
+
+         Track Zone.Identifier ADS -- MOTW bypass detection (ISO/VHD)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="FileCreateStreamHash" groupRelation="or">
+      <FileCreateStreamHash onmatch="include">
+        <TargetFilename condition="end with">.iso</TargetFilename>
+        <TargetFilename condition="end with">.vhd</TargetFilename>
+        <TargetFilename condition="end with">.vhdx</TargetFilename>
+        <TargetFilename condition="end with">.img</TargetFilename>
+        <TargetFilename condition="end with">.exe</TargetFilename>
+        <TargetFilename condition="end with">.dll</TargetFilename>
+        <TargetFilename condition="end with">.ps1</TargetFilename>
+      </FileCreateStreamHash>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 17/18: Pipe Events
+         Captures: Image, PipeName, User
+
+         Named pipe C2 beacon detection.
+         Include everything -- pipe creation is rare and high-signal.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="PipeEvent" groupRelation="or">
+      <PipeEvent onmatch="exclude">
+        <!-- Windows standard named pipes -- always benign -->
+        <PipeName condition="begin with">\PIPE\srvsvc</PipeName>
+        <PipeName condition="begin with">\PIPE\wkssvc</PipeName>
+        <PipeName condition="begin with">\PIPE\browser</PipeName>
+        <PipeName condition="begin with">\PIPE\spoolss</PipeName>
+        <PipeName condition="begin with">\PIPE\samr</PipeName>
+        <PipeName condition="begin with">\PIPE\lsarpc</PipeName>
+      </PipeEvent>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 22: DNS Event
+         Captures: Image, QueryName, QueryResults, User
+
+         DNS beacon and exfil detection.
+         Exclude: standard OS and browser DNS queries
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="DnsQuery" groupRelation="or">
+      <DnsQuery onmatch="exclude">
+        <!-- OS/system DNS -- always benign -->
+        <Image condition="is">C:\Windows\System32\svchost.exe</Image>
+        <Image condition="is">C:\Windows\System32\SearchProtocolHost.exe</Image>
+        <!-- Microsoft update domains -->
+        <QueryName condition="end with">microsoft.com</QueryName>
+        <QueryName condition="end with">windowsupdate.com</QueryName>
+        <QueryName condition="end with">live.com</QueryName>
+        <!-- CDN / cloud infra baseline -->
+        <QueryName condition="end with">akamai.net</QueryName>
+        <QueryName condition="end with">cloudflare.net</QueryName>
+        <!-- IPv6 link-local -->
+        <QueryName condition="end with">.local</QueryName>
+      </DnsQuery>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 23: File Delete
+         EVENT 26: File Delete Detected
+
+         BYOVD driver cleanup and evidence destruction.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="FileDelete" groupRelation="or">
+      <FileDelete onmatch="include">
+        <TargetFilename condition="end with">.sys</TargetFilename>
+        <TargetFilename condition="end with">.exe</TargetFilename>
+        <TargetFilename condition="end with">.dll</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\Temp\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Users\Public\</TargetFilename>
+      </FileDelete>
+    </RuleGroup>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EVENT 25: Process Tampering
+         Captures: Image, Type
+
+         Process hollowing detection (Type: Image is replaced).
+         Capture all -- extremely low volume, always high-signal.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <RuleGroup name="ProcessTampering" groupRelation="or">
+      <ProcessTampering onmatch="exclude">
+        <!-- No exclusions -- every process tamper event is relevant -->
+      </ProcessTampering>
+    </RuleGroup>
+
+  </EventFiltering>
+</Sysmon>

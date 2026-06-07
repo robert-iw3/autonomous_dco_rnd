@@ -1,0 +1,27 @@
+[Unit]
+Description=Middleware {{ worker_binary }}
+After=network-online.target middleware-ingress.service
+
+[Container]
+Image={{ middleware_image }}:{{ middleware_version }}
+Exec=/app/{{ worker_binary }}
+Volume={{ config_dir }}/middleware.toml:/config/middleware.toml:ro,Z
+Volume={{ config_dir }}/cim_mappings.yaml:/config/cim_mappings.yaml:ro,Z
+Volume={{ config_dir }}/ecs_mappings.yaml:/config/ecs_mappings.yaml:ro,Z
+Volume={{ cert_dir }}:/config/certs:ro,Z
+# H-R3 fix: persistent state volume for sequence counter (prevents ban on restart)
+Volume={{ middleware_state_dir | default('/var/lib/nexus-middleware') }}:/var/lib/nexus-middleware:Z
+Environment=MIDDLEWARE_CONFIG=/config/middleware.toml
+Environment=STATE_DIR=/var/lib/nexus-middleware
+PublishPort={{ worker_port }}:{{ worker_port }}
+Network=host
+ReadOnly=false
+NoNewPrivileges=true
+DropCapability=all
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

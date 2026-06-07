@@ -1,0 +1,38 @@
+# Detect traffic to 0927.vercel.app with /api/ipcheck path
+alert http any any -> any 443 (msg:"Lazarus Group C2 - Suspicious Connection to 0927.vercel.app /api/ipcheck"; \
+flow:established,to_server; tls.sni; content:"0927.vercel.app"; http.uri; content:"/api/ipcheck"; \
+classtype:trojan-activity; sid:3333005; rev:1;)
+
+# Detect traffic to log-server-lovat.vercel.app with /api/ipcheck/703 path
+alert http any any -> any 443 (msg:"Lazarus Group C2 - Suspicious Connection to log-server-lovat.vercel.app /api/ipcheck/703"; \
+flow:established,to_server; tls.sni; content:"log-server-lovat.vercel.app"; http.uri; content:"/api/ipcheck/703"; \
+classtype:trojan-activity; sid:3333006; rev:1;)
+
+# Detect traffic to 0927.vercel.app domain (broader match)
+alert http any any -> any 443 (msg:"Lazarus Group C2 - Suspicious Connection to 0927.vercel.app"; \
+flow:established,to_server; tls.sni; content:"0927.vercel.app"; classtype:trojan-activity; sid:3333007; rev:1;)
+
+# Detect traffic to log-server-lovat.vercel.app domain (broader match)
+alert http any any -> any 443 (msg:"Lazarus Group C2 - Suspicious Connection to log-server-lovat.vercel.app"; \
+flow:established,to_server; tls.sni; content:"log-server-lovat.vercel.app"; classtype:trojan-activity; sid:3333008; rev:1;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET 6168 (msg:"LAZARUS OtterCookie POST to Delivery Domain"; \
+flow:established,to_server; http.method; content:"POST"; http.host; content:"fashdefi.store"; \
+nocase; http.request_body; content:"eval("; classtype:trojan-activity; sid:3333011; rev:1;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"LAZARUS OtterCookie Vercel C2 Communication"; \
+flow:established,to_server; http.host; content:".vercel.app"; nocase; http.uri; content:"/favicon"; \
+http.header_names; content:"User-Agent|0d 0a|Accept|0d 0a|Host"; \
+classtype:command-and-control; sid:3333012; rev:1;)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 1224 (msg:"LAZARUS OtterCookie Non-Standard Port C2"; \
+flow:established,to_server; content:"|00 01|"; depth:2; byte_test:2,>,100,2,relative; \
+classtype:command-and-control; sid:3333013; rev:1;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"LAZARUS OtterCookie Suspicious Obfuscated JS Payload"; \
+flow:established,to_server; http.request_body; content:"eval("; content:"token"; within:50; http.header_names; \
+content:"Content-Type|0d 0a|application/javascript"; classtype:trojan-activity; sid:3333014; rev:1;)
+
+alert dns $HOME_NET any -> $EXTERNAL_NET any (msg:"LAZARUS OtterCookie Suspicious Domain Query"; \
+flow:established,to_server; dns.query; content:"fashdefi.store"; nocase; \
+classtype:trojan-activity; sid:3333015; rev:1;)

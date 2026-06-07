@@ -1,0 +1,44 @@
+[Unit]
+Description=Linux Sentinel v0.3.0
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/linux-sentinel/linux-sentinel
+User=root
+Group=nogroup
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+
+CPUQuota=10%
+MemoryMax=256M
+MemorySwapMax=0B
+IOReadBandwidthMax=/ 50M
+
+LimitMEMLOCK=infinity
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_BPF CAP_PERFMON CAP_SYS_RESOURCE CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+SystemCallErrorNumber=EPERM
+
+ReadWritePaths=/var/log/linux-sentinel /var/backups/linux-sentinel
+SystemCallFilter=@system-service bpf perf_event_open setrlimit prlimit64 ptrace
+RestrictNamespaces=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=false
+LockPersonality=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+RestrictSUIDSGID=yes
+
+RestartSec=5
+WatchdogSec=120
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

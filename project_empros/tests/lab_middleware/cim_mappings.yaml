@@ -1,0 +1,289 @@
+schemas:
+  - name: cloud_network_flows_vpc
+    match_field: event_type
+    match_value: vpc_flow
+    fields:
+      time: timestamp
+      src: process_name
+      dest: dst_ip
+      dest_port: dst_port
+      action: mitre_tactic
+      severity: score
+      vendor_product: '"Nexus_Cloud_Connector"'
+      sourcetype: '"nexus:cloud:flow"'
+      bytes_out: packet_size_mean
+
+  - name: cloud_nsg_flows
+    match_field: event_type
+    match_value: nsg_flow
+    fields:
+      time: timestamp
+      src: process_name
+      dest: dst_ip
+      dest_port: dst_port
+      action: mitre_tactic
+      severity: score
+      vendor_product: '"Nexus_Azure_NSG"'
+      sourcetype: '"nexus:azure:nsg"'
+
+  - name: cloud_control_plane
+    match_field: event_type
+    match_value: cloudtrail_api
+    fields:
+      time: timestamp
+      user: process_hash
+      action: process_name
+      src: dst_ip
+      severity: score
+      mitre_technique: mitre_technique
+      vendor_product: '"AWS_CloudTrail"'
+      sourcetype: '"nexus:aws:cloudtrail"'
+
+  - name: azure_activity
+    match_field: event_type
+    match_value: azure_activity
+    fields:
+      time: timestamp
+      user: process_hash
+      action: process_name
+      src: dst_ip
+      severity: score
+      vendor_product: '"Azure_Activity"'
+      sourcetype: '"nexus:azure:activity"'
+
+  - name: entraid_signin
+    match_field: event_type
+    match_value: entraid_signin
+    fields:
+      time: timestamp
+      user: process_hash
+      app: process_name
+      src: dst_ip
+      action: '"authentication"'
+      severity: score
+      vendor_product: '"Microsoft_Entra_ID"'
+      sourcetype: '"nexus:entraid:signin"'
+
+  - name: guardduty_finding
+    match_field: event_type
+    match_value: guardduty_finding
+    fields:
+      time: timestamp
+      signature: process_name
+      dest: dst_ip
+      severity: score
+      body: reasons
+      vendor_product: '"AWS_GuardDuty"'
+      sourcetype: '"nexus:aws:guardduty"'
+
+  - name: network_tap
+    match_field: sensor_type
+    match_value: network_tap
+    fields:
+      time: timestamp_start
+      src: src_ip
+      src_port: src_port
+      dest: dst_ip
+      dest_port: dst_port
+      transport: protocol_name
+      bytes_in: bytes_dst
+      bytes_out: bytes_src
+      duration: session_duration_ms
+      http_method: http_method
+      http_uri: http_uri
+      http_user_agent: http_useragent
+      ssl_ja3: tls_ja3
+      vendor_product: '"Nexus_Network_Tap"'
+      sourcetype: '"nexus:nettap:session"'
+
+  - name: linux_c2_sensor
+    match_field: sensor_type
+    match_value: linux-c2-sensor
+    fields:
+      time: timestamp
+      app: process_name
+      dest: dst_ip
+      dest_port: dst_port
+      action: mitre_tactic
+      severity: score
+      transport: event_type
+      bytes_out: packet_size_mean
+      dns_query: dns_query
+      vendor_product: '"Nexus_C2_Sensor_Linux"'
+      sourcetype: '"nexus:c2:linux"'
+
+  - name: sysmon_sensor
+    match_field: sensor_type
+    match_value: sysmon_sensor
+    fields:
+      time: timestamp
+      app: Image
+      parent_app: ParentImage
+      command: CommandLine
+      user: User
+      dest: DestinationIp
+      dest_port: DestinationPort
+      file_path: TargetFilename
+      registry_path: TargetObject
+      registry_value: Details
+      pipe_name: PipeName
+      dns_query: QueryName
+      signature: TamperingType
+      severity: integrity_score
+      score: anomaly_score
+      category: sysmon_event_id
+      vendor_product: '"Nexus_Sysmon_Sensor"'
+      sourcetype: '"nexus:sysmon"'
+
+  - name: macos_sensor
+    match_field: sensor_type
+    match_value: macos_sensor
+    fields:
+      time: timestamp
+      app: process_name
+      file_path: file_path
+      dest: plist_path
+      signature: code_signature
+      category: quarantine_flag
+      severity: integrity_score
+      score: anomaly_score
+      vendor_product: '"Nexus_macOS_Sensor"'
+      sourcetype: '"nexus:macos"'
+
+  - name: windows_deepsensor
+    match_field: sensor_type
+    match_value: windows_deepsensor
+    fields:
+      time: timestamp
+      app: path
+      parent_app: parent_image
+      command: command_line
+      user: event_user
+      dest: destination_ip
+      dest_port: port
+      signature: signature_name
+      tactic: tactic
+      technique: technique
+      severity: severity
+      score: score
+      category: category
+      vendor_product: '"Nexus_DeepSensor"'
+      sourcetype: '"nexus:deepsensor"'
+
+  - name: windows_c2sensor
+    match_field: sensor_type
+    match_value: c2sensor
+    fields:
+      time: timestamp
+      src: host_ip
+      user: user
+      app: process
+      dest: destination
+      signature: alert_reason
+      severity: severity
+      score: score
+      vendor_product: '"Nexus_C2_Sensor_Win"'
+      sourcetype: '"nexus:c2:windows"'
+
+  - name: linux_sentinel
+    match_field: sensor_type
+    match_value: Linux-Sentinel
+    fields:
+      time: timestamp
+      app: comm
+      parent_app: parent_comm
+      command: command_line
+      user: user_name
+      dest: dest_ip
+      dest_port: dest_port
+      file_path: target_file
+      severity: level
+      score: anomaly_score
+      tactic: mitre_tactic
+      technique: mitre_technique
+      body: message
+      vendor_product: '"Nexus_Linux_Sentinel"'
+      sourcetype: '"nexus:sentinel"'
+
+  - name: gcp_audit
+    match_field: event_type
+    match_value: gcp_audit
+    fields:
+      time: timestamp
+      user: process_hash
+      action: process_name
+      src: dst_ip
+      severity: score
+      mitre_technique: mitre_technique
+      body: description
+      vendor_product: '"GCP_Cloud_Audit"'
+      sourcetype: '"nexus:gcp:audit"'
+
+  - name: gcp_scc
+    match_field: event_type
+    match_value: gcp_scc
+    fields:
+      time: timestamp
+      signature: process_name
+      dest: dst_ip
+      severity: score
+      body: reasons
+      vendor_product: '"GCP_Security_Command_Center"'
+      sourcetype: '"nexus:gcp:scc"'
+
+  - name: gcp_vpc_flow
+    match_field: event_type
+    match_value: gcp_vpc_flow
+    fields:
+      time: timestamp
+      src: process_name
+      dest: dst_ip
+      dest_port: dst_port
+      action: mitre_tactic
+      severity: score
+      bytes_out: packet_size_mean
+      vendor_product: '"GCP_VPC_Flow"'
+      sourcetype: '"nexus:gcp:vpc_flow"'
+
+  - name: vmware_syslog
+    match_field: event_type
+    match_value: vmware_syslog
+    fields:
+      time: timestamp
+      src: process_name
+      dest: dst_ip
+      dest_port: dst_port
+      severity: score
+      body: description
+      tactic: mitre_tactic
+      technique: mitre_technique
+      vendor_product: '"VMware_vSphere"'
+      sourcetype: '"nexus:vmware:syslog"'
+
+  - name: trellix_ens
+    match_field: sensor_type
+    match_value: trellix_ens
+    fields:
+      time:         timestamp
+      action:       action
+      dest:         host
+      signature:    detection_name
+      file_path:    file_path
+      file_name:    file_name
+      user:         user
+      app:          process
+      severity:     severity
+      body:         message
+      category:     event_category
+      vendor_product: '"Trellix Endpoint Security"'
+      sourcetype:   '"trellix:ens:log"'
+
+  - name: generic_telemetry
+    match_field: ""
+    match_value: ""
+    fields:
+      time: timestamp
+      dest: dst_ip
+      severity: score
+      vendor_product: '"Nexus_Generic"'
+      sourcetype: '"nexus:generic"'

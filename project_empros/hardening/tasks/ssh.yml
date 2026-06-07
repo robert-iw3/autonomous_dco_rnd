@@ -1,0 +1,98 @@
+---
+# ==============================================================================
+# ssh.yml -- SSH server and client hardening
+# Deploys a drop-in config to avoid clobbering the base sshd_config.
+# ==============================================================================
+
+# ── Filter weak DH moduli ─────────────────────────────────────────────────────
+- name: Filter /etc/ssh/moduli for strong DH parameters
+  ansible.builtin.shell: |
+    awk '$5 >= {{ hardening_ssh_moduli_minimum }}' /etc/ssh/moduli > /etc/ssh/moduli.safe && \
+    mv /etc/ssh/moduli.safe /etc/ssh/moduli
+  args:
+    creates: /etc/ssh/.moduli_filtered
+  register: moduli_result
+
+- name: Mark moduli as filtered
+  ansible.builtin.file:
+    path: /etc/ssh/.moduli_filtered
+    state: touch
+    mode: '0644'
+  when: moduli_result.changed
+
+# ── Drop-in SSHD hardening config ────────────────────────────────────────────
+- name: Create sshd_config.d directory
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Ensure sshd_config includes drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Include\s+/etc/ssh/sshd_config\.d/'
+    line: 'Include /etc/ssh/sshd_config.d/*.conf'
+    insertbefore: BOF
+    state: present
+
+- name: Deploy SSHD hardening drop-in config
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-nexus-hardening.conf
+    owner: root
+    group: root
+    mode: '0600'
+    validate: 'sshd -t -f %s'
+  notify: Restart sshd
+
+# ── SSH client hardening ──────────────────────────────────────────────────────
+- name: Harden ssh_config -- HashKnownHosts
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/ssh_config
+    regexp: '^\s*HashKnownHosts'
+    line: '    HashKnownHosts yes'
+    state: present
+
+- name: Harden ssh_config -- Ciphers
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/ssh_config
+    regexp: '^\s*Ciphers'
+    line: "    Ciphers {{ hardening_ssh_ciphers | regex_replace('\\s+', '') }}"
+    state: present
+
+- name: Harden ssh_config -- MACs
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/ssh_config
+    regexp: '^\s*MACs'
+    line: "    MACs {{ hardening_ssh_macs | regex_replace('\\s+', '') }}"
+    state: present
+
+# ── Set permissions on SSH host keys ──────────────────────────────────────────
+- name: Set restrictive permissions on SSH private host keys
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ lookup('fileglob', '/etc/ssh/ssh_host_*_key', wantlist=True) }}"
+  failed_when: false
+
+# ── Login banner ──────────────────────────────────────────────────────────────
+- name: Deploy login banner
+  ansible.builtin.template:
+    src: banner.txt.j2
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - /etc/issue
+    - /etc/issue.net
+    - /etc/motd
+
+- name: Remove execute permissions from update-motd.d scripts
+  ansible.builtin.shell: chmod a-x /etc/update-motd.d/* 2>/dev/null || true
+  changed_when: false
+  failed_when: false

@@ -1,0 +1,12 @@
+# Author: Rob Weber
+#    reference:url,https://cloud.google.com/blog/topics/threat-intelligence/uncovering-unc3886-espionage-operations
+#    reference:url,https://www.sygnia.co/blog/fire-ant-a-deep-dive-into-hypervisor-level-espionage/
+# Activity on TCP port 58899, often associated with the Fire Ant threat actor (UNC3886) and the V2Ray framework.
+alert tcp any any -> any 58899 (msg:"Fire Ant (UNC3886) V2Ray C2 Activity Detected on Port 58899"; \
+    flow:established,to_server; sid:10003224; rev:1; classtype:trojan-activity;)
+alert tcp any any -> $HOME_NET [902,443] (msg:"Fire Ant - Suspicious VMware Management Traffic from Untrusted Source"; \
+    flow:established,to_server; classtype:trojan-activity; sid:10002311; rev:1;)
+alert tcp any any <> any any (msg:"Fire Ant - Potential Covert Tunneling Detected"; \
+    flow:established; content:"|17 03 01|"; depth:3;  sid:1002325123; rev:1;)
+
+

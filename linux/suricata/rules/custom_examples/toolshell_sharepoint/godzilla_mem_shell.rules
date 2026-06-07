@@ -1,0 +1,10 @@
+# Author: Rob Weber
+# False Positives: Large __VIEWSTATE payloads can occur in legitimate applications.  This is a head's up, possible exploit warning.
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET WEB_SHELL Godzilla Webshell Activity - Possible SharePoint Exploitation"; \
+    flow:to_server; http.method; content:"POST"; http.uri; \
+    pcre:"/\.aspx$/i"; content:"__FIXEDPATH"; content:"__SCROLLPOSITION"; content:"__SCROLLPATH"; \
+    distance:0; fast_pattern; classtype:web-application-attack; sid:2024072501; rev:1;)
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET WEB_SHELL Possible SharePoint .NET Deserialization Payload (Large ViewState)"; \
+    flow:to_server; http.method; content:"POST"; http.uri; \
+    pcre:"/\.aspx$/i"; content:"__VIEWSTATE"; http.content_len; byte_test:4,>,100000,0; \
+    classtype:attempted-user; sid:2024072502; rev:1;)

@@ -1,0 +1,154 @@
+# =============================================================================
+# APT37 (Reaper / ScarCruft)
+# =============================================================================
+- ttp_signature:
+    name: "APT37 Rust Backdoor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Rust-based backdoor executed via PowerShell"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "rust"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "APT37 Python Backdoor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: Python (T1059.006)"
+      procedure: "Python-based backdoor execution"
+    match:
+      actor: "python.exe"
+      type: "PROCESS_START"
+      target: ""
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor: "python.exe"
+
+- ttp_signature:
+    name: "APT37 Rust Backdoor Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "Rust backdoor registering persistence"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "Rust"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target: "Rust"
+
+- ttp_signature:
+    name: "APT37 Python Dropper Download"
+    severity: "High"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Ingress Tool Transfer (T1105)"
+      procedure: "Python dropper downloading secondary payload"
+    match:
+      actor: "python.exe"
+      type: "PROCESS_START"
+      target: "http"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "python.exe"
+
+- ttp_signature:
+    name: "APT37 Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "APT37 using multiple LOLBins in sequence"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "APT37 Backdoor Command & Control"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol (T1071)"
+      procedure: "Rust/Python backdoor beaconing to C2"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "curl.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "curl.exe"
+
+- ttp_signature:
+    name: "APT37 Rust Compiled Binary Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Native API (T1106)"
+      procedure: "Direct execution of compiled Rust implant"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: ".rs"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target: ".rs"
+
+- ttp_signature:
+    name: "APT37 Python Persistence via Registry"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "Python backdoor adding Run key persistence"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "Python"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor: "reg.exe"
+
+- ttp_signature:
+    name: "APT37 Certutil + Python Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "APT37 abusing certutil followed by Python dropper"
+    match:
+      actor: "certutil.exe"
+      type: "PROCESS_START"
+      target: "-decode"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "certutil.exe -decode"
+
+- ttp_signature:
+    name: "APT37 Rust Backdoor Network Beacon"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol (T1071)"
+      procedure: "Rust backdoor initiating outbound beacon"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Invoke-WebRequest -Uri http"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+      exclude_actor_cmd:
+        - "update"

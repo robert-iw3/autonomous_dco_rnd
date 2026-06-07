@@ -1,0 +1,94 @@
+# =============================================================================
+# UAC-0247 (Sandman / Storm-1099)
+# =============================================================================
+
+- ttp_signature:
+    name: "UAC-0247 LuaDream Engine Deployment"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Hijack Execution Flow: DLL Side-Loading (T1574.002)"
+      procedure: "Side-loading the LuaJIT engine into legitimate system processes"
+    match:
+      actor: "spoolsv.exe"
+      type: "MODULE_LOAD"
+      target:
+        - "lua51.dll"
+        - "lua54.dll"
+        - "luajit.dll"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Program Files\\*"
+        - "C:\\Program Files (x86)\\*"
+
+- ttp_signature:
+    name: "UAC-0247 LuaDream Modular Script Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter (T1059)"
+      procedure: "Execution of Lua bytecode or scripts from unusual directories like ProgramData or Public"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "*.lua"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "UAC-0247 Process Hollowing (Fax/Print Spooler)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Process Injection: Process Hollowing (T1055.012)"
+      procedure: "UAC-0247 hollowing native Windows services to host the LuaDream orchestrator"
+    match:
+      actor: "spoolsv.exe"
+      type: "PROCESS_START"
+      target: "fxssvc.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "UAC-0247 Covert C2 Signaling (NTP)"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Abusing NTP (Port 123) for initial C2 signaling and heartbeats via custom Lua modules"
+    match:
+      actor: "**"
+      type: "NETWORK_EVENT"
+      target: "DEST_PORT: 123"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\w32time.exe"
+
+- ttp_signature:
+    name: "UAC-0247 Persistent Service Hijacking"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Create or Modify System Process: Windows Service (T1543.003)"
+      procedure: "Modifying existing service binaries or paths to point to a malicious DLL loader for LuaDream"
+    match:
+      actor: "reg.exe"
+      type: "REGISTRY_EVENT"
+      target: "Services\\*\\ImagePath"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target_value: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "UAC-0247 Internal Reconnaissance (Lua-Based)"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "System Network Configuration Discovery (T1016)"
+      procedure: "Using Lua modules to query local ARP tables and active network connections for lateral movement prep"
+    match:
+      actor: "lua*.exe"
+      type: "PROCESS_START"
+      target: "arp -a"
+    filter:
+      exclude_path: "C:\\Windows\\*"

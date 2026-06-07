@@ -1,0 +1,68 @@
+# ==============================================================================
+# Sentinel Nexus -- Kernel & Network Hardening
+# Managed by Ansible -- common_hardening role
+#
+# Performance notes:
+#   - Large network buffers for 10Gbps+ telemetry ingestion
+#   - No CPU governor overrides (leave at hardware default)
+#   - No transparent huge pages changes (leaves THP at system default)
+#   - ASLR enabled but no KPTI overrides (preserves syscall performance)
+# ==============================================================================
+
+# ── Network Security ─────────────────────────────────────────────────────────
+net.ipv4.ip_forward = {{ hardening_sysctl_ipv4_forwarding }}
+net.ipv4.conf.all.send_redirects = {{ hardening_sysctl_send_redirects }}
+net.ipv4.conf.default.send_redirects = {{ hardening_sysctl_send_redirects }}
+net.ipv4.conf.all.accept_redirects = {{ hardening_sysctl_accept_redirects }}
+net.ipv4.conf.default.accept_redirects = {{ hardening_sysctl_accept_redirects }}
+net.ipv4.conf.all.accept_source_route = {{ hardening_sysctl_accept_source_route }}
+net.ipv4.conf.default.accept_source_route = {{ hardening_sysctl_accept_source_route }}
+net.ipv4.conf.all.log_martians = {{ hardening_sysctl_log_martians }}
+net.ipv4.conf.default.log_martians = {{ hardening_sysctl_log_martians }}
+net.ipv4.conf.all.rp_filter = {{ hardening_sysctl_rp_filter }}
+net.ipv4.conf.default.rp_filter = {{ hardening_sysctl_rp_filter }}
+net.ipv4.tcp_syncookies = {{ hardening_sysctl_tcp_syncookies }}
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+
+# IPv6 security
+net.ipv6.conf.all.accept_redirects = {{ hardening_sysctl_accept_redirects }}
+net.ipv6.conf.default.accept_redirects = {{ hardening_sysctl_accept_redirects }}
+net.ipv6.conf.all.accept_source_route = {{ hardening_sysctl_accept_source_route }}
+net.ipv6.conf.default.accept_source_route = {{ hardening_sysctl_accept_source_route }}
+net.ipv6.conf.all.accept_ra = 0
+net.ipv6.conf.default.accept_ra = 0
+{% if hardening_sysctl_disable_ipv6 %}
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+{% endif %}
+
+# ── Network Performance (high-throughput telemetry ingestion) ─────────────────
+net.core.rmem_max = {{ hardening_sysctl_rmem_max }}
+net.core.wmem_max = {{ hardening_sysctl_wmem_max }}
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.ipv4.tcp_rmem = 4096 1048576 {{ hardening_sysctl_rmem_max }}
+net.ipv4.tcp_wmem = 4096 1048576 {{ hardening_sysctl_wmem_max }}
+net.core.somaxconn = {{ hardening_sysctl_somaxconn }}
+net.ipv4.tcp_max_syn_backlog = {{ hardening_sysctl_tcp_max_syn_backlog }}
+net.core.netdev_max_backlog = {{ hardening_sysctl_netdev_max_backlog }}
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+
+# ── Kernel Security ───────────────────────────────────────────────────────────
+kernel.randomize_va_space = {{ hardening_sysctl_randomize_va }}
+kernel.dmesg_restrict = {{ hardening_sysctl_dmesg_restrict }}
+kernel.kptr_restrict = {{ hardening_sysctl_kptr_restrict }}
+kernel.yama.ptrace_scope = {{ hardening_sysctl_yama_ptrace }}
+kernel.sysrq = 0
+kernel.core_uses_pid = 1
+fs.suid_dumpable = 0
+
+# ── Memory ────────────────────────────────────────────────────────────────────
+# vm.swappiness left at default (60) -- Qdrant and vLLM manage their own memory
+# vm.overcommit_memory left at default (0) -- safe for mixed workloads
+vm.mmap_min_addr = 65536

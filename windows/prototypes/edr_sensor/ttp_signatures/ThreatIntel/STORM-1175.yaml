@@ -1,0 +1,88 @@
+# =============================================================================
+# STORM-1175 (Medusa Affiliate / High-Velocity Ransomware Actor)
+# =============================================================================
+
+- ttp_signature:
+    name: "Storm-1175 Cloudflare Tunnel Masquerading"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Cloudflare tunnel (cloudflared) executed as conhost.exe to proxy RDP sessions"
+    match:
+      actor: "conhost.exe"
+      type: "NETWORK_EVENT"
+      target: "*.trycloudflare.com"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Storm-1175 Security Tampering (AV Exclusions)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify Tools (T1562.001)"
+      procedure: "Using PowerShell to add a root-level exclusion to Microsoft Defender"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Add-MpPreference -ExclusionPath \"C:\\\""
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Storm-1175 PDQ Deployer Ransomware Staging"
+    severity: "Critical"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Software Deployment Tools (T1072)"
+      procedure: "Abusing PDQ Deployer (RunFileCopy.cmd) to push Medusa payloads network-wide"
+    match:
+      actor: "PDQDeployService.exe"
+      type: "PROCESS_START"
+      target: "RunFileCopy.cmd"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Storm-1175 SmarterMail Firewall Hijack"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify System Firewall (T1562.004)"
+      procedure: "Modifying firewall policy to enable RDP following SmarterMail (CVE-2026-23760) exploitation"
+    match:
+      actor: "netsh.exe"
+      type: "PROCESS_START"
+      target: "advfirewall firewall set rule group=\"remote desktop\" new enable=Yes"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Storm-1175 Credential Theft (WDigest Enable)"
+    severity: "High"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Modify Authentication Process (T1556)"
+      procedure: "Setting UseLogonCredential to 1 to force plaintext credential caching"
+    match:
+      actor: "reg.exe"
+      type: "REGISTRY_EVENT"
+      target: "WDigest\\UseLogonCredential"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target_value: "0"
+
+- ttp_signature:
+    name: "Storm-1175 Rclone Exfiltration Staging"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567.002)"
+      procedure: "Using Rclone to sync collected data (staged via Bandizip) to actor cloud storage"
+    match:
+      actor: "rclone.exe"
+      type: "PROCESS_START"
+      target: "copy --max-age"
+    filter:
+      exclude_path: "C:\\Windows\\*"

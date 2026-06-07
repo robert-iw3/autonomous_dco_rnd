@@ -1,0 +1,44 @@
+# Rule to detect NOVABLIGHT infostealer C2 communication over HTTP
+alert http any any -> any any (msg:"NOVABLIGHT Infostealer C2 Communication Detected"; \
+flow:to_server; http.method; content:"POST"; http.uri; content:"/api/"; http.user_agent; \
+content:"Mozilla/5.0|20|(Windows NT 10.0; Win64; x64)"; http.request_body; content:"|7b 22|id|22 3a|"; \
+depth:10; classtype:trojan-activity; sid:3535001; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT malicious PowerShell command execution
+alert tcp any any -> any any (msg:"NOVABLIGHT PowerShell Sabotage Command Detected"; \
+flow:established; content:"icacls|20|"; content:"/deny|20|"; content:"Everyone:(D)"; \
+content:"powershell"; classtype:trojan-activity; sid:3535002; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT fake game installer download
+alert http any any -> any any (msg:"NOVABLIGHT Fake Game Installer Download Detected"; \
+flow:to_client; http.content_type; content:"application/octet-stream"; http.header; \
+content:"Content-Disposition: attachment; filename="; content:".exe"; within:50; http.uri; \
+content:"gonefishe.com"; classtype:trojan-activity; sid:3535003; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT anti-VM checks
+alert tcp any any -> any any (msg:"NOVABLIGHT Anti-VM Driver Check Detected"; \
+flow:established; content:"qemu-ga"; content:"balloon.sys"; distance:0; within:100; \
+classtype:trojan-activity; sid:3535004; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT Discord webhook communication
+alert http any any -> any any (msg:"NOVABLIGHT Discord Webhook Communication Detected"; \
+flow:to_server; http.uri; content:"discord.com/api/webhooks/"; http.method; \
+content:"POST"; http.request_body; content:"|7b 22|content|22 3a|"; \
+classtype:trojan-activity; sid:3535005; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT modular configuration in payload
+alert tcp any any -> any any (msg:"NOVABLIGHT Modular Configuration Detected"; \
+flow:established; content:"flow/init"; content:"flow/injecting"; \
+content:"flow/disable"; distance:0; within:200; classtype:trojan-activity; sid:3535006; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)
+
+# Rule to detect NOVABLIGHT troll popup message
+alert tcp any any -> any any (msg:"NOVABLIGHT Troll Popup Message Detected"; \
+flow:established; content:"jgqatJ"; content:"MessageBox"; distance:0; within:50; \
+classtype:trojan-activity; sid:3535007; rev:1; \
+metadata:created_at 2025_08_03, updated_at 2025_08_03, novablight, maas, infostealer;)

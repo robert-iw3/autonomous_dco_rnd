@@ -1,0 +1,46 @@
+# Instantiate per enabled destination: sed 's/WORKER_NAME/worker_splunk/g; s/WORKER_PORT/9010/g'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: middleware-WORKER_NAME
+  namespace: middleware
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: middleware-WORKER_NAME
+  template:
+    metadata:
+      labels:
+        app: middleware-WORKER_NAME
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "WORKER_PORT"
+    spec:
+      containers:
+      - name: worker
+        image: middleware:latest
+        command: ["/app/WORKER_NAME"]
+        env:
+        - name: MIDDLEWARE_CONFIG
+          value: /config/middleware.toml
+        ports:
+        - containerPort: WORKER_PORT
+          name: metrics
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: certs
+          mountPath: /config/certs
+          readOnly: true
+        resources:
+          requests: { cpu: "250m", memory: "256Mi" }
+          limits: { cpu: "1", memory: "1Gi" }
+      volumes:
+      - name: config
+        configMap:
+          name: middleware-config
+      - name: certs
+        secret:
+          secretName: middleware-tls

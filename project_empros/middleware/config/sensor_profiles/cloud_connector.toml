@@ -1,0 +1,19 @@
+# Generic Cloud Connector -- server-side pull connector (Azure NSG/Activity/EntraID/AWS)
+# The sensor_type is set per-request by the connector binary to route each source
+# into the correct CIM/ECS schema and NATS subject (middleware.telemetry.{sensor_type}).
+# Sensor types emitted: vpc_flow, nsg_flow, cloudtrail_api, azure_activity,
+#                       entraid_signin, guardduty_finding
+# For GCP/VMware sources use gcp_connector.toml / vmware_connector.toml instead.
+
+[transmission]
+middleware_url = "https://middleware.internal:8443/api/v1/telemetry"
+auth_token = "ChangeMe-Rotate-In-Production"
+# sensor_type is injected per-request by the connector -- not a static field here
+integrity_secret = "Nexus-Integrity-SharedKey-Rotate-Me"
+max_backoff_sec = 60
+spool_dir = "/app/data/spool"
+
+[tls]
+enabled = true
+ca_path = "/app/certs/ca.pem"
+verify = true

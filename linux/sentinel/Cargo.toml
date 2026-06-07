@@ -1,0 +1,87 @@
+[package]
+name = "linux-sentinel"
+version = "0.3.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+codegen-units = 1
+
+[dependencies]
+# Core CLI and Config
+anyhow = "1.0.93"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+uuid = { version = "1.11.0", features = ["v4", "serde"] }
+serde_norway = "0.9"
+extended-isolation-forest = "0.2.2"
+libc = "0.2.164"
+toml = "0.8.19"
+mimalloc = "=0.1.43"
+core_affinity = "0.8"
+aho-corasick = "1.1.3"
+
+# Async Runtime & Concurrency
+tokio = { version = "1.41.1", features = ["full", "signal"] }
+
+# Web Server (Dashboard)
+axum = "0.8"
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+rustls = { version = "0.23", features = ["ring"] }
+
+# eBPF and System Security
+libbpf-rs = "=0.24.0"
+yara = { version = "=0.28.0", features = ["vendored"] }
+subtle = "2.6.1"
+sha2 = "0.10"
+hex = "0.4"
+ring = "0.17"
+caps = "0.5.5"
+#flume = "0.11"
+
+# Logging and Diagnostics
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["json", "env-filter"] }
+tracing-appender = "0.2.3"
+
+# Data Plane Serialization
+arrow = "53"
+parquet = "53"
+
+# SIEM Storage and Middleware Transmission
+sqlx = { version = "0.8.2", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "sqlite"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "rustls-native-certs"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+# nexus_integrity: path dep pointing at the shared stamper crate in windows_xdr_dev.
+# The stamper was fixed to use the canonical HMAC field order matching core_ingress:
+#   HMAC( parquet || seq_BE || sensor_id || ts_BE )
+# Previously: seq_LE ‖ ts_LE ‖ sensor_id ‖ parquet -- every batch rejected.
+# IMPORTANT: rebuild with --features integrity to enable HMAC stamping.
+# Without this feature, parquet_transmitter.rs sends batches without HMAC headers
+# and the middleware/ingress rejects them with 400 (missing X-Batch-HMAC).
+nexus_integrity = { path = "../../windows/windows_xdr_dev/nexus_integrity", optional = true }
+hmac = { version = "0.12", optional = true }
+
+[features]
+default = ["integrity"]
+integrity = ["dep:nexus_integrity", "dep:hmac"]
+
+[dev-dependencies]
+hmac    = "0.12"
+sha2    = "0.10"
+hex     = "0.4"
+uuid    = { version = "1", features = ["v4"] }
+# Parquet reader for schema inspection tests
+parquet = "53"
+arrow   = "53"
+bytes   = "1"
+
+[[test]]
+name = "test_sensor_pipeline"
+path = "tests/test_sensor_pipeline.rs"
+
+[build-dependencies]
+libbpf-cargo = "=0.24.0"

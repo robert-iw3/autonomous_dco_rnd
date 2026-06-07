@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "SQL Server Shell Spawn"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Server Software Component: SQL Stored Procedures (T1505.001)"
+      procedure: "SQL Server (sqlservr.exe) spawning cmd.exe via xp_cmdshell or CLR abuse"
+    match:
+      actor: "sqlservr.exe"
+      type: "PROCESS_START"
+      target: "cmd.exe"

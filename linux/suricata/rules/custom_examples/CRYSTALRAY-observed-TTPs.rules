@@ -1,0 +1,21 @@
+alert tcp any any -> any 22 (msg:"CRYSTALRAY SSH-Snake Propagation Detected"; \
+flow:to_server; content:"SSH-"; depth:8; threshold: type both, track by_src, count 10, seconds 60; \
+classtype:suspicious-login; sid:2828001; rev:1; \
+metadata:signature CRYSTALRAY, created_at 2025_08_07, ttp lateral_movement, ttp ssh_snake;)
+
+alert http any any -> any any (msg:"CRYSTALRAY Confluence CVE-2021-3129 Exploit Attempt"; \
+flow:to_server; http.method; content:"POST"; http.uri; content:"/pages/createpage.action"; \
+content:"spaceKey"; content:"title"; content:"%24%7B"; fast_pattern; pcre:"/.*%24%7B.*%7D/"; \
+classtype:attempted-admin; sid:2828002; rev:1; \
+metadata:signature CRYSTALRAY, created_at 2025_08_07, ttp vulnerability_exploit, cve CVE-2021-3129;)
+
+alert http any any -> any any (msg:"CRYSTALRAY C2 Communication Detected"; \
+flow:to_server; http.host; content:!"example.com"; content:!"*.edu"; content:!"*.gov"; http.user_agent; \
+content:"curl/|20|"; content:"Go-http-client/|20|"; pcre:"/curl\/[0-9]+\.[0-9]+|Go-http-client\/[0-9]+\.[0-9]+/"; \
+threshold: type both, track by_dst, count 5, seconds 300; classtype:trojan-activity; sid:2828003; rev:1; \
+metadata:signature CRYSTALRAY, created_at 2025_08_07, ttp c2_communication, ttp sliver, ttp platypus;)
+
+alert tcp any any -> any any (msg:"CRYSTALRAY zmap Port Scanning Detected"; \
+flow:to_server; flags:S; threshold: type both, track by_src, count 100, seconds 30; \
+classtype:network-scan; sid:2828004; rev:1; \
+metadata:signature CRYSTALRAY, created_at 2025_08_07, ttp reconnaissance, ttp zmap;)

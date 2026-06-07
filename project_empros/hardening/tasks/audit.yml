@@ -1,0 +1,44 @@
+---
+# ==============================================================================
+# audit.yml -- Auditd rules for Nexus infrastructure and Podman
+# ==============================================================================
+
+- name: Deploy Nexus-specific audit rules
+  ansible.builtin.template:
+    src: audit_nexus.rules.j2
+    dest: /etc/audit/rules.d/99-nexus.rules
+    owner: root
+    group: root
+    mode: '0640'
+  notify: Restart auditd
+
+- name: Set auditd max log file size
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^max_log_file\s*='
+    line: "max_log_file = {{ hardening_audit_max_log_size }}"
+    state: present
+
+- name: Set auditd log file action to rotate
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^max_log_file_action\s*='
+    line: "max_log_file_action = ROTATE"
+    state: present
+
+- name: Set auditd space_left_action
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^space_left_action\s*='
+    line: "space_left_action = SYSLOG"
+    state: present
+
+- name: Ensure auditd is immutable in production (append -e 2)
+  ansible.builtin.lineinfile:
+    path: /etc/audit/rules.d/99-finalize.rules
+    line: "-e 2"
+    create: yes
+    owner: root
+    group: root
+    mode: '0640'
+  notify: Restart auditd

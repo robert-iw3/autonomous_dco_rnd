@@ -1,0 +1,91 @@
+# =============================================================================
+# CHARMING KITTEN (Phosphorus / APT35 / Mint Sandstorm / TA453 / Yellow Liderc)
+# =============================================================================
+
+- ttp_signature:
+    name: "Charming Kitten BellaCiao DNS Command Signaling"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol: DNS (T1071.004)"
+      procedure: "BellaCiao interpreting DNS response IP addresses as specific command codes"
+    match:
+      actor: "powershell.exe"
+      type: "NETWORK_EVENT"
+      target: "DNS_RESPONSE_IP: 127.0.0."
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Charming Kitten Hyperscrape Credential Exfiltration"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Steal Web Session Cookie (T1539)"
+      procedure: "Execution of Hyperscrape to automate the downloading of entire Gmail or Outlook mailboxes via hijacked sessions"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "hyperscrape.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Charming Kitten BITSAdmin Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "BITS Jobs (T1197)"
+      procedure: "Abusing BITSAdmin to create persistent download jobs for secondary payloads in the ProgramData directory"
+    match:
+      actor: "bitsadmin.exe"
+      type: "PROCESS_START"
+      target: "/transfer /download /priority foreground"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Charming Kitten BasicStar Backdoor Staging"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: Visual Basic (T1059.005)"
+      procedure: "WScript execution of the BasicStar VBScript backdoor to gather system metadata and facilitate C2"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "AppData\\Local\\*.vbs"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "Charming Kitten Unauthorized RustDesk Deployment"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Remote Access Software (T1219)"
+      procedure: "Silent installation of RustDesk for persistent, encrypted remote management"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "RustDesk.exe --install"
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\RustDesk\\*"
+
+- ttp_signature:
+    name: "Charming Kitten Targeted Document Collection"
+    severity: "High"
+    meta:
+      tactic: "Collection (TA0009)"
+      technique: "Data from Local System (T1005)"
+      procedure: "PowerShell scripts specifically targeting .pptx, .pdf, and .docx files for staging in Public directories"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "copy-item -filter *.pptx"
+    filter:
+      exclude_path: "C:\\Windows\\*"

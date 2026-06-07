@@ -1,0 +1,85 @@
+---
+services:
+  nats:
+    image: nats:2-alpine
+    command: ["--js", "--store_dir=/data"]
+    ports: ["4222:4222", "8222:8222"]
+    volumes: ["nats-data:/data"]
+    restart: unless-stopped
+
+  ingress:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    entrypoint: ["/app/core_ingress"]
+    environment:
+      MIDDLEWARE_CONFIG: /config/middleware.toml
+    ports: ["8443:8443", "9000:9000"]
+    volumes:
+      - ../../config:/config:ro,Z
+      - ../../certs:/config/certs:ro,Z
+    depends_on: [nats]
+    restart: unless-stopped
+
+  worker-nexus:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_nexus"]
+    environment:
+      MIDDLEWARE_CONFIG: /config/middleware.toml
+    ports: ["9012:9012"]
+    volumes:
+      - ../../config:/config:ro,Z
+      - ../../certs:/config/certs:ro,Z
+    depends_on: [nats, ingress]
+    restart: unless-stopped
+    profiles: ["nexus"]
+
+  worker-splunk:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_splunk"]
+    environment:
+      MIDDLEWARE_CONFIG: /config/middleware.toml
+    ports: ["9010:9010"]
+    volumes:
+      - ../../config:/config:ro,Z
+      - ../../certs:/config/certs:ro,Z
+    depends_on: [nats, ingress]
+    restart: unless-stopped
+    profiles: ["splunk"]
+
+  worker-elastic:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_elastic"]
+    environment:
+      MIDDLEWARE_CONFIG: /config/middleware.toml
+    ports: ["9011:9011"]
+    volumes:
+      - ../../config:/config:ro,Z
+      - ../../certs:/config/certs:ro,Z
+    depends_on: [nats, ingress]
+    restart: unless-stopped
+    profiles: ["elastic"]
+
+  worker-sql:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_sql"]
+    environment:
+      MIDDLEWARE_CONFIG: /config/middleware.toml
+    ports: ["9013:9013"]
+    volumes:
+      - ../../config:/config:ro,Z
+      - ../../certs:/config/certs:ro,Z
+    depends_on: [nats, ingress]
+    restart: unless-stopped
+    profiles: ["sql"]
+
+volumes:
+  nats-data:

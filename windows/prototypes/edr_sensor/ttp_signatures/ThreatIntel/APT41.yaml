@@ -1,0 +1,123 @@
+# =============================================================================
+# APT41 (SilverFox / Winnti / Barium / Wicked Panda / Bronze Union)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT41 SilverFox Vulnerable Driver Loading (Non-System Path)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Exploitation for Defense Evasion: Vulnerable Driver (T1068)"
+      procedure: "Loading vulnerable driver from non-system path (BYOVD)"
+    match:
+      actor: "**"
+      type: "MODULE_LOAD"
+      target: "\\*.sys"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target: "*.System.dll"
+      exclude_actor: "services.exe"
+
+- ttp_signature:
+    name: "APT41 SilverFox RAT Execution via Encoded PowerShell"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "SilverFox RAT execution via encoded PowerShell"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd:
+        - "*chocolatey*"
+        - "*scoop*"
+        - "*Set-ExecutionPolicy*"
+
+- ttp_signature:
+    name: "APT41 SilverFox Persistence via Registry Run Key"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "SilverFox/APT41 maintaining persistence via Run key using LotL or side-loaded binaries"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "*\\Microsoft\\Windows\\CurrentVersion\\Run*"
+    filter:
+      exclude_actor:
+        - "svchost.exe"
+        - "MoUsoCoreWorker.exe"
+        - "SearchIndexer.exe"
+      exclude_target_value:
+        - "*LastRunVersion*"
+        - "*FeatureTimestampOfLatestRun*"
+        - "*Microsoft\\Teams\\*"
+        - "*Google\\Chrome\\*"
+        - "*Discord\\*"
+        - "*OneDrive.exe*"
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT41 SilverFox Lateral Movement via WMI"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "Using WMI for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "/node:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor: "DeepSensor_Launcher.exe"
+
+- ttp_signature:
+    name: "APT41 SilverFox DodgeBox DLL Sideloading"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "DLL Side-Loading (T1574.002)"
+      procedure: "taskhostw.exe loading malicious sbiedll.dll"
+    match:
+      actor: "taskhostw.exe"
+      type: "MODULE_LOAD"
+      target: "sbiedll.dll"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor: "services.exe"
+
+- ttp_signature:
+    name: "APT41 SilverFox Encoded Command Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "SilverFox using encoded commands for execution"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-encodedcommand"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "*$Profile*"
+
+- ttp_signature:
+    name: "APT41 SilverFox WMI Lateral Movement Create Process"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "wmic process call create for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "process call create"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe"

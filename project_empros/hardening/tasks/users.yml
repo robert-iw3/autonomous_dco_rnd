@@ -1,0 +1,163 @@
+---
+# ==============================================================================
+# users.yml -- User, PAM, sudo, and login hardening
+# ==============================================================================
+
+# ── Root access restrictions ──────────────────────────────────────────────────
+- name: Restrict root TTY access to console only
+  ansible.builtin.copy:
+    content: "console\n"
+    dest: /etc/securetty
+    owner: root
+    group: root
+    mode: '0600'
+  failed_when: false
+
+- name: Mask debug-shell service
+  ansible.builtin.systemd:
+    name: debug-shell.service
+    masked: yes
+    state: stopped
+  failed_when: false
+  notify: Reload systemd
+
+# ── Sudo hardening ────────────────────────────────────────────────────────────
+- name: Configure sudo defaults
+  ansible.builtin.copy:
+    content: "{{ item.content }}\n"
+    dest: "/etc/sudoers.d/{{ item.filename }}"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  loop:
+    - { filename: "011_use_pty",           content: "Defaults use_pty" }
+    - { filename: "012_logfile",           content: 'Defaults logfile="/var/log/sudo.log"' }
+    - { filename: "013_pwfeedback",        content: "Defaults !pwfeedback" }
+    - { filename: "014_visiblepw",         content: "Defaults !visiblepw" }
+    - { filename: "015_passwdtimeout",     content: "Defaults passwd_timeout={{ hardening_sudo_passwd_timeout }}" }
+    - { filename: "016_timestamptimeout",  content: "Defaults timestamp_timeout={{ hardening_sudo_timestamp_timeout }}" }
+
+- name: Restrict su to sudo group via pam_wheel
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/su
+    regexp: '^auth\s+required\s+pam_wheel\.so'
+    line: "auth required pam_wheel.so use_uid group={{ hardening_ssh_allowed_groups }}"
+    state: present
+
+# ── Password policy -- login.defs ─────────────────────────────────────────────
+- name: Configure /etc/login.defs
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^PASS_MIN_DAYS',       line: "PASS_MIN_DAYS   {{ hardening_password_min_days }}" }
+    - { regexp: '^PASS_MAX_DAYS',       line: "PASS_MAX_DAYS   {{ hardening_password_max_days }}" }
+    - { regexp: '^UMASK',               line: "UMASK           {{ hardening_umask }}" }
+    - { regexp: '^ENCRYPT_METHOD',      line: "ENCRYPT_METHOD  SHA512" }
+    - { regexp: '^DEFAULT_HOME',        line: "DEFAULT_HOME    no" }
+    - { regexp: '^LOG_OK_LOGINS',       line: "LOG_OK_LOGINS   yes" }
+    - { regexp: '^USERGROUPS_ENAB',     line: "USERGROUPS_ENAB no" }
+    - { regexp: '^SHA_CRYPT_MIN_ROUNDS', line: "SHA_CRYPT_MIN_ROUNDS {{ hardening_sha_crypt_min_rounds }}" }
+    - { regexp: '^SHA_CRYPT_MAX_ROUNDS', line: "SHA_CRYPT_MAX_ROUNDS {{ hardening_sha_crypt_max_rounds }}" }
+
+# ── Password quality (Debian) ─────────────────────────────────────────────────
+- name: Configure pwquality (Debian)
+  ansible.builtin.copy:
+    content: |
+      minlen = 14
+      dcredit = -1
+      ucredit = -1
+      ocredit = -1
+      lcredit = -1
+      minclass = 4
+      maxrepeat = 3
+      maxclassrepeat = 4
+      retry = {{ hardening_password_max_retries }}
+      enforce_for_root
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: ansible_os_family == 'Debian'
+
+# ── Password quality (RHEL) ──────────────────────────────────────────────────
+- name: Configure pwquality (RHEL)
+  ansible.builtin.copy:
+    content: |
+      minlen = 14
+      dcredit = -1
+      ucredit = -1
+      ocredit = -1
+      lcredit = -1
+      minclass = 4
+      maxrepeat = 3
+      maxclassrepeat = 4
+      retry = {{ hardening_password_max_retries }}
+      enforce_for_root
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: ansible_os_family == 'RedHat'
+
+# ── Faillock (RHEL 8+/Debian 12+) ────────────────────────────────────────────
+- name: Configure faillock
+  ansible.builtin.lineinfile:
+    path: /etc/security/faillock.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?\s*deny',          line: "deny = {{ hardening_faillock_deny }}" }
+    - { regexp: '^#?\s*fail_interval', line: "fail_interval = {{ hardening_faillock_interval }}" }
+    - { regexp: '^#?\s*audit',         line: "audit" }
+    - { regexp: '^#?\s*local_users_only', line: "local_users_only" }
+  when: ansible_facts.packages is defined
+  failed_when: false
+
+# ── Logind hardening ──────────────────────────────────────────────────────────
+- name: Harden systemd logind
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/logind.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?KillUserProcesses',    line: "KillUserProcesses=yes" }
+    - { regexp: '^#?KillExcludeUsers',     line: "KillExcludeUsers=root" }
+    - { regexp: '^#?IdleAction=',          line: "IdleAction=lock" }
+    - { regexp: '^#?IdleActionSec=',       line: "IdleActionSec=15min" }
+    - { regexp: '^#?RemoveIPC=',           line: "RemoveIPC=yes" }
+  notify: Reload systemd
+
+# ── Default shell and home directory permissions ──────────────────────────────
+- name: Set default useradd INACTIVE period
+  ansible.builtin.lineinfile:
+    path: /etc/default/useradd
+    regexp: '^#?\s*INACTIVE='
+    line: "INACTIVE={{ hardening_inactive_days }}"
+    state: present
+
+- name: Set default useradd shell to /bin/false
+  ansible.builtin.lineinfile:
+    path: /etc/default/useradd
+    regexp: '^SHELL='
+    line: "SHELL=/bin/false"
+    state: present
+
+- name: Restrict existing user home directory permissions
+  ansible.builtin.shell: |
+    awk -F ':' '$3 >= 1000 && $3 <= 65000 && $6 != "" { print $6 }' /etc/passwd | while read -r dir; do
+      [ -d "$dir" ] && chmod {{ hardening_home_dir_mode }} "$dir"
+    done
+  changed_when: false
+
+# ── Lock root account ─────────────────────────────────────────────────────────
+- name: Lock root account
+  ansible.builtin.user:
+    name: root
+    password_lock: yes
+  when: hardening_lock_root

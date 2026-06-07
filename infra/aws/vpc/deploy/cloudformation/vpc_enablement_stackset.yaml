@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Automated regional VPC flow logging delivery target configuration.'
+
+Parameters:
+  TargetS3BucketArn:
+    Type: String
+    Description: 'The ARN of the centralized Nexus S3 storage bucket.'
+  TargetVpcId:
+    Type: String
+    Description: 'The target target VPC identification string to configure.'
+
+Resources:
+  VpcFlowLogChannel:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn: !Ref AWS::NoValue
+      LogDestination: !Ref TargetS3BucketArn
+      LogDestinationType: s3
+      LogFormat: '${version} ${account-id} ${interface-id} ${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${packets} ${bytes} ${start} ${end} ${action} ${log-status} ${vpc-id}'
+      LogFileNameFormat: parquet
+      HiveCompatiblePartitions: true
+      ResourceId: !Ref TargetVpcId
+      ResourceType: VPC
+      TrafficType: ALL

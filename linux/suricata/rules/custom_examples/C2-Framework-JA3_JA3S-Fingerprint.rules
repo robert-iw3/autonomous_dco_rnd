@@ -1,0 +1,11 @@
+alert tls any any -> any any (msg:"Malicious C2 Framework Detected via JA3/JA3S Fingerprint"; \
+flow:established,to_server; ja3.hash; \
+content:"e7d705a3286e19ea42f587b344ee6865|a0e9f5d64349fb13191bc781f81f42e1|4d7a28d5f652494751259342149a1222|6734f37431670b3ab4292b8f60f29984|6268c6b7a55651e83568134465714412|e20c5952f6424433577a639ab2459f83"; \
+classtype:trojan-activity; sid:1444401; rev:1; \
+metadata:author RW, description "Detects potential C2 activity by matching JA3 (client-side) TLS fingerprints against known malicious hashes (e.g., Cobalt Strike, Empire, Metasploit, Trickbot, AsyncRAT)", tags T1071.001, severity High, false_positives "Legitimate apps using similar TLS libraries, JA3/S randomization, authorized pen-testing";)
+
+alert tls any any -> any any (msg:"Malicious C2 Framework Detected via JA3S Fingerprint"; \
+flow:established,to_client; ja3s.hash; \
+content:"b742b4075194d9c110154b3380b51c42|3bda27285f336a8889a5d72c74665b27"; \
+classtype:trojan-activity; sid:1444402; rev:1; \
+metadata:author RW, description "Detects potential C2 activity by matching JA3S (server-side) TLS fingerprints against known malicious hashes (e.g., Cobalt Strike)", tags T1071.001, severity High, false_positives "Legitimate apps using similar TLS libraries, JA3/S randomization, authorized pen-testing";)

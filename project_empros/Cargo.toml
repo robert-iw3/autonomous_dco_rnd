@@ -1,0 +1,122 @@
+[workspace]
+resolver = "2"
+members = [
+    # -- Core libraries ----------------------------------------------------------
+    "libs/lib_siem_core",
+
+    # -- Sensor ingress + data workers (services layer) --------------------------
+    "services/core_ingress",
+    "services/worker_qdrant",
+    "services/worker_s3_archive",
+    "services/worker_rules",
+    "services/worker_rlhf",
+    "services/worker_soar",
+
+    # middleware/ has its own standalone Cargo.toml workspace and builds
+    # independently -- not listed here to avoid sub-workspace conflicts.
+
+    # -- Integration tests --------------------------------------------------------
+    "tests",
+]
+
+# ==============================================================================
+# Single dependency table -- all members use { workspace = true }.
+# Versions are set to the minimum-safe values from the supply chain audit
+# (Supply_Chain_Report(Rust).pdf, May 2026). Do not downgrade security-pinned
+# crates without re-running cargo audit.
+#
+# Security pins (minimum-safe):
+#   async-nats  >= 0.48   RUSTSEC-2026-{0049,0098,0099,0104}  rustls-webpki
+#   validator   >= 0.20   RUSTSEC-2024-0421 (idna)
+#   object_store >= 0.11  RUSTSEC-2024-0358 (AWS WebIdentityToken)
+#   parquet     >= 53     RUSTSEC-2023-0086 (lexical-core)  -- 58.3 satisfies
+#
+# Residual warnings (accepted risk, no CVE):
+#   paste 1.0.15           via parquet→arrow-cast  (unmaintained, compile-time only)
+#   rustls-pemfile 2.2.0   via qdrant-client→tonic (unmaintained, upstream blocked)
+# ==============================================================================
+[workspace.dependencies]
+
+# -- Async Runtime -------------------------------------------------------------
+tokio       = { version = "1.52", features = ["full", "signal"] }
+futures     = "0.3"
+async-trait = "0.1"
+tokio-util  = { version = "0.7", features = ["compat"] }
+
+# -- Messaging -- security pin: 0.48 resolves rustls-webpki to 0.103+ -----------
+async-nats = "0.48"
+
+# -- Serialization -------------------------------------------------------------
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml       = "0.8"
+
+# -- Apache Arrow / Parquet -- security pin: >=53 fixes lexical-core ------------
+arrow   = "58.3"
+parquet = "58.3"
+bytes   = "1.10"
+
+# -- Observability -------------------------------------------------------------
+tracing                     = "0.1"
+tracing-subscriber          = { version = "0.3", features = ["env-filter"] }
+metrics                     = "0.24"
+metrics-exporter-prometheus = "0.16"
+opentelemetry               = "0.21"
+opentelemetry_sdk           = "0.21"
+tracing-opentelemetry       = "0.22"
+
+# -- Cryptography --------------------------------------------------------------
+hmac = "0.12"
+sha2 = "0.10"
+hex  = "0.4"
+
+# -- HTTP ----------------------------------------------------------------------
+axum        = "0.8"
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+tower       = { version = "0.5", features = ["limit", "timeout"] }
+tower-http  = { version = "0.6", features = ["limit"] }
+reqwest     = { version = "0.12", features = ["json", "rustls-tls"] }
+jsonwebtoken = "9.2"
+
+# -- Storage -- security pin: object_store 0.11 fixes RUSTSEC-2024-0358 ---------
+redis        = { version = "0.27", features = ["tokio-comp"] }
+object_store = { version = "0.11", features = ["aws"] }
+qdrant-client = "1.13"
+# tiberius 0.12.3 is the current latest. 0.12.x carries rustls 0.21 → rustls-webpki 0.101.7
+# (RUSTSEC-2026-{0097,0098,0099,0104}). Upstream has not released a 0.13 that upgrades
+# the TLS stack. These are documented as accepted risk in .cargo/audit.toml.
+tiberius     = { version = "0.12", features = ["tds73", "rustls"] }
+
+# -- Validation -- security pin: 0.20 fixes idna RUSTSEC-2024-0421 --------------
+validator = { version = "0.20", features = ["derive"] }
+
+# -- Utilities -----------------------------------------------------------------
+uuid        = { version = "1.16", features = ["v4", "v5"] }
+chrono      = "0.4"
+regex       = "1.10"
+minijinja   = "1.0"
+failsafe    = "1.1"
+notify      = "6.1"
+gethostname = "0.5"
+base64      = "0.22"
+
+# -- Compression ---------------------------------------------------------------
+zstd = "0.13"
+
+# -- Concurrency ---------------------------------------------------------------
+dashmap = "6.1"
+
+# -- Allocator -----------------------------------------------------------------
+tikv-jemallocator = "0.6"
+
+# -- Internal crates -----------------------------------------------------------
+lib_siem_core  = { path = "libs/lib_siem_core" }
+# lib_etl and lib_middleware live in the middleware/ sub-workspace (middleware/Cargo.toml)
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

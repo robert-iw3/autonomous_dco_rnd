@@ -1,0 +1,193 @@
+---
+- name: Deploy Sentinel Nexus Middleware
+  hosts: middleware
+  become: true
+  vars:
+    middleware_image: "localhost/sentinel/middleware"
+    middleware_version: "v0.1"
+    config_dir: /etc/middleware
+    data_dir: /var/lib/middleware
+    cert_dir: /etc/middleware/certs
+
+  tasks:
+    - name: Create directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - "{{ config_dir }}"
+        - "{{ config_dir }}/sensor_profiles"
+        - "{{ cert_dir }}"
+        - "{{ data_dir }}"
+        - /opt/middleware/src
+
+    # STATE_DIR for worker_nexus sequence counter persistence.
+    # Bug found in Lab 5 audit: this path was mounted in the Quadlet but never
+    # created by Ansible, so it would fail to mount → container used ephemeral
+    # tmpfs → sequence counter reset to 0 on every restart → Nexus gateway banned
+    # the middleware sensor after detecting a sequence gap (H-R3: same as sensors).
+    - name: Create worker STATE_DIR for sequence counter persistence
+      ansible.builtin.file:
+        path: "{{ middleware_state_dir | default('/var/lib/nexus-middleware') }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Synchronize build context
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/../../"
+        dest: /opt/middleware/src/
+        rsync_opts:
+          - "--include=src/***"
+          - "--include=config/***"
+          - "--include=Cargo.toml"
+          - "--include=Cargo.lock"
+          - "--include=Dockerfile"
+          - "--exclude=*"
+
+    - name: Generate TLS certificates (self-signed if none provided)
+      ansible.builtin.shell: |
+        if [ ! -f "{{ cert_dir }}/server.pem" ]; then
+          openssl req -x509 -newkey rsa:4096 -keyout "{{ cert_dir }}/server-key.pem" \
+            -out "{{ cert_dir }}/server.pem" -days 365 -nodes \
+            -subj "/CN={{ ansible_fqdn }}/O=Middleware"
+          chmod 640 "{{ cert_dir }}/server-key.pem"
+        fi
+      args:
+        creates: "{{ cert_dir }}/server.pem"
+
+    - name: Template middleware configuration
+      ansible.builtin.template:
+        src: middleware.toml.j2
+        dest: "{{ config_dir }}/middleware.toml"
+        mode: '0640'
+      notify: Restart middleware services
+
+    - name: Deploy CIM schema mappings
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../config/cim_mappings.yaml"
+        dest: "{{ config_dir }}/cim_mappings.yaml"
+        mode: '0644'
+      notify: Restart middleware splunk
+
+    - name: Deploy ECS schema mappings
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../config/ecs_mappings.yaml"
+        dest: "{{ config_dir }}/ecs_mappings.yaml"
+        mode: '0644'
+      notify: Restart middleware elastic
+
+    - name: Deploy sensor profile configs
+      ansible.builtin.template:
+        src: "{{ item }}"
+        dest: "{{ config_dir }}/sensor_profiles/{{ item | basename | regex_replace('\\.j2$', '') }}"
+        mode: '0644'
+      with_fileglob: "templates/sensor_profiles/*.j2"
+
+    - name: Build middleware container image
+      containers.podman.podman_image:
+        name: "{{ middleware_image }}"
+        tag: "{{ middleware_version }}"
+        path: /opt/middleware/src
+        build:
+          file: /opt/middleware/src/Dockerfile
+          format: oci
+          cache: yes
+
+    # ── Ingress (always runs) ─────────────────────────────────
+    - name: Deploy ingress Quadlet
+      ansible.builtin.template:
+        src: middleware-ingress.container.j2
+        dest: /etc/containers/systemd/middleware-ingress.container
+      notify: Reload systemd
+
+    # ── Destination workers (conditionally deployed) ──────────
+    - name: Deploy Nexus worker Quadlet
+      ansible.builtin.template:
+        src: middleware-worker.container.j2
+        dest: /etc/containers/systemd/middleware-nexus.container
+      vars:
+        worker_binary: worker_nexus
+        worker_port: 9012
+      when: nexus_enabled | default(true)
+      notify: Reload systemd
+
+    - name: Deploy Splunk worker Quadlet
+      ansible.builtin.template:
+        src: middleware-worker.container.j2
+        dest: /etc/containers/systemd/middleware-splunk.container
+      vars:
+        worker_binary: worker_splunk
+        worker_port: 9010
+      when: splunk_enabled | default(false)
+      notify: Reload systemd
+
+    - name: Deploy Elastic worker Quadlet
+      ansible.builtin.template:
+        src: middleware-worker.container.j2
+        dest: /etc/containers/systemd/middleware-elastic.container
+      vars:
+        worker_binary: worker_elastic
+        worker_port: 9011
+      when: elastic_enabled | default(false)
+      notify: Reload systemd
+
+    - name: Deploy SQL worker Quadlet
+      ansible.builtin.template:
+        src: middleware-worker.container.j2
+        dest: /etc/containers/systemd/middleware-sql.container
+      vars:
+        worker_binary: worker_sql
+        worker_port: 9013
+      when: sql_enabled | default(false)
+      notify: Reload systemd
+
+    - name: Ensure ingress is started
+      ansible.builtin.systemd:
+        daemon_reload: yes
+        name: middleware-ingress.service
+        state: started
+        enabled: yes
+
+    - name: Start enabled workers
+      ansible.builtin.systemd:
+        name: "middleware-{{ item.name }}.service"
+        state: started
+        enabled: yes
+      loop:
+        - { name: nexus, enabled: "{{ nexus_enabled | default(true) }}" }
+        - { name: splunk, enabled: "{{ splunk_enabled | default(false) }}" }
+        - { name: elastic, enabled: "{{ elastic_enabled | default(false) }}" }
+        - { name: sql, enabled: "{{ sql_enabled | default(false) }}" }
+      when: item.enabled | bool
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart middleware services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - middleware-ingress.service
+      ignore_errors: true
+
+    - name: Restart middleware splunk
+      ansible.builtin.systemd:
+        name: middleware-splunk.service
+        state: restarted
+      when: splunk_enabled | default(false)
+      ignore_errors: true
+
+    - name: Restart middleware elastic
+      ansible.builtin.systemd:
+        name: middleware-elastic.service
+        state: restarted
+      when: elastic_enabled | default(false)
+      ignore_errors: true

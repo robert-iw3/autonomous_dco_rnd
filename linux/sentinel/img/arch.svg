@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 850" width="100%" height="100%" style="background-color: #050505; font-family: 'Inter', sans-serif;">
+  <defs>
+    <style>
+      .title { font-family: 'Fira Code', monospace; fill: #06b6d4; font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+      .zone-title { fill: #64748b; font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+      .box { fill: #0f172a; stroke-width: 2px; rx: 6px; }
+      .box-kernel { stroke: #ef4444; }
+      .box-ebpf { stroke: #a855f7; }
+      .box-pipeline { stroke: #06b6d4; }
+      .box-scanner { stroke: #ec4899; }
+      .box-deception { stroke: #f59e0b; }
+      .box-storage { stroke: #4ade80; }
+      .box-external { stroke: #64748b; stroke-dasharray: 4 4; fill: #050505; }
+      .text-title { fill: #f8fafc; font-size: 13px; font-weight: bold; }
+      .text-tech { fill: #38bdf8; font-size: 11px; font-family: 'Fira Code', monospace; }
+      .text-desc { fill: #94a3b8; font-size: 10px; font-family: 'Fira Code', monospace; }
+      .path-label { fill: #cbd5e1; font-size: 10px; font-family: 'Fira Code', monospace; font-weight: 600; background: #050505; }
+      .link { fill: none; stroke: #334155; stroke-width: 2px; }
+      .link-data { stroke: #06b6d4; stroke-width: 2.5px; }
+      .link-alert { stroke: #ef4444; stroke-width: 2.5px; }
+      .link-feedback { stroke: #f59e0b; stroke-width: 2px; stroke-dasharray: 4 4; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155" />
+    </marker>
+    <marker id="arrow-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+    </marker>
+    <marker id="arrow-alert" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+    </marker>
+    <marker id="arrow-feedback" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+    </marker>
+  </defs>
+
+  <text x="50" y="50" class="title">LINUX SENTINEL: SYSTEM ARCHITECTURE &amp; IPC ROUTING</text>
+
+  <rect x="40" y="80" width="280" height="730" fill="none" stroke="#ef4444" stroke-width="1" stroke-dasharray="4 4" rx="12" />
+  <text x="180" y="110" class="zone-title" text-anchor="middle">Kernel Space (Ring-0)</text>
+
+  <rect x="350" y="80" width="600" height="730" fill="none" stroke="#06b6d4" stroke-width="1" stroke-dasharray="4 4" rx="12" />
+  <text x="650" y="110" class="zone-title" text-anchor="middle">Agent Core (Rust Userspace)</text>
+
+  <rect x="980" y="80" width="280" height="730" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="4 4" rx="12" />
+  <text x="1120" y="110" class="zone-title" text-anchor="middle">External Interfaces</text>
+
+  <path d="M 180 230 L 180 280" class="link" marker-end="url(#arrow)" />
+  <path d="M 180 360 L 180 410" class="link-data" marker-end="url(#arrow-data)" />
+  <text x="190" y="385" class="path-label">bpf_ringbuf_submit</text>
+
+  <path d="M 290 450 L 400 450" class="link-data" marker-end="url(#arrow-data)" />
+  <text x="345" y="440" class="path-label" text-anchor="middle">mmap() Zero-Copy</text>
+
+  <path d="M 510 410 L 510 360" class="link-data" marker-end="url(#arrow-data)" />
+  <text x="520" y="385" class="path-label">mpsc::channel(100k)</text>
+
+  <path d="M 510 280 L 510 230" class="link-data" marker-end="url(#arrow-data)" />
+  <text x="520" y="255" class="path-label">Event Clone</text>
+
+  <path d="M 620 190 L 700 190" class="link-data" marker-end="url(#arrow-data)" />
+  <text x="660" y="180" class="path-label" text-anchor="middle">WAL Update</text>
+
+  <path d="M 620 320 L 660 320 L 660 210 L 700 210" class="link-alert" marker-end="url(#arrow-alert)" />
+  <text x="670" y="280" class="path-label">tx.send(Alert)</text>
+
+  <path d="M 810 280 L 810 230" class="link-alert" marker-end="url(#arrow-alert)" />
+  <text x="820" y="255" class="path-label">YaraMatch Alert</text>
+
+  <path d="M 810 410 L 810 360 L 880 360 L 880 210 L 920 210" class="link-alert" marker-end="url(#arrow-alert)" />
+
+  <path d="M 920 170 L 1020 170" class="link" marker-end="url(#arrow)" />
+  <text x="970" y="160" class="path-label" text-anchor="middle">?immutable=1</text>
+
+  <path d="M 920 190 L 970 190 L 970 320 L 1020 320" class="link" marker-end="url(#arrow)" />
+  <text x="980" y="260" class="path-label">Batch SELECT</text>
+
+  <path d="M 400 190 L 340 190 L 340 580 L 290 580" class="link-feedback" marker-end="url(#arrow-feedback)" />
+  <text x="350" y="550" class="path-label">bpf_map_update_elem(PID)</text>
+
+  <g transform="translate(70, 150)">
+    <rect width="220" height="80" class="box box-kernel" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">Self-PID Filter</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">BPF_MAP_TYPE_HASH</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">Excludes agent's own syscalls</text>
+  </g>
+  <g transform="translate(70, 280)">
+    <rect width="220" height="80" class="box box-kernel" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">eBPF CO-RE Probes</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">17x tracepoint/sys_enter</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">vmlinux.h / BPF_CORE_READ</text>
+  </g>
+  <g transform="translate(70, 410)">
+    <rect width="220" height="80" class="box box-kernel" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">BPF Ring Buffer</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">BPF_MAP_TYPE_RINGBUF</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">64MB lockless memory region</text>
+  </g>
+  <g transform="translate(70, 540)">
+    <rect width="220" height="80" class="box box-kernel" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">Kill List Map</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">BPF_MAP_TYPE_LRU_HASH</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">bpf_send_signal(SIGKILL)</text>
+  </g>
+
+  <g transform="translate(400, 410)">
+    <rect width="220" height="80" class="box box-ebpf" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">eBPF Engine</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">ebpf.rs | tokio::task</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">Aya-bpf ringbuf::poll(50ms)</text>
+  </g>
+  <g transform="translate(400, 280)">
+    <rect width="220" height="80" class="box box-pipeline" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">Sigma AST Evaluator</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">rules.rs | O(1) Hash Lookups</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">MITRE ATT&amp;CK Heuristics</text>
+  </g>
+  <g transform="translate(400, 150)">
+    <rect width="220" height="80" class="box box-scanner" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">UEBA ML Scanner</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">scanner.rs | Isolation Forest</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">19D Vectors &amp; Welford Maths</text>
+  </g>
+
+  <g transform="translate(700, 410)">
+    <rect width="220" height="80" class="box box-deception" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">Honeypot Engine</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">honeypot.rs | Active Defense</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">16x TCP Listeners &amp; Traps</text>
+  </g>
+  <g transform="translate(700, 280)">
+    <rect width="220" height="80" class="box box-pipeline" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">YARA Engine</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">yara.rs | process_vm_readv</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">In-Memory Signature Scans</text>
+  </g>
+  <g transform="translate(700, 150)">
+    <rect width="220" height="80" class="box box-storage" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">SQLite Storage Layer</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">sentinel.db &amp; baselines.db</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">PRAGMA journal_mode=WAL</text>
+  </g>
+
+  <g transform="translate(1020, 280)">
+    <rect width="220" height="80" class="box box-external" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">SIEM Forwarder</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">NATS JetStream / HTTPS</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">Batched TLS Export</text>
+  </g>
+  <g transform="translate(1020, 150)">
+    <rect width="220" height="80" class="box box-external" />
+    <text x="110" y="25" class="text-title" text-anchor="middle">Forensic Dashboard</text>
+    <text x="110" y="45" class="text-tech" text-anchor="middle">FastAPI | Port 8443 | JWT</text>
+    <text x="110" y="65" class="text-desc" text-anchor="middle">Live Visualization UI</text>
+  </g>
+</svg>

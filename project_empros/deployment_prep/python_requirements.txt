@@ -1,0 +1,49 @@
+# Aggregated Python requirements for offline pip wheel download.
+# Generated from: mlops/requirements.txt + analytics/llm_hunter/requirements.txt
+# + infrastructure/ansible/roles/nexus_hunter/files/requirements.txt
+# + deployment_prep/scan/requirements.txt
+#
+# Usage (on internet-connected machine):
+#   pip download -r python_requirements.txt -d ../deployment_prep/wheels/
+#
+# Usage (on air-gapped target):
+#   pip install --no-index --find-links /path/to/wheels/ -r python_requirements.txt
+
+# -- Anchore scanner deps ------------------------------------------------------
+tqdm
+pyyaml
+requests
+
+# -- Orchestration / deployment prep ------------------------------------------
+pyyaml
+jinja2
+ansible-core>=2.16
+
+# -- MLOps pipeline ------------------------------------------------------------
+# (representative top-level deps -- full pinned list is in mlops/requirements.txt)
+torch>=2.2
+transformers>=4.40
+peft>=0.10
+trl>=0.8
+accelerate>=0.29
+bitsandbytes>=0.43
+vllm>=0.4
+fastapi>=0.110
+uvicorn[standard]
+nats-py>=2.6
+duckdb>=0.10
+safetensors>=0.4
+datasets>=2.18
+pyarrow>=16.0
+s3fs>=2024.3
+
+# -- LLM Hunter agent swarm ----------------------------------------------------
+langchain>=0.2
+langchain-core>=0.2
+langchain-community>=0.2
+langgraph>=0.1
+anthropic>=0.28
+openai>=1.30
+qdrant-client>=1.9
+redis>=5.0
+boto3>=1.34

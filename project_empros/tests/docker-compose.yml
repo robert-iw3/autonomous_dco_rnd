@@ -1,0 +1,303 @@
+---
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+x-restart: &default-restart
+  restart: unless-stopped
+
+services:
+# ── Edge Load Balancer ──────────────────────────────────────────────
+  haproxy:
+    image: haproxy:3.3-alpine
+    container_name: nexus-edge-lb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infrastructure/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      core-ingress-1:
+        condition: service_healthy
+      core-ingress-2:
+        condition: service_healthy
+    networks:
+      - nexus-net
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+
+  # ── API Gateway Fleet ───────────────────────────────────────────────
+  core-ingress-1: &ingress-template
+    build:
+      context: ./
+      dockerfile: ./services/core_ingress/Dockerfile
+    container_name: nexus-ingress-01
+    env_file:
+      - ./nexus.env
+    environment:
+      - BIND_ADDR=0.0.0.0:8080
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - nexus-net
+    logging: *default-logging
+    <<: *default-restart
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  core-ingress-2:
+    <<: *ingress-template
+    container_name: nexus-ingress-02
+
+  # ── Message Bus ─────────────────────────────────────────────────────
+  nats:
+    build:
+      context: ./infrastructure/nats
+    container_name: nexus-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats-data:/data
+      - ./infrastructure/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+    networks:
+      - nexus-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          memory: 1G
+
+  # ── Distributed State ───────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: nexus-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+        --save 60 1
+        --loglevel warning
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
+        --tcp-backlog 511
+        --rename-command FLUSHALL ""
+        --rename-command FLUSHDB ""
+        --rename-command DEBUG ""
+        --rename-command CONFIG ""
+    volumes:
+      - redis-data:/data
+    networks:
+      - nexus-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+
+  # ── Vector Database ─────────────────────────────────────────────────
+  qdrant:
+    build:
+      context: ./infrastructure/qdrant
+    container_name: nexus-qdrant
+    environment:
+      QDRANT__STORAGE__ON_DISK_PAYLOAD: "true"
+      QDRANT__STORAGE__OPTIMIZERS__DEFAULT_SEGMENT_NUMBER: "2"
+      QDRANT__TELEMETRY_DISABLED: "false"
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - nexus-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # ── On-Premise Object Storage ───────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: nexus-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - nexus-net
+
+  # ── Durable Workers ─────────────────────────────────────────────────
+  worker-qdrant:
+    build:
+      context: ./
+      dockerfile: ./services/worker_qdrant/Dockerfile
+    container_name: nexus-worker-qdrant
+    env_file:
+      - ./nexus.env
+    environment:
+      - NATS_URL=nats://nats:4222
+      - QDRANT_GRPC_URL=http://qdrant:6334
+      - NEXUS_CONFIG=/config/nexus.toml
+    volumes:
+      - ./tests/config/nexus.toml:/config/nexus.toml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - nexus-net
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  # ── Deterministic Rules Engine ──────────────────────────────────────
+  worker-rules:
+    build:
+      context: ./
+      dockerfile: ./services/worker_rules/Dockerfile
+    container_name: nexus-worker-rules
+    env_file:
+      - ./nexus.env
+    environment:
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379/0
+      - NEXUS_CONFIG=/config/nexus.toml
+    volumes:
+      - ./tests/config/nexus.toml:/config/nexus.toml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-net
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+
+  # ── Analytics Daemon ────────────────────────────────────────────────
+  llm-hunter:
+    build:
+      context: ./analytics/llm_hunter
+    container_name: nexus-llm-hunter
+    env_file:
+      - ./nexus.env
+    environment:
+      - NEXUS_CONFIG=/config/nexus.toml
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./tests/config/nexus.toml:/config/nexus.toml:ro
+      - hunter-state:/app/data
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-net
+    logging: *default-logging
+    <<: *default-restart
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  # ── Observability Stack ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nexus-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - nexus-net
+    <<: *default-restart
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nexus-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - nexus-net
+    <<: *default-restart
+
+volumes:
+  nats-data:
+  qdrant-data:
+  hunter-state:
+  grafana-data:
+  redis-data:
+
+networks:
+  nexus-net:
+    driver: bridge

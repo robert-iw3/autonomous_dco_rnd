@@ -1,0 +1,98 @@
+# =============================================================================
+# FAMOUSSPARROW (Salt Typhoon / Earth Estries / GhostEmperor / UNC2286)
+# =============================================================================
+
+- ttp_signature:
+    name: "FamousSparrow K7AntiVirus Sideloading (SparrowDoor)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Hijack Execution Flow: DLL Side-Loading (T1574.002)"
+      procedure: "Sideloading SparrowDoor/ShadowPad via vulnerable K7AntiVirus Messenger Scanner"
+    match:
+      actor: "K7AVMScn.exe"
+      type: "MODULE_LOAD"
+      target: "K7AVWScn.dll"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\"
+        - "C:\\Program Files\\K7 Computing\\"
+        - "C:\\Program Files (x86)\\K7 Computing\\"
+
+- ttp_signature:
+    name: "FamousSparrow DotNetNuke Webshell Deployment"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Server Software Component: Web Shell (T1505.003)"
+      procedure: "FamousSparrow batch script copying decoded ASHX webshell into DotNetNuke directories"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "DesktopModules\\DotNetNuke.ashx"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "FamousSparrow Certutil Webshell Decoding"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Deobfuscate/Decode Files or Information (T1140)"
+      procedure: "Certutil decoding a base64-encoded .NET webshell from a public directory"
+    match:
+      actor: "certutil.exe"
+      type: "PROCESS_START"
+      target: "users\\public\\s.ashx"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "FamousSparrow / Salt Typhoon SAM Registry Dump"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping: Security Account Manager (T1003.002)"
+      procedure: "Batch script execution dumping SYSTEM, SAM, and SECURITY hives to C:\\Users\\Public\\"
+    match:
+      actor: "reg.exe"
+      type: "PROCESS_START"
+      target: "save HKLM\\SAM"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Salt Typhoon VGAuthtools Service Persistence"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Create or Modify System Process: Windows Service (T1543.003)"
+      procedure: "Creation of malicious VGAuthtools service pointing to InstallUtil.exe for payload execution"
+    match:
+      actor: "sc.exe"
+      type: "PROCESS_START"
+      target: "VGAuthtools"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Salt Typhoon WMI Lateral Movement Batch Execution"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "Using WMI to remotely execute a staged batch payload on target endpoints"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "process call create \"cmd /c"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+      exclude_target:
+        - "CCM\\CcmExec.exe"

@@ -1,0 +1,48 @@
+version: 1
+metadata:
+  name: Nexus Ephemeral Identity Bootstrap
+  labels:
+    sentinel/managed: "true"
+    sentinel/purpose: "ephemeral-ops"
+
+entries:
+  # ── OAuth2/OIDC Provider ──
+  - model: authentik_providers_oauth2.oauth2provider
+    id: nexus_ephemeral_tools
+    state: present
+    attrs:
+      name: Nexus Operations C&C
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      client_type: confidential
+      client_id: "%(ENV_OAUTH_CLIENT_ID)s"
+      client_secret: "%(ENV_OAUTH_CLIENT_SECRET)s"
+      redirect_uris: |
+        https://%(ENV_NEXUS_DOMAIN_WEBUI)s/oauth/callback
+        https://%(ENV_NEXUS_DOMAIN_N8N)s/rest/oauth2-credential/callback
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+      sub_mode: hashed_user_id
+      token_validity: hours=1
+
+  # ── Application Registration ──
+  - model: authentik_core.application
+    id: nexus_ephemeral_app
+    state: present
+    attrs:
+      name: Nexus Operations C&C
+      slug: nexus-operations
+      provider: !KeyOf nexus_ephemeral_tools
+      meta_launch_url: "https://%(ENV_NEXUS_DOMAIN_WEBUI)s/"
+      policy_engine_mode: any
+
+  # ── Outpost for Traefik ForwardAuth ──
+  - model: authentik_providers_proxy.proxyprovider
+    id: nexus_traefik_outpost_provider
+    state: present
+    attrs:
+      name: Nexus Traefik Forward Auth
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      mode: forward_single
+      external_host: "https://%(ENV_NEXUS_DOMAIN_SSO)s"

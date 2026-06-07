@@ -1,0 +1,76 @@
+---
+networks:
+  falco:
+    driver: bridge
+
+volumes:
+  certs_data:
+  falco_logs:
+  redis_data:
+
+services:
+  certs:
+    build: ./certs
+    container_name: falco-certs
+    volumes:
+      - certs_data:/certs:rw
+
+  falco:
+    image: docker.io/falcosecurity/falco:latest
+    container_name: falco
+    privileged: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - /dev:/host/dev
+      - /boot:/host/boot:ro
+      - /lib/modules:/host/lib/modules:ro
+      - /usr:/host/usr:ro
+      - ./config/falco.yml:/etc/falco/falco.yaml:ro,Z
+      - falco_logs:/logs:rw
+      - certs_data:/etc/falco/certs:ro
+    networks:
+      - falco
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  sidekick:
+    image: docker.io/falcosecurity/falcosidekick:latest
+    container_name: sidekick
+    environment:
+      - WEBUI_URL=http://webui:2802
+    networks:
+      - falco
+    depends_on:
+      - falco
+    restart: unless-stopped
+
+  webui:
+    image: docker.io/falcosecurity/falcosidekick-ui:latest
+    container_name: falco-webui
+    networks:
+      - falco
+    depends_on:
+      - redis
+    ports:
+      - "127.0.0.1:2802:2802"
+    command: ['-r', 'redis:6379', '-d']
+    restart: unless-stopped
+
+  redis:
+    image: docker.io/redis/redis-stack-server:latest
+    container_name: falco-redis
+    networks:
+      - falco
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped

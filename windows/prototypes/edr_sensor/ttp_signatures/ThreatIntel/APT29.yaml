@@ -1,0 +1,84 @@
+# =============================================================================
+# APT29 (Cozy Bear)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT29 Spearphishing with Malicious Attachments"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Spearphishing Attachment (T1566.001)"
+      procedure: "APT29 delivering initial access via malicious Office documents"
+    match:
+      actor: "winword.exe"
+      type: "FILE_EVENT"
+      target:
+        - "*.vbs"
+        - "*.ps1"
+        - "*.exe"
+        - "*.dll"
+        - "*.js"
+    filter:
+      exclude_path:
+        - "C:\\Users\\*\\AppData\\Local\\Microsoft\\Office\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "APT29 PowerShell Encoded Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "APT29 using encoded PowerShell commands"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "APT29 Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "APT29 abusing multiple LOLBins"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "APT29 Scheduled Task Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job (T1053)"
+      procedure: "APT29 creating scheduled tasks for persistence"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "schtasks.exe /create"
+
+- ttp_signature:
+    name: "APT29 WMI Lateral Movement"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "APT29 using WMI for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "/node:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe /node:"

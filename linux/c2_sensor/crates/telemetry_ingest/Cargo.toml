@@ -1,0 +1,22 @@
+[package]
+name = "telemetry_ingest"
+version = "0.7.0"
+edition = "2024"
+authors = ["Robert Weber"]
+description = "High-speed, zero-copy eBPF ring buffer ingestion pipeline"
+
+[dependencies]
+shared_models = { path = "../shared_models" }
+libbpf-rs.workspace = true
+crossbeam-channel.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+mimalloc.workspace = true
+once_cell.workspace = true
+procfs.workspace = true
+moka.workspace = true
+sha2.workspace = true
+hex.workspace = true
+md5.workspace = true

@@ -1,0 +1,75 @@
+# =============================================================================
+# INTELBROKER
+# =============================================================================
+
+- ttp_signature:
+    name: "IntelBroker Endurance Wiper Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Destructively Erased (T1485)"
+      procedure: "Execution of the C#-based Endurance wiper to overwrite and delete targeted file systems"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "Endurance.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "IntelBroker Source Code Repository Exfiltration"
+    severity: "Critical"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567)"
+      procedure: "Unauthorized use of git or gh-cli to clone internal repositories"
+    match:
+      actor: "git.exe"
+      type: "PROCESS_START"
+      target: "clone "
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\"
+        - "\\source\\repos\\"
+
+- ttp_signature:
+    name: "IntelBroker Confluence RCE Exploitation (CVE-2024-1597)"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Exploit Public-Facing Application (T1190)"
+      procedure: "Confluence Server spawning cmd.exe or powershell.exe following exploitation of known vulnerabilities"
+    match:
+      actor: "tomcat*.exe"
+      type: "PROCESS_START"
+      target: "cmd.exe /c"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "IntelBroker Hardcoded Credential Harvesting"
+    severity: "High"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Unsecured Credentials: Credentials in Files (T1552.001)"
+      procedure: "Searching source code or configuration files for API_TOKEN, AWS_SECRET, or hardcoded passwords"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "findstr /s /i \"API_TOKEN\""
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "IntelBroker Unauthorized Jira Instance Access"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "System Information Discovery (T1082)"
+      procedure: "Actor utilizing compromised credentials to access internal Jira test instances for application metadata"
+    match:
+      actor: "browser_process"
+      type: "NETWORK_EVENT"
+      target: "*/rest/api/*/issue/*"
+    filter:
+      exclude_path: "C:\\Windows\\*"

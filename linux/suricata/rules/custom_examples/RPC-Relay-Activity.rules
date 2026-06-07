@@ -1,0 +1,17 @@
+alert tcp any any -> any any (msg:"WinReg Relay Vulnerability - Suspicious WinReg RPC Interface Bind"; \
+flow:established,to_server; dce_iface:338cd001-2244-31f1-aaaa-900038001003; reference:cve,2024-43532; \
+classtype:attempted-admin; sid:639001; rev:1;)
+
+alert tcp any any -> any any (msg:"WinReg Relay Vulnerability - WinReg RPC over Non-SMB Transport"; \
+flow:established,to_server; dce_iface:338cd001-2244-31f1-aaaa-900038001003; content:"|00|"; depth:1; offset:0; !smb; \
+reference:cve,2024-43532; classtype:attempted-admin; sid:639002; rev:1;)
+
+alert http any any -> any any (msg:"WinReg Relay Vulnerability - NTLM Relay to ADCS HTTP Endpoint"; \
+flow:established,to_server; http_method; content:"POST"; http_uri; content:"/certsrv/certfnsh.asp"; \
+nocase; http_header; content:"NTLM"; nocase; flowbits:set,ntlm_relay_adcs; reference:cve,2024-43532; \
+classtype:attempted-admin; sid:639003; rev:1;)
+
+alert http any any -> any any (msg:"WinReg Relay Vulnerability - Certificate Request via Relayed NTLM"; \
+flow:established,to_server; http_method; content:"POST"; http_uri; content:"/certsrv/certfnsh.asp"; \
+nocase; http_request_body; content:"Mode=newreq"; nocase; flowbits:isset,ntlm_relay_adcs; \
+reference:cve,2024-43532; classtype:attempted-admin; sid:639004; rev:1;)

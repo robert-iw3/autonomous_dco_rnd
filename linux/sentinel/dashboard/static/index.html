@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Sentinel | Forensic Workbench</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg-obsidian: #050505;
+            --bg-glass: rgba(15, 23, 42, 0.6);
+            --border-slate: #1e293b;
+            --crimson: #ef4444;
+            --cyan: #06b6d4;
+            --amber: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-obsidian);
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .font-mono { font-family: 'Fira Code', monospace; }
+
+        .workbench-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr auto;
+            height: 100vh;
+        }
+
+        .pane {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border-slate);
+            overflow-y: auto;
+        }
+
+        .inspector {
+            width: 0;
+            border-left: 1px solid var(--border-slate);
+            background: #020617;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-x: hidden;
+        }
+        .inspector.open { width: 500px; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        tr { transition: background 0.15s; cursor: pointer; }
+        tr:hover { background: rgba(30, 41, 59, 0.8); }
+        tr.selected { background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--crimson); }
+
+        .nav-active { background: rgba(6, 182, 212, 0.1); border-left: 3px solid var(--cyan); color: var(--cyan); font-weight: bold; }
+        .nav-inactive { border-left: 3px solid transparent; color: #94a3b8; }
+        .nav-inactive:hover { background: rgba(30, 41, 59, 0.5); color: #cbd5e1; }
+    </style>
+</head>
+<body class="workbench-layout">
+
+    <div id="login-overlay" class="fixed inset-0 bg-obsidian z-[100] flex items-center justify-center">
+        <div class="bg-slate-950 border border-slate-800 p-8 w-[400px] shadow-2xl relative">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+            <h1 class="text-2xl font-extrabold tracking-widest text-cyan-400 font-mono mb-2">SENTINEL</h1>
+            <p class="text-xs uppercase tracking-widest text-gray-500 mb-8">Secure Authenticated Uplink</p>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase text-slate-500 mb-1">Operator ID</label>
+                    <input type="text" id="username" class="w-full bg-black/50 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-cyan-400 focus:outline-none focus:border-cyan-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-slate-500 mb-1">Passphrase</label>
+                    <input type="password" id="password" class="w-full bg-black/50 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-cyan-400 focus:outline-none focus:border-cyan-500" required>
+                </div>
+                <div id="login-error" class="text-xs text-red-500 hidden font-mono">Authentication failed.</div>
+                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-gray-200 py-2 text-xs uppercase font-bold tracking-widest transition-colors mt-4">
+                    Initialize Connection
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="password-overlay" class="fixed inset-0 bg-obsidian z-[100] hidden items-center justify-center">
+        <div class="bg-slate-950 border border-slate-800 p-8 w-[400px] shadow-2xl relative">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-red-500"></div>
+            <h1 id="pwd-modal-title" class="text-2xl font-extrabold tracking-widest text-amber-400 font-mono mb-2">Change Password</h1>
+            <p id="pwd-modal-desc" class="text-xs uppercase tracking-widest text-gray-500 mb-8">Credential Update Required</p>
+
+            <form id="password-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase text-slate-500 mb-1">New Passphrase</label>
+                    <input type="password" id="new-password" class="w-full bg-black/50 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-400 focus:outline-none focus:border-amber-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-slate-500 mb-1">Confirm Passphrase</label>
+                    <input type="password" id="confirm-password" class="w-full bg-black/50 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-400 focus:outline-none focus:border-amber-500" required>
+                </div>
+                <div id="password-error" class="text-xs text-red-500 hidden font-mono">Passwords do not match.</div>
+                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-gray-200 py-2 text-xs uppercase font-bold tracking-widest transition-colors mt-4">
+                    Update Credentials
+                </button>
+                <button type="button" id="pwd-cancel-btn" onclick="closeChangePassword()" class="w-full hidden text-slate-500 hover:text-slate-300 py-2 text-xs uppercase tracking-widest transition-colors mt-2">
+                    Cancel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <aside class="pane flex flex-col p-4">
+        <div class="mb-8">
+            <h1 class="text-xl font-extrabold tracking-widest text-cyan-400 font-mono">SENTINEL</h1>
+            <p class="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Forensic_Workbench</p>
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <h3 class="text-xs uppercase text-gray-400 mb-2 font-bold tracking-wider">Workspaces</h3>
+                <div class="space-y-1">
+                    <button id="nav-summary" onclick="switchMainView('summary')" class="w-full text-left px-3 py-2 text-sm nav-active rounded-r transition-all">
+                        ❖ Dashboard Summary
+                    </button>
+                    <button id="nav-telemetry" onclick="switchMainView('telemetry')" class="w-full text-left px-3 py-2 text-sm nav-inactive rounded-r transition-all flex justify-between items-center">
+                        <span>≡ Alert Telemetry</span>
+                        <span id="active-filter-badge" class="hidden bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">Filtered</span>
+                    </button>
+                    <button id="nav-ml" onclick="switchMainView('ml')" class="w-full text-left px-3 py-2 text-sm nav-inactive rounded-r transition-all flex justify-between items-center">
+                        <span>⎈ UEBA Engine</span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs uppercase text-gray-400 mb-2 font-bold tracking-wider">Global Health</h3>
+                <div class="bg-black/50 p-3 rounded border border-slate-800">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs">Database Link</span>
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    </div>
+                    <div id="filter-crit-btn" onclick="toggleCriticalFilter()" class="flex justify-between items-center cursor-pointer hover:bg-slate-800/50 p-2 -mx-2 rounded border border-transparent transition-all group">
+                        <span class="text-xs group-hover:text-cyan-400 transition-colors">Critical Alerts</span>
+                        <span id="nav-crit-count" class="text-xs font-mono text-crimson font-bold">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-800">
+                <h3 class="text-xs uppercase text-gray-400 mb-2 font-bold tracking-wider">Operator Settings</h3>
+                <button onclick="openChangePassword()" class="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded transition-colors">
+                    ⚙ Change Passphrase
+                </button>
+            </div>
+
+            <div class="mt-auto pt-6">
+                <h3 class="text-xs uppercase text-gray-400 mb-2 font-bold tracking-wider">Export Tools</h3>
+                <button onclick="exportCSV()" class="w-full text-left px-3 py-2 text-xs bg-slate-800 hover:bg-slate-700 rounded transition-colors text-gray-300 mb-2">
+                    [ ↓ ] Export to CSV
+                </button>
+                <button onclick="logout()" class="w-full text-left px-3 py-2 text-xs bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 rounded transition-colors text-red-400">
+                    [ X ] Terminate Session
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="pane p-6 flex flex-col relative overflow-hidden">
+
+        <div id="view-summary" class="flex-1 flex flex-col overflow-y-auto pr-2 pb-10">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-200">Telemetry Overview</h2>
+                <p class="text-xs text-gray-500">Click any chart segment to drill down into specific telemetry.</p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="col-span-2 bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[300px]">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Event Volume Timeline</h3>
+                    <div class="absolute top-10 left-4 right-4 bottom-4">
+                        <canvas id="chart-timeline"></canvas>
+                    </div>
+                </div>
+                <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[300px]">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Tactics Breakdown</h3>
+                    <div class="absolute top-10 left-4 right-4 bottom-4">
+                        <canvas id="chart-tactics"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[300px]">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Top Offending Processes</h3>
+                    <div class="absolute top-10 left-4 right-4 bottom-4">
+                        <canvas id="chart-processes"></canvas>
+                    </div>
+                </div>
+                <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[300px]">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Severity Distribution</h3>
+                    <div class="absolute top-10 left-4 right-4 bottom-4">
+                        <canvas id="chart-severity"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-ml" class="flex-1 flex flex-col hidden overflow-y-auto pr-2 pb-10">
+
+        <div class="mb-6 flex justify-between items-end border-b border-slate-800 pb-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-200">UEBA / ML Engine</h2>
+                <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">19D Extended Isolation Forest & Welford Variance Analytics</p>
+            </div>
+            <button onclick="forceModelRetrain()" class="text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded transition-colors flex items-center">
+                <span class="text-fuchsia-500 mr-2">⟳</span> Force Model Rebuild
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div class="bg-slate-900/50 border border-slate-800 p-5 rounded-lg shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                <h3 class="text-xs uppercase text-slate-400 font-bold mb-1">Active Profiles</h3>
+                <div id="ml-widget-profiles" class="text-3xl font-mono text-cyan-400 font-bold">--</div>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Welford Trackers</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800 p-5 rounded-lg shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                <h3 class="text-xs uppercase text-slate-400 font-bold mb-1">Global Baselines</h3>
+                <div id="ml-widget-roles" class="text-3xl font-mono text-amber-400 font-bold">--</div>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Binaries Mapped</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800 p-5 rounded-lg shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+                <h3 class="text-xs uppercase text-slate-400 font-bold mb-1">Adaptive Threshold</h3>
+                <div id="ml-widget-threshold" class="text-3xl font-mono text-purple-400 font-bold">0.82</div>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">P95 Anomaly Floor</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800 p-5 rounded-lg shadow-lg relative overflow-hidden flex flex-col justify-center">
+                <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                <h3 class="text-xs uppercase text-slate-400 font-bold mb-2">Isolation Forest</h3>
+                <div class="flex items-center mb-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                    <span class="text-emerald-400 font-mono text-sm uppercase tracking-widest">Online</span>
+                </div>
+                <p id="ml-widget-latency" class="text-[10px] text-slate-500 uppercase tracking-widest">Last Build: 2m ago (4ms)</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[350px] lg:col-span-2 shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Anomaly Score Trend (LotL Map)</h3>
+                    <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-1 rounded">Last 500 Vectors</span>
+                </div>
+                <div class="relative flex-1 w-full">
+                    <canvas id="chart-ml-trend"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[350px] shadow-lg flex flex-col">
+                <h3 class="text-xs uppercase text-slate-400 font-bold mb-4">Top Feature Contributions</h3>
+                <div class="relative flex-1 w-full">
+                    <canvas id="chart-ml-features"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[350px] flex flex-col shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Active Process Tracking (Welford's Alg)</h3>
+                    <input type="text" placeholder="Filter hashes..." class="bg-black/50 border border-slate-700 rounded px-2 py-1 text-[10px] text-cyan-400 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="overflow-y-auto flex-1 border border-slate-800 rounded bg-black/30 custom-scrollbar">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase sticky top-0 border-b border-slate-800 shadow">
+                            <tr>
+                                <th class="p-2 font-semibold">Process Hash</th>
+                                <th class="p-2 font-semibold">Events</th>
+                                <th class="p-2 font-semibold">Mean Δ (s)</th>
+                                <th class="p-2 font-semibold">Variance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ml-process-tbody" class="divide-y divide-slate-800/50 font-mono text-[11px] text-gray-300">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800 rounded-lg p-4 relative h-[350px] flex flex-col shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xs uppercase text-slate-400 font-bold">Global Role Execution Baselines</h3>
+                    <input type="text" placeholder="Filter binaries..." class="bg-black/50 border border-slate-700 rounded px-2 py-1 text-[10px] text-amber-400 focus:outline-none focus:border-amber-500">
+                </div>
+                <div class="overflow-y-auto flex-1 border border-slate-800 rounded bg-black/30 custom-scrollbar">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 text-[10px] uppercase sticky top-0 border-b border-slate-800 shadow">
+                            <tr>
+                                <th class="p-2 font-semibold">Binary Name</th>
+                                <th class="p-2 font-semibold">Executions</th>
+                                <th class="p-2 font-semibold">Max Velocity</th>
+                                <th class="p-2 font-semibold">Mean Entropy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ml-roles-tbody" class="divide-y divide-slate-800/50 font-mono text-[11px] text-gray-300">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <div id="view-telemetry" class="flex-1 flex flex-col hidden h-full">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-200">Alert Telemetry</h2>
+                    <div id="filter-banner" class="hidden mt-2 flex items-center gap-2">
+                        <span class="text-xs text-gray-500 uppercase tracking-wider">Drill-Down Active:</span>
+                        <span id="filter-label" class="text-xs bg-cyan-900/50 text-cyan-300 border border-cyan-700/50 px-2 py-0.5 rounded font-mono"></span>
+                        <button onclick="clearFilters()" class="text-xs text-red-400 hover:text-red-300 border border-red-900/50 bg-red-900/20 px-2 py-0.5 rounded transition-colors">Clear ✕</button>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <input type="text" id="searchInput" placeholder="Search vectors..." class="bg-black/50 border border-slate-700 rounded px-3 py-1 text-sm font-mono text-cyan-400 focus:outline-none focus:border-cyan-500 w-64">
+                </div>
+            </div>
+
+            <div class="flex-1 border border-slate-800 rounded bg-black/30 overflow-hidden flex flex-col relative">
+                <div class="overflow-y-auto flex-1 absolute inset-0 w-full">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-gray-400 text-xs uppercase sticky top-0 backdrop-blur z-10 border-b border-slate-800 shadow-md">
+                            <tr>
+                                <th class="p-3 font-semibold cursor-pointer hover:text-cyan-400 select-none group whitespace-nowrap" onclick="setSort('timestamp')">
+                                    Date & Time <span id="sort-timestamp" class="text-cyan-500 inline-block w-4">↓</span>
+                                </th>
+                                <th class="p-3 font-semibold cursor-pointer hover:text-cyan-400 select-none group" onclick="setSort('comm')">
+                                    Process <span id="sort-comm" class="text-cyan-500 inline-block w-4"></span>
+                                </th>
+
+                                <th class="p-3 font-semibold cursor-pointer hover:text-cyan-400 select-none group" onclick="setSort('container_name')">
+                                    Container <span id="sort-container_name" class="text-cyan-500 inline-block w-4"></span>
+                                </th>
+
+                                <th class="p-3 font-semibold cursor-pointer hover:text-cyan-400 select-none group" onclick="setSort('mitre_technique')">
+                                    MITRE TTP <span id="sort-mitre_technique" class="text-cyan-500 inline-block w-4"></span>
+                                </th>
+                                <th class="p-3 font-semibold cursor-pointer hover:text-cyan-400 select-none group" onclick="setSort('anomaly_score')">
+                                    Anomaly Score <span id="sort-anomaly_score" class="text-cyan-500 inline-block w-4"></span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="grid-body" class="divide-y divide-slate-800/50 font-mono text-[11px]">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <aside id="inspector" class="inspector flex flex-col relative bg-slate-950">
+        <button onclick="closeInspector()" class="absolute top-4 right-4 text-gray-500 hover:text-white z-50">✕</button>
+
+        <div class="flex-1 flex flex-col w-[500px]">
+            <div class="p-6 pb-0 mb-4 border-b border-slate-800">
+                <span id="ins-level" class="text-[10px] uppercase px-2 py-1 rounded bg-red-900/30 text-red-500 font-bold tracking-widest border border-red-900/50"></span>
+                <h2 id="ins-process" class="text-2xl font-bold mt-3 text-cyan-300 font-mono"></h2>
+                <p id="ins-technique" class="text-sm text-purple-400 font-mono mt-1 mb-4"></p>
+
+                <div class="flex space-x-4 border-b border-slate-800 text-xs font-bold tracking-widest text-gray-500">
+                    <button onclick="switchTab('overview')" id="tab-btn-overview" class="pb-2 border-b-2 border-cyan-500 text-cyan-400 transition-colors">OVERVIEW</button>
+                    <button onclick="switchTab('lineage')" id="tab-btn-lineage" class="pb-2 border-b-2 border-transparent hover:text-gray-300 transition-colors">LINEAGE</button>
+                    <button onclick="switchTab('timeline')" id="tab-btn-timeline" class="pb-2 border-b-2 border-transparent hover:text-gray-300 transition-colors">TIMELINE</button>
+                    <button onclick="switchTab('ueba')" id="tab-btn-ueba" class="pb-2 border-b-2 border-transparent hover:text-gray-300 transition-colors">UEBA_MATH</button>
+                </div>
+            </div>
+
+            <div class="p-6 flex-1 overflow-y-auto">
+                <div id="tab-overview" class="tab-content block space-y-6">
+                    <div>
+                        <h3 class="text-xs uppercase text-gray-600 font-bold mb-2">Command Execution</h3>
+                        <div class="bg-black/80 p-3 rounded border border-slate-800 font-mono text-xs text-gray-300 break-all select-all">
+                            <span id="ins-cmd" class="text-cyan-200"></span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-xs font-mono">
+                        <div class="bg-black/50 p-3 rounded border border-slate-800">
+                            <span class="text-slate-500 block mb-1">Actor PID / Lineage</span>
+                            <span id="ins-pid" class="text-gray-200"></span>
+                        </div>
+                        <div class="bg-black/50 p-3 rounded border border-slate-800">
+                            <span class="text-slate-500 block mb-1">Executing User</span>
+                            <span id="ins-uid" class="text-gray-200"></span>
+                        </div>
+
+                        <div id="ins-container-block" class="bg-cyan-950/20 p-3 rounded border border-cyan-900/50 col-span-2 hidden">
+                            <span class="text-cyan-600 block mb-1 uppercase tracking-widest text-[10px] font-bold">Container Boundary</span>
+                            <span id="ins-container" class="text-cyan-300"></span>
+                        </div>
+
+                        <div class="bg-black/50 p-3 rounded border border-slate-800 col-span-2">
+                            <span class="text-slate-500 block mb-1">Target Network Tuple</span>
+                            <span id="ins-net" class="text-amber-400"></span>
+                        </div>
+                    </div> </div> <div id="tab-lineage" class="tab-content hidden">
+                    <div id="lineage-graph" class="bg-black/80 p-4 rounded border border-slate-800 flex justify-center text-xs min-h-[300px]"></div>
+                </div>
+
+                <div id="tab-timeline" class="tab-content hidden">
+                    <div class="relative border-l border-slate-700 ml-3 space-y-6 pb-4" id="timeline-feed"></div>
+                </div>
+
+                <div id="tab-ueba" class="tab-content hidden space-y-4">
+                    <div class="bg-black/50 p-3 rounded border border-slate-800 flex justify-between items-center text-xs font-mono">
+                        <span class="text-slate-500">Anomaly Score</span>
+                        <span id="ins-ueba-score" class="text-red-500 font-bold text-lg"></span>
+                    </div>
+                    <div class="bg-black/50 p-3 rounded border border-slate-800 flex justify-between items-center text-xs font-mono">
+                        <span class="text-slate-500">Shannon Entropy</span>
+                        <span id="ins-ueba-entropy" class="text-amber-400"></span>
+                    </div>
+                    <div class="bg-black/50 p-3 rounded border border-slate-800 flex justify-between items-center text-xs font-mono">
+                        <span class="text-slate-500">Execution Velocity</span>
+                        <span id="ins-ueba-velocity" class="text-cyan-400"></span>
+                    </div>
+                    <div class="bg-black/50 p-3 rounded border border-slate-800 flex justify-between items-center text-xs font-mono">
+                        <span class="text-slate-500">Path Depth</span>
+                        <span id="ins-ueba-depth" class="text-gray-300"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // Set Chart.js Globals
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.borderColor = '#1e293b';
+
+        mermaid.initialize({ theme: 'dark', startOnLoad: false });
+
+        let activeData = [];
+        let authToken = localStorage.getItem('sentinel_token');
+        let tempToken = null;
+        let pollInterval;
+
+        // Data State
+        let sortCol = 'timestamp';
+        let sortDesc = true;
+        let showOnlyCriticals = false;
+        let activeDrillDown = null;
+
+        // Chart Instances
+        let chartInstances = {};
+
+        function checkAuth() {
+            if (!authToken) {
+                document.getElementById('login-overlay').classList.remove('hidden');
+            } else {
+                document.getElementById('login-overlay').classList.add('hidden');
+                initDashboard();
+            }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const formData = new URLSearchParams();
+            formData.append('username', u);
+            formData.append('password', p);
+
+            try {
+                const res = await fetch('/api/v2/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                if (!res.ok) throw new Error('Auth failed');
+                const data = await res.json();
+
+                if (data.must_change_pwd) {
+                    tempToken = data.access_token;
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('password-overlay').classList.remove('hidden');
+                    document.getElementById('password-overlay').classList.add('flex');
+                    document.getElementById('pwd-cancel-btn').classList.add('hidden');
+                } else {
+                    authToken = data.access_token;
+                    localStorage.setItem('sentinel_token', authToken);
+                    checkAuth();
+                }
+            } catch (err) {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        });
+
+        function logout() {
+            authToken = null;
+            localStorage.removeItem('sentinel_token');
+            if (pollInterval) clearInterval(pollInterval);
+            checkAuth();
+        }
+
+        async function fetchSecure(url, options = {}) {
+            if (!authToken) { checkAuth(); throw new Error("No token"); }
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${authToken}` };
+            const res = await fetch(url, options);
+            if (res.status === 401) { logout(); throw new Error("Session expired"); }
+            return res;
+        }
+
+        function switchMainView(view) {
+            document.getElementById('view-summary').classList.toggle('hidden', view !== 'summary');
+            document.getElementById('view-telemetry').classList.toggle('hidden', view !== 'telemetry');
+            document.getElementById('view-ml').classList.toggle('hidden', view !== 'ml');
+
+            const sumBtn = document.getElementById('nav-summary');
+            const telBtn = document.getElementById('nav-telemetry');
+            const mlBtn = document.getElementById('nav-ml');
+
+            sumBtn.className = "w-full text-left px-3 py-2 text-sm nav-inactive rounded-r transition-all";
+            telBtn.className = "w-full text-left px-3 py-2 text-sm nav-inactive rounded-r transition-all flex justify-between items-center";
+            mlBtn.className = "w-full text-left px-3 py-2 text-sm nav-inactive rounded-r transition-all flex justify-between items-center";
+
+            if (view === 'summary') {
+                sumBtn.className = "w-full text-left px-3 py-2 text-sm nav-active rounded-r transition-all";
+                setTimeout(drawCharts, 50);
+            } else if (view === 'telemetry') {
+                telBtn.className = "w-full text-left px-3 py-2 text-sm nav-active rounded-r transition-all flex justify-between items-center";
+            } else if (view === 'ml') {
+                mlBtn.className = "w-full text-left px-3 py-2 text-sm nav-active rounded-r transition-all flex justify-between items-center";
+                fetchMlTrends();
+                fetchMlProfiles();
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+
+            document.querySelectorAll('[id^="tab-btn-"]').forEach(el => {
+                el.classList.remove('border-cyan-500', 'text-cyan-400');
+                el.classList.add('border-transparent', 'text-gray-500');
+            });
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            activeBtn.classList.remove('border-transparent', 'text-gray-500');
+            activeBtn.classList.add('border-cyan-500', 'text-cyan-400');
+        }
+
+        async function fetchAlerts() {
+            const searchTerm = document.getElementById('searchInput').value;
+            const url = searchTerm
+                ? `/api/v2/alerts/query?search=${encodeURIComponent(searchTerm)}&limit=2500&_t=${Date.now()}`
+                : `/api/v2/alerts/query?limit=2500&_t=${Date.now()}`;
+
+            try {
+                const res = await fetchSecure(url);
+                const newData = await res.json();
+
+                if (!Array.isArray(newData)) {
+                    console.error("API returned invalid data payload.", newData);
+                    return;
+                }
+
+                let dataChanged = false;
+                if (activeData.length !== newData.length) {
+                    dataChanged = true;
+                } else if (newData.length > 0 && activeData.length > 0) {
+                    if (newData[0].timestamp !== activeData[0].timestamp || newData[0].pid !== activeData[0].pid) {
+                        dataChanged = true;
+                    }
+                }
+
+                if (dataChanged || activeData.length === 0) {
+                    activeData = newData;
+                    renderGrid();
+                    if(!document.getElementById('view-summary').classList.contains('hidden')) {
+                        drawCharts();
+                    }
+                }
+                updateMetrics();
+            } catch (err) { console.error("Database Query Failed:", err); }
+        }
+
+        function extractTacticForChart(row) {
+            let tactic = row.mitre_tactic;
+            if (!tactic || tactic === 'Unknown') {
+                if (row.mitre_technique && row.mitre_technique.includes('ML Anomaly')) {
+                    return 'ML / UEBA Detection';
+                }
+                return 'Uncategorized';
+            }
+            return tactic;
+        }
+
+        // --- Chart.js Generation ---
+        function drawCharts() {
+            let chartData = activeData || [];
+            if (showOnlyCriticals) {
+                chartData = chartData.filter(row => row.level === 'CRITICAL');
+            }
+
+            // Chart 1: Timeline (Line)
+            const timeBuckets = {};
+            [...chartData].reverse().forEach(row => {
+                const d = new Date(row.timestamp * 1000);
+                const bucket = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                timeBuckets[bucket] = (timeBuckets[bucket] || 0) + 1;
+            });
+            const tLabels = Object.keys(timeBuckets).length ? Object.keys(timeBuckets) : ['No Data'];
+            const tValues = Object.values(timeBuckets).length ? Object.values(timeBuckets) : [0];
+
+            if(chartInstances.timeline) chartInstances.timeline.destroy();
+            chartInstances.timeline = new Chart(document.getElementById('chart-timeline'), {
+                type: 'line',
+                data: {
+                    labels: tLabels,
+                    datasets: [{
+                        data: tValues, borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } }, y: { beginAtZero: true, border: { dash: [4, 4] } } },
+                    onClick: (e, elements) => { if(elements.length) applyFilter('time', tLabels[elements[0].index]); }
+                }
+            });
+
+            // Chart 2: Tactics (Doughnut)
+            const tactics = {};
+            chartData.forEach(r => {
+                const tacLabel = extractTacticForChart(r);
+                tactics[tacLabel] = (tactics[tacLabel] || 0) + 1;
+            });
+            const tacLabels = Object.keys(tactics).length ? Object.keys(tactics) : ['Clean Baseline'];
+            const tacVals = Object.values(tactics).length ? Object.values(tactics) : [1];
+
+            if(chartInstances.tactics) chartInstances.tactics.destroy();
+            chartInstances.tactics = new Chart(document.getElementById('chart-tactics'), {
+                type: 'doughnut',
+                data: {
+                    labels: tacLabels,
+                    datasets: [{ data: tacVals, backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#8b5cf6', '#10b981'], borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            onClick: (e, legendItem) => { applyFilter('mitre_tactic_display', legendItem.text); }
+                        }
+                    },
+                    onClick: (e, elements) => { if(elements.length) applyFilter('mitre_tactic_display', tacLabels[elements[0].index]); }
+                }
+            });
+
+            // Chart 3: Processes (Bar)
+            const procs = {};
+            chartData.forEach(r => { procs[r.comm || 'unknown'] = (procs[r.comm || 'unknown'] || 0) + 1; });
+            const sortedProcs = Object.entries(procs).sort((a,b) => b[1]-a[1]).slice(0, 10);
+            const pLabels = sortedProcs.length ? sortedProcs.map(p => p[0]) : ['None'];
+            const pVals = sortedProcs.length ? sortedProcs.map(p => p[1]) : [0];
+
+            if(chartInstances.processes) chartInstances.processes.destroy();
+            chartInstances.processes = new Chart(document.getElementById('chart-processes'), {
+                type: 'bar',
+                data: {
+                    labels: pLabels,
+                    datasets: [{ data: pVals, backgroundColor: '#3b82f6', borderRadius: 4 }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    onClick: (e, elements) => { if(elements.length) applyFilter('comm', pLabels[elements[0].index]); }
+                }
+            });
+
+            // Chart 4: Severity (Bar)
+            const severities = { 'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0 };
+            chartData.forEach(r => { severities[r.level || 'INFO']++; });
+
+            if(chartInstances.severity) chartInstances.severity.destroy();
+            chartInstances.severity = new Chart(document.getElementById('chart-severity'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(severities),
+                    datasets: [{ data: Object.values(severities), backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#475569'], borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false } } },
+                    onClick: (e, elements) => { if(elements.length) applyFilter('level', Object.keys(severities)[elements[0].index]); }
+                }
+            });
+        }
+
+        // --- Filtering & Sorting ---
+        function applyFilter(key, value) {
+            activeDrillDown = { key, value };
+            document.getElementById('filter-banner').classList.remove('hidden');
+            document.getElementById('filter-label').innerText = `${key} = ${value}`;
+            document.getElementById('active-filter-badge').classList.remove('hidden');
+
+            switchMainView('telemetry');
+            renderGrid();
+        }
+
+        function clearFilters() {
+            activeDrillDown = null;
+            document.getElementById('filter-banner').classList.add('hidden');
+            document.getElementById('active-filter-badge').classList.add('hidden');
+            renderGrid();
+        }
+
+        function toggleCriticalFilter() {
+            showOnlyCriticals = !showOnlyCriticals;
+            const btn = document.getElementById('filter-crit-btn');
+            if (showOnlyCriticals) {
+                btn.classList.add('bg-red-900/30', 'border-red-900/50');
+                btn.classList.remove('border-transparent');
+            } else {
+                btn.classList.remove('bg-red-900/30', 'border-red-900/50');
+                btn.classList.add('border-transparent');
+            }
+
+            renderGrid();
+
+            if (!document.getElementById('view-summary').classList.contains('hidden')) {
+                drawCharts();
+            }
+        }
+
+        function setSort(col) {
+            if (sortCol === col) {
+                sortDesc = !sortDesc;
+            } else {
+                sortCol = col;
+                sortDesc = true;
+            }
+            renderGrid();
+        }
+
+        function renderGrid() {
+            const tbody = document.getElementById('grid-body');
+            tbody.innerHTML = '';
+
+            ['timestamp', 'comm', 'container_name', 'mitre_technique', 'anomaly_score'].forEach(col => {
+                const el = document.getElementById(`sort-${col}`);
+                if (el) el.innerText = (sortCol === col) ? (sortDesc ? '↓' : '↑') : '';
+            });
+
+            let displayData = [...activeData];
+            if (showOnlyCriticals) {
+                displayData = displayData.filter(row => row.level === 'CRITICAL');
+            }
+
+            if (activeDrillDown) {
+                if (activeDrillDown.key === 'time') {
+                    displayData = displayData.filter(row => {
+                        const d = new Date(row.timestamp * 1000);
+                        const bucket = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                        return bucket === activeDrillDown.value;
+                    });
+                } else if (activeDrillDown.key === 'mitre_tactic_display') {
+                    displayData = displayData.filter(row => extractTacticForChart(row) === activeDrillDown.value);
+                } else {
+                    displayData = displayData.filter(row => (row[activeDrillDown.key] || 'Unknown') === activeDrillDown.value);
+                }
+            }
+
+            displayData.sort((a, b) => {
+                let valA = a[sortCol] ?? '';
+                let valB = b[sortCol] ?? '';
+
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortDesc ? 1 : -1;
+                if (valA > valB) return sortDesc ? -1 : 1;
+                return 0;
+            });
+
+            const renderLimit = 250;
+            const slicedData = displayData.slice(0, renderLimit);
+
+            if (slicedData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 font-mono text-sm">No telemetry found in current view.</td></tr>';
+                return;
+            }
+
+            slicedData.forEach((row) => {
+                const originalIndex = activeData.indexOf(row);
+                const isCrit = row.level === 'CRITICAL';
+                const scoreColor = isCrit ? 'text-red-500 font-bold' : 'text-amber-500';
+
+                const dateObj = new Date(row.timestamp * 1000);
+                const formattedDate = dateObj.toLocaleString('en-US', {
+                    year: 'numeric', month: 'short', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                });
+
+                const tr = document.createElement('tr');
+                tr.onclick = () => openInspector(originalIndex, tr);
+                tr.innerHTML = `
+                    <td class="p-3 text-gray-400 whitespace-nowrap">${formattedDate}</td>
+                    <td class="p-3 text-cyan-400 font-bold">${row.comm || 'unknown'}</td>
+                    <td class="p-3 text-purple-400 text-xs">${row.container_name && row.container_name !== 'host' ? '📦 ' + row.container_name : 'host'}</td>
+                    <td class="p-3 text-purple-400">${row.mitre_technique || 'N/A'}</td>
+                    <td class="p-3 ${scoreColor}">${(row.anomaly_score * 100).toFixed(1)}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function openInspector(index, rowElement) {
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+            rowElement.classList.add('selected');
+
+            const data = activeData[index];
+            const inspector = document.getElementById('inspector');
+
+            document.getElementById('ins-level').innerText = data.level || 'UNKNOWN';
+            document.getElementById('ins-process').innerText = data.comm || 'Unknown';
+            document.getElementById('ins-technique').innerText = `${data.mitre_tactic} | ${data.mitre_technique}`;
+            document.getElementById('ins-cmd').innerText = data.command_line || '[No arguments captured]';
+            const parentDisplay = data.parent_comm ? `${data.parent_comm} (${data.ppid})` : data.ppid;
+            document.getElementById('ins-pid').innerText = `${data.pid} / ${parentDisplay}`;
+            const userDisplay = data.user_name ? `${data.user_name} (UID: ${data.uid || 0})` : (data.uid || '0');
+            document.getElementById('ins-uid').innerText = userDisplay;
+            const containerBlock = document.getElementById('ins-container-block');
+            if (data.container_name && data.container_name !== 'host') {
+                document.getElementById('ins-container').innerText = `${data.container_name} [ID: ${data.container_id.substring(0, 12)}]`;
+                containerBlock.classList.remove('hidden');
+            } else {
+                containerBlock.classList.add('hidden');
+            }
+            let netString = 'None';
+            if (data.dest_ip) {
+                const src = data.source_port ? `:${data.source_port}` : '';
+                const dst = data.dest_port ? `:${data.dest_port}` : '';
+                netString = `Local${src} -> ${data.dest_ip}${dst}`;
+            }
+            document.getElementById('ins-net').innerText = netString;
+            document.getElementById('ins-ueba-score').innerText = `${(data.anomaly_score * 100).toFixed(1)}%`;
+            document.getElementById('ins-ueba-entropy').innerText = data.shannon_entropy ? data.shannon_entropy.toFixed(3) : 'N/A';
+            document.getElementById('ins-ueba-velocity').innerText = data.execution_velocity ? data.execution_velocity.toFixed(1) + ' ev/s' : 'N/A';
+            document.getElementById('ins-ueba-depth').innerText = data.path_depth !== null ? data.path_depth : '0';
+
+            const graphContainer = document.getElementById('lineage-graph');
+            graphContainer.innerHTML = '';
+
+            const safeComm = (data.comm || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            const safeId = `graph_${data.pid}_${data.ppid}`;
+
+            const graphDef = `graph TD
+    A["PPID: ${data.ppid || '?'}"] -->|spawns| B_${safeComm}["${data.comm}<br/>PID: ${data.pid}"]
+    classDef crit fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fca5a5;
+    class B_${safeComm} crit;`;
+
+            try {
+                const { svg } = await mermaid.render(safeId, graphDef);
+                graphContainer.innerHTML = svg;
+            } catch(e) {
+                console.error("Mermaid Render Error:", e);
+                graphContainer.innerHTML = `<span class="text-red-500 text-xs">Graph Render Failed</span>`;
+            }
+
+            loadTimeline(data.pid);
+            switchTab('overview');
+            inspector.classList.add('open');
+        }
+
+        function closeInspector() {
+            document.getElementById('inspector').classList.remove('open');
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+        }
+
+        async function loadTimeline(pid) {
+            const timelineDiv = document.getElementById('timeline-feed');
+            timelineDiv.innerHTML = '<span class="text-xs text-gray-500 ml-4">Loading kernel telemetry...</span>';
+
+            try {
+                const res = await fetchSecure(`/api/v2/forensics/timeline/${pid}`);
+                const events = await res.json();
+
+                let html = '';
+                events.forEach(ev => {
+                    const isCrit = ev.level === 'CRITICAL';
+                    const dotColor = isCrit ? 'bg-red-500' : 'bg-cyan-500';
+                    const time = new Date(ev.timestamp * 1000).toLocaleTimeString();
+
+                    html += `
+                    <div class="relative pl-6">
+                        <div class="absolute w-3 h-3 ${dotColor} rounded-full -left-[6.5px] top-1 border-2 border-slate-950"></div>
+                        <div class="text-[10px] text-gray-500 mb-1">${time}</div>
+                        <div class="bg-black/50 p-2 border border-slate-800 rounded text-xs font-mono">
+                            <span class="text-cyan-400">[${ev.mitre_technique}]</span>
+                            <span class="text-gray-300">${ev.message || ev.comm}</span>
+                        </div>
+                    </div>`;
+                });
+
+                if(html === '') html = '<span class="text-xs text-gray-500 ml-4">No additional events found.</span>';
+                timelineDiv.innerHTML = html;
+            } catch (e) {
+                timelineDiv.innerHTML = '<span class="text-xs text-red-500 ml-4">Failed to fetch timeline data.</span>';
+            }
+        }
+
+        async function updateMetrics() {
+            try {
+                const res = await fetchSecure('/api/v2/metrics');
+                const metrics = await res.json();
+                document.getElementById('nav-crit-count').innerText = metrics.critical_alerts || 0;
+            } catch (e) {
+                console.error("Metric sync failed");
+            }
+        }
+
+        function exportCSV() {
+            if (!activeData.length) return;
+            const headers = Object.keys(activeData[0]).join(',');
+            const rows = activeData.map(obj => Object.values(obj).map(v => `"${(v||'').toString().replace(/"/g, '""')}"`).join(','));
+            const csv = [headers, ...rows].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `LinuxSentinel_ForensicExport_${Date.now()}.csv`;
+            a.click();
+        }
+
+        document.getElementById('searchInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') fetchAlerts();
+        });
+
+        // --- Password Management ---
+        function openChangePassword() {
+            document.getElementById('password-overlay').classList.remove('hidden');
+            document.getElementById('password-overlay').classList.add('flex');
+            document.getElementById('pwd-modal-title').innerText = "OPERATOR SETTINGS";
+            document.getElementById('pwd-modal-desc').innerText = "Update your passphrase below.";
+            document.getElementById('pwd-cancel-btn').classList.remove('hidden');
+            document.getElementById('password-error').classList.add('hidden');
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        }
+
+        function closeChangePassword() {
+            document.getElementById('password-overlay').classList.add('hidden');
+            document.getElementById('password-overlay').classList.remove('flex');
+        }
+
+        document.getElementById('password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const p1 = document.getElementById('new-password').value;
+            const p2 = document.getElementById('confirm-password').value;
+            const err = document.getElementById('password-error');
+
+            if (p1 !== p2 || p1.length < 8) {
+                err.innerText = "Passphrases must match and be at least 8 characters.";
+                err.classList.remove('hidden');
+                return;
+            }
+
+            const tokenToUse = tempToken || authToken;
+
+            try {
+                const res = await fetch('/api/v2/auth/change_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${tokenToUse}`
+                    },
+                    body: JSON.stringify({ new_password: p1 })
+                });
+
+                if (!res.ok) throw new Error('Update failed');
+
+                if (tempToken) {
+                    authToken = tempToken;
+                    localStorage.setItem('sentinel_token', authToken);
+                    tempToken = null;
+                    closeChangePassword();
+                    checkAuth();
+                } else {
+                    closeChangePassword();
+                }
+            } catch (error) {
+                err.innerText = "Server error. Could not update passphrase.";
+                err.classList.remove('hidden');
+            }
+        });
+
+        // --- ML Trend Rendering ---
+        async function fetchMlTrends() {
+            try {
+                const res = await fetchSecure('/api/v2/ml/trends');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('ml-widget-profiles').innerText = (data.stats.total_process_profiles || 0).toLocaleString();
+                document.getElementById('ml-widget-roles').innerText = (data.stats.active_roles || 0).toLocaleString();
+
+                const sortedTrends = (data.trends || []).sort((a, b) => a.timestamp - b.timestamp);
+                const labels = sortedTrends.length ? sortedTrends.map(t => new Date(t.timestamp * 1000).toLocaleTimeString()) : ['No Baselines'];
+                const scores = sortedTrends.length ? sortedTrends.map(t => t.anomaly_score * 100) : [0];
+
+                if(chartInstances.mlTrend) chartInstances.mlTrend.destroy();
+                chartInstances.mlTrend = new Chart(document.getElementById('chart-ml-trend'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Anomaly Score %',
+                            data: scores,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            borderWidth: 2, fill: true, tension: 0.3, pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, max: 100 } }
+                    }
+                });
+
+                if(chartInstances.mlFeatures) chartInstances.mlFeatures.destroy();
+                const featureCanvas = document.getElementById('chart-ml-features');
+                if (featureCanvas) {
+                    chartInstances.mlFeatures = new Chart(featureCanvas, {
+                        type: 'radar',
+                        data: {
+                            labels: ['Velocity', 'Entropy', 'Syscalls', 'Paths', 'Network'],
+                            datasets: [{
+                                label: 'Model Weights',
+                                data: [0.8, 0.6, 0.9, 0.4, 0.7],
+                                borderColor: '#06b6d4',
+                                backgroundColor: 'rgba(6, 182, 212, 0.2)'
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            scales: { r: { grid: { color: '#1e293b' }, ticks: { display: false }, pointLabels: { color: '#94a3b8' } } },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+            } catch (err) { console.error("ML Query Failed:", err); }
+        }
+
+        async function fetchMlProfiles() {
+            try {
+                const res = await fetchSecure('/api/v2/ml/profiles');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const pTbody = document.getElementById('ml-process-tbody');
+                if (pTbody && data.processes) {
+                    if (data.processes.length === 0) {
+                        pTbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 font-mono text-sm">Awaiting Welford Baselines...</td></tr>';
+                    } else {
+                        pTbody.innerHTML = data.processes.map(p => {
+                            const hashParts = p.process_hash.split('|');
+                            const shortHash = hashParts.length > 2 ? hashParts.slice(-3).join('|') : p.process_hash;
+                            const variance = p.event_count > 1 && p.m2_delta ? (p.m2_delta / (p.event_count - 1)).toFixed(6) : "0.000000";
+                            return `
+                            <tr class="hover:bg-slate-800/50">
+                                <td class="p-2 text-cyan-400 truncate max-w-[200px]" title="${p.process_hash}">${shortHash}</td>
+                                <td class="p-2">${p.event_count}</td>
+                                <td class="p-2 text-amber-200">${(p.mean_delta || 0).toFixed(4)}s</td>
+                                <td class="p-2 text-gray-400">${variance}</td>
+                            </tr>`;
+                        }).join('');
+                    }
+                }
+
+                const rTbody = document.getElementById('ml-roles-tbody');
+                if (rTbody && data.roles) {
+                    if (data.roles.length === 0) {
+                        rTbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500 font-mono text-sm">Awaiting Role Baselines...</td></tr>';
+                    } else {
+                        rTbody.innerHTML = data.roles.map(r => `
+                            <tr class="hover:bg-slate-800/50">
+                                <td class="p-2 text-fuchsia-400">${r.binary_name}</td>
+                                <td class="p-2">${r.instance_count}</td>
+                                <td class="p-2 text-emerald-400">${(r.max_velocity || 0).toFixed(2)} ev/s</td>
+                                <td class="p-2 text-purple-400">${(r.mean_entropy || 0).toFixed(2)}</td>
+                            </tr>`).join('');
+                    }
+                }
+            } catch (err) { console.error("ML Profiles Query Failed:", err); }
+        }
+
+        function initDashboard() {
+            fetchAlerts();
+            pollInterval = setInterval(fetchAlerts, 5000);
+
+            switchMainView('summary');
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

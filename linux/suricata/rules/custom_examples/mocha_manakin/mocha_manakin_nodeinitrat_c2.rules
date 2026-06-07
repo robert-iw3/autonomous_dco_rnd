@@ -1,0 +1,15 @@
+# author: Rob Weber
+# https://redcanary.com/blog/threat-intelligence/mocha-manakin-nodejs-backdoor/
+# c2 detection
+alert http any any -> any any (msg:"NodeInitRAT C2 Communication Detected (Mocha Manakin)"; \
+    flow:to_server; http.method; content:"POST"; http.uri; \
+    content:"/init1234"; endswith; http.host; \
+    content:".trycloudflare.com"; \
+    pcre:"/\.trycloudflare\.com$/"; \
+    classtype:trojan-activity; sid:5550000; rev:1;)
+# pwsh loader
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"PowerShell Download Cradle Detected (Invoke-WebRequest/Invoke-Expression)"; \
+    flow:to_server,established; content:"powershell"; nocase; \
+    content:"Invoke-WebRequest"; nocase; \
+    pcre:"/Invoke-WebRequest\s+(-Uri\s+)?(http|https):\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b.*?Invoke-Expression/i"; \
+    classtype:trojan-activity; sid:5550001; rev:1;)

@@ -1,0 +1,54 @@
+title: "Pay2Key Ransomware IOC and TTPs - Iranian Cyber Warfare"
+id: e975c066-4fae-4d24-b960-39d047511f69
+status: experimental
+description: Detects Indicators of Compromise (IOCs) and Tactics, Techniques,
+  and Procedures (TTPs) associated with the Pay2Key ransomware campaign as
+  reported by Morphisec in mid-2025. This includes specific file hashes, defense
+  evasion techniques like adding Defender exclusions, sandbox evasion, and
+  specific file artifacts.
+references:
+  - https://www.morphisec.com/blog/pay2key-resurgence-iranian-cyber-warfare/
+author: RW
+date: 2025-07-12
+tags:
+  - attack.ransomware
+  - attack.impact
+  - attack.t1486
+  - attack.defense_evasion
+  - attack.t1562.001
+  - threat_actor.fox_kitten
+  - malware.pay2key
+  - malware.mimic
+logsource:
+  - category: process_creation
+    product: windows
+  - category: file_event
+    product: windows
+detection:
+  ioa_defender_exclusion:
+    category: process_creation
+    Image|endswith: '\powershell.exe'
+    CommandLine|contains|all:
+      - 'Add-MpPreference'
+      - '-Force'
+      - '-ExclusionExtension'
+      - '.exe'
+  ioa_sandbox_evasion:
+    category: process_creation
+    Image|endswith: '\cmd.exe'
+    CommandLine|contains|all:
+      - 'reg query'
+      - 'HKEY_USERS\S-1-5-19' # Checks for LOCAL SERVICE account to evade sandboxes
+      - '||'
+      - 'exit'
+  ioa_file_drop:
+    category: file_event
+    TargetFilename|endswith:
+      - '\enc-build.exe' # Mimic ransomware component
+      - '\Avast Software\Avast\powrprof.exe' # Masqueraded NoDefender tool dropped in an anomalous location
+  condition: 1 of them
+falsepositives:
+  # The 'Add-MpPreference' command could be used legitimately by administrators, however, excluding all '.exe' files is highly suspicious and warrants investigation.
+  # The sandbox evasion technique might be used by other malware or legitimate software for environment checks.
+  # The file 'powrprof.exe' is a legitimate Windows binary; this rule is scoped to its creation in an anomalous path associated with this threat actor.
+level: high

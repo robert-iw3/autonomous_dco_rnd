@@ -1,0 +1,39 @@
+# Detect HTTP requests to pivqmane[.]com with specific URI paths for fb.mp4
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Suspicious Request to pivqmane.com for fb.mp4"; \
+flow:established,to_server; http.host; content:"pivqmane.com"; nocase; http.uri; content:"/doc/fb.mp4"; nocase; \
+reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525001; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect HTTP requests to pivqmane[.]com with specific URI paths for testonload.mp4
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Suspicious Request to pivqmane.com for testonload.mp4"; \
+flow:established,to_server; http.host; content:"pivqmane.com"; nocase; http.uri; content:"/testonload.mp4"; nocase; \
+reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525002; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect HTTP requests to 185.215.113.16 for amnew.exe
+alert http $HOME_NET any -> 185.215.113.16 any (msg:"ET MALWARE Suspicious Download of amnew.exe from 185.215.113.16"; \
+flow:established,to_server; http.uri; content:"/test/amnew.exe"; nocase; \
+reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; \
+sid:2525003; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect HTTP requests to 185.215.113.43 for Zu7JuNko/index.php
+alert http $HOME_NET any -> 185.215.113.43 any (msg:"ET MALWARE Suspicious Request to Amadey C2 at 185.215.113.43"; \
+flow:established,to_server; http.uri; content:"/Zu7JuNko/index.php"; nocase; \
+reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525004; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect traffic to or from suspicious IP 185.156.73.73
+alert ip $HOME_NET any -> 185.156.73.73 any (msg:"ET MALWARE Traffic to Suspicious IP 185.156.73.73"; \
+flow:to_server; reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525005; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect traffic to or from suspicious IP 185.215.113.209
+alert ip $HOME_NET any -> 185.215.113.209 any (msg:"ET MALWARE Traffic to Suspicious IP 185.215.113.209"; \
+flow:to_server; reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525006; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+# Detect traffic to or from suspicious IP 185.215.113.75
+alert ip $HOME_NET any -> 185.215.113.75 any (msg:"ET MALWARE Traffic to Suspicious IP 185.215.113.75"; \
+flow:to_server; reference:url,blog.talosintelligence.com/maas-operation-using-emmenhtal-and-amadey-linked-to-threats-against-ukrainian-entities/; \
+classtype:trojan-activity; sid:2525007; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)

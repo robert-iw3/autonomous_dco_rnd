@@ -1,0 +1,571 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 2350" font-family="'JetBrains Mono', 'Fira Code', 'SF Mono', monospace">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#64748b"/></marker>
+    <marker id="ao" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#f97316"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#22c55e"/></marker>
+    <marker id="ap" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#8b5cf6"/></marker>
+    <marker id="ab" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#3b82f6"/></marker>
+    <marker id="ay" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#eab308"/></marker>
+    <marker id="ac" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#06b6d4"/></marker>
+    <linearGradient id="sensor-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c0a09"/><stop offset="100%" stop-color="#1c1917"/></linearGradient>
+    <linearGradient id="ingress-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#172554"/></linearGradient>
+    <linearGradient id="detect-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#052e16"/><stop offset="100%" stop-color="#14532d"/></linearGradient>
+    <linearGradient id="llm-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
+    <linearGradient id="ops-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#1e293b"/></linearGradient>
+    <linearGradient id="mlops-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a1523"/><stop offset="100%" stop-color="#2e1065"/></linearGradient>
+    <linearGradient id="arkime-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c1220"/><stop offset="100%" stop-color="#0e2340"/></linearGradient>
+    <filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
+  </defs>
+
+  <rect width="1400" height="2350" fill="#09090b" rx="8"/>
+
+  <text x="700" y="36" text-anchor="middle" fill="#f8fafc" font-size="16" font-weight="700" letter-spacing="3">PROJECT EMPROS -- UNIFIED DATA FLOW</text>
+  <line x1="380" y1="46" x2="1020" y2="46" stroke="#334155" stroke-width="1"/>
+  <text x="700" y="62" text-anchor="middle" fill="#475569" font-size="9">6 Sensor Types → Integrity Verification → Detection Layers → LSTM-AE Baseline → Agentic LLM Swarm → 4-Track MLOps Pipeline</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 1: SENSOR FLEET & INTEGRITY STAMPING                    -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="80" width="1340" height="240" rx="6" fill="url(#sensor-bg)" stroke="#78716c" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="102" fill="#d6d3d1" font-size="10" font-weight="600" letter-spacing="2">PHASE 1 -- SENSOR FLEET &amp; INTEGRITY STAMPING</text>
+  <text x="1350" y="102" text-anchor="end" fill="#475569" font-size="9">Continuous · Per-Host · Multi-OS · 6 Sensor Types</text>
+
+  <!-- Row 1: Endpoint Sensors -->
+  <text x="50" y="125" fill="#78716c" font-size="8" letter-spacing="1">ENDPOINT SENSORS</text>
+
+  <rect x="50" y="133" width="185" height="58" rx="4" fill="#1c1917" stroke="#3b82f6" stroke-width="1"/>
+  <text x="143" y="152" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600">Linux Sentinel</text>
+  <text x="60" y="165" fill="#94a3b8" font-size="8">eBPF tracepoints · 5D sentinel_math</text>
+  <text x="60" y="177" fill="#3b82f6" font-size="8" font-weight="600">Parquet (ZSTD) · process lineage</text>
+
+  <rect x="250" y="133" width="185" height="58" rx="4" fill="#1c1917" stroke="#3b82f6" stroke-width="1"/>
+  <text x="343" y="152" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600">Linux C2</text>
+  <text x="260" y="165" fill="#94a3b8" font-size="8">Rust agent · 8D c2_math vector</text>
+  <text x="260" y="177" fill="#3b82f6" font-size="8" font-weight="600">Parquet (ZSTD) · beacon scoring</text>
+
+  <rect x="450" y="133" width="185" height="58" rx="4" fill="#1c1917" stroke="#3b82f6" stroke-width="1"/>
+  <text x="543" y="152" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600">Windows C2</text>
+  <text x="460" y="165" fill="#94a3b8" font-size="8">ETW + Rust FFI · 8D c2_math</text>
+  <text x="460" y="177" fill="#3b82f6" font-size="8" font-weight="600">Parquet (ZSTD) · Sysmon compat</text>
+
+  <rect x="650" y="133" width="185" height="58" rx="4" fill="#1c1917" stroke="#3b82f6" stroke-width="1"/>
+  <text x="743" y="152" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600">Windows DeepSensor</text>
+  <text x="660" y="165" fill="#94a3b8" font-size="8">Kernel callbacks · 4D windows_math</text>
+  <text x="660" y="177" fill="#3b82f6" font-size="8" font-weight="600">Parquet (ZSTD) · velocity scoring</text>
+
+  <!-- Row 2: Cloud + Network Sensors -->
+  <text x="50" y="208" fill="#78716c" font-size="8" letter-spacing="1">CLOUD &amp; NETWORK SENSORS</text>
+
+  <rect x="50" y="216" width="185" height="58" rx="4" fill="#1c1917" stroke="#06b6d4" stroke-width="1"/>
+  <text x="143" y="235" text-anchor="middle" fill="#67e8f9" font-size="10" font-weight="600">Cloud Flow</text>
+  <text x="60" y="248" fill="#94a3b8" font-size="8">AWS CloudTrail + Azure · 5D</text>
+  <text x="60" y="260" fill="#06b6d4" font-size="8" font-weight="600">Parquet (ZSTD) · cloud_flow vector</text>
+
+  <rect x="250" y="216" width="185" height="58" rx="4" fill="#1c1917" stroke="#06b6d4" stroke-width="1"/>
+  <text x="343" y="235" text-anchor="middle" fill="#67e8f9" font-size="10" font-weight="600">Network Tap (Arkime)</text>
+  <text x="260" y="248" fill="#94a3b8" font-size="8">AF_PACKET · 42+2 field SPI</text>
+  <text x="260" y="260" fill="#06b6d4" font-size="8" font-weight="600">Parquet (ZSTD) · 8D network_tap</text>
+
+  <!-- Integrity + Forwarder (right side) -->
+  <rect x="870" y="133" width="250" height="65" rx="4" fill="#085041" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="995" y="152" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">Lineage Stamper</text>
+  <text x="880" y="168" fill="#94a3b8" font-size="9">HMAC-SHA256 + monotonic sequence</text>
+  <text x="880" y="182" fill="#4ade80" font-size="9" font-weight="600">Constant-time at point of origin</text>
+
+  <rect x="1140" y="133" width="210" height="65" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="1245" y="152" text-anchor="middle" fill="#fed7aa" font-size="11" font-weight="600">nexus_forwarder</text>
+  <text x="1150" y="168" fill="#94a3b8" font-size="9">Async extraction cycle</text>
+  <text x="1150" y="182" fill="#f97316" font-size="9" font-weight="600">HTTPS POST + integrity headers</text>
+
+  <!-- Arkime sub-pipeline -->
+  <rect x="480" y="216" width="870" height="58" rx="4" fill="#0e2340" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="490" y="235" fill="#7dd3fc" font-size="9" font-weight="600">Arkime Network Tap Pipeline:</text>
+  <text x="490" y="252" fill="#94a3b8" font-size="8">Wire → AF_PACKET → Arkime Capture → Redpanda (Kafka) → Rust ML Gateway [simd_json · noise filter · 42-field extraction · is_internal_dst · port_class]</text>
+  <text x="490" y="264" fill="#0ea5e9" font-size="8" font-weight="600">→ SQLite WAL spool (max 50GB cap) → sorted Parquet (ZSTD, 50K row groups) → HTTPS POST + partition hints (X-Partition-Date/Hour)</text>
+
+  <!-- Sensor→Stamper arrows -->
+  <line x1="835" y1="162" x2="868" y2="162" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="1120" y1="165" x2="1138" y2="165" stroke="#f97316" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <!-- dashed lines showing all sensors stamp -->
+  <path d="M250 191 L250 205 L995 205 L995 198" fill="none" stroke="#4ade80" stroke-width="0.5" stroke-dasharray="4,3"/>
+  <text x="620" y="202" text-anchor="middle" fill="#4ade80" font-size="7">all 6 sensor types stamp at point of origin</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 2: MIDDLEWARE INGRESS & NATS FAN-OUT                     -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="335" width="1340" height="175" rx="6" fill="url(#ingress-bg)" stroke="#1d4ed8" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="357" fill="#93c5fd" font-size="10" font-weight="600" letter-spacing="2">PHASE 2 -- MIDDLEWARE INGRESS &amp; NATS FAN-OUT</text>
+  <text x="1350" y="357" text-anchor="end" fill="#475569" font-size="9">Zero-Trust · Schema-Neutral · Parallel Consumers</text>
+
+  <rect x="50" y="375" width="250" height="115" rx="4" fill="#0369a1" stroke="#7dd3fc" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="175" y="395" text-anchor="middle" fill="#e0f2fe" font-size="12" font-weight="700">Axum Ingress Gateway</text>
+  <text x="60" y="413" fill="#bae6fd" font-size="9">TLS 1.3 termination · Bearer JWT</text>
+  <text x="60" y="428" fill="#bae6fd" font-size="9">3-Tier integrity verification:</text>
+  <text x="70" y="441" fill="#7dd3fc" font-size="8">① HMAC  ② Temporal/Seq  ③ Cross-OS</text>
+  <text x="60" y="456" fill="#bae6fd" font-size="9">Binary schema neutrality</text>
+  <text x="60" y="471" fill="#7dd3fc" font-size="9" font-weight="600">Per-sensor routing via nexus.toml</text>
+
+  <rect x="360" y="375" width="210" height="95" rx="4" fill="#2e1065" stroke="#8b5cf6" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="465" y="395" text-anchor="middle" fill="#ddd6fe" font-size="12" font-weight="700">NATS JetStream</text>
+  <text x="370" y="413" fill="#c4b5fd" font-size="9">nexus.{sensor_type}.telemetry</text>
+  <text x="370" y="428" fill="#c4b5fd" font-size="9">nexus.soar.execute</text>
+  <text x="370" y="443" fill="#c4b5fd" font-size="9">nexus.training.rlhf</text>
+  <text x="370" y="458" fill="#c4b5fd" font-size="9">nexus.alerts.baseline</text>
+
+  <rect x="630" y="375" width="155" height="50" rx="4" fill="#1c1917" stroke="#94a3b8" stroke-width="1"/>
+  <text x="708" y="395" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="600">Splunk HEC</text>
+  <text x="640" y="413" fill="#94a3b8" font-size="9">Parquet → CIM</text>
+
+  <rect x="800" y="375" width="155" height="50" rx="4" fill="#1c1917" stroke="#94a3b8" stroke-width="1"/>
+  <text x="878" y="395" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="600">Elastic Bulk API</text>
+  <text x="810" y="413" fill="#94a3b8" font-size="9">Parquet → ECS</text>
+
+  <rect x="970" y="375" width="155" height="50" rx="4" fill="#1c1917" stroke="#94a3b8" stroke-width="1"/>
+  <text x="1048" y="395" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="600">SQL Server</text>
+  <text x="980" y="413" fill="#94a3b8" font-size="9">Parquet → TDS sproc</text>
+
+  <text x="810" y="455" fill="#475569" font-size="8">Passthrough + re-stamp (optional fan-out)</text>
+
+  <line x1="1245" y1="200" x2="1245" y2="310" stroke="#f97316" stroke-width="1.5" marker-end="url(#ao)"/>
+  <line x1="1245" y1="310" x2="175" y2="325" stroke="#f97316" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ao)"/>
+  <line x1="300" y1="420" x2="358" y2="420" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="570" y1="395" x2="628" y2="395" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <line x1="570" y1="415" x2="798" y2="395" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <line x1="570" y1="435" x2="968" y2="395" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 3: DETECTION LAYERS (RUST WORKERS)                       -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="525" width="1340" height="260" rx="6" fill="url(#detect-bg)" stroke="#15803d" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="547" fill="#86efac" font-size="10" font-weight="600" letter-spacing="2">PHASE 3 -- DETECTION LAYERS (RUST WORKERS) + MODEL A BASELINE</text>
+  <text x="1350" y="547" text-anchor="end" fill="#475569" font-size="9">Parallel · NATS Consumer Groups · High-Throughput</text>
+
+  <rect x="50" y="565" width="260" height="80" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="180" y="585" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">Worker: Qdrant (Layer 1)</text>
+  <text x="60" y="603" fill="#94a3b8" font-size="9">In-flight normalization (L2 / Euclidean)</text>
+  <text x="60" y="618" fill="#94a3b8" font-size="9">Named vectors per sensor schema</text>
+  <text x="60" y="633" fill="#4ade80" font-size="9" font-weight="600">Unknown unknowns -- cosine similarity</text>
+
+  <rect x="330" y="565" width="260" height="80" rx="4" fill="#450a0a" stroke="#fb7185" stroke-width="1"/>
+  <text x="460" y="585" text-anchor="middle" fill="#fecdd3" font-size="11" font-weight="600">Worker: Rules (Layer 2)</text>
+  <text x="340" y="603" fill="#94a3b8" font-size="9">Zero-copy Sigma string matching</text>
+  <text x="340" y="618" fill="#94a3b8" font-size="9">In-memory Parquet parsing</text>
+  <text x="340" y="633" fill="#fb7185" font-size="9" font-weight="600">Known unknowns -- deterministic</text>
+
+  <rect x="610" y="565" width="260" height="80" rx="4" fill="#1c1917" stroke="#94a3b8" stroke-width="1"/>
+  <text x="740" y="585" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Worker: S3 Archive</text>
+  <text x="620" y="603" fill="#94a3b8" font-size="9">Hive paths: dt=YYYY-MM-DD/hour=HH/</text>
+  <text x="620" y="618" fill="#94a3b8" font-size="9">Partition hints from gateway headers</text>
+  <text x="620" y="633" fill="#94a3b8" font-size="9" font-weight="600">Cold forensic data lake foundation</text>
+
+  <!-- Model A Baseline Detector -->
+  <rect x="900" y="560" width="310" height="90" rx="4" fill="#085041" stroke="#4ade80" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="1055" y="580" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="700">Model A: Network Baseline</text>
+  <text x="910" y="597" fill="#94a3b8" font-size="9">BiLSTM-AE (8→64→32→64→8) · CPU only</text>
+  <text x="910" y="612" fill="#94a3b8" font-size="9">Per-IP-pair deque buffers · μ+3σ threshold</text>
+  <text x="910" y="627" fill="#4ade80" font-size="9" font-weight="600">Reconstruction error → nexus.alerts.baseline</text>
+  <text x="910" y="642" fill="#4ade80" font-size="9">serve_baseline.py · NATS consumer</text>
+
+  <!-- Storage tier -->
+  <rect x="50" y="660" width="195" height="55" rx="4" fill="#065f46" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="148" y="680" text-anchor="middle" fill="#a7f3d0" font-size="11" font-weight="600">Qdrant Vector DB</text>
+  <text x="60" y="700" fill="#94a3b8" font-size="9">HNSW · named vectors per schema</text>
+
+  <rect x="265" y="660" width="195" height="55" rx="4" fill="#9f1239" stroke="#fda4af" stroke-width="1"/>
+  <text x="363" y="680" text-anchor="middle" fill="#fecdd3" font-size="11" font-weight="600">Redis Cluster</text>
+  <text x="275" y="700" fill="#94a3b8" font-size="9">FIFO · entity state · fleet SCARD</text>
+
+  <rect x="480" y="660" width="195" height="55" rx="4" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+  <text x="578" y="680" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">S3 / MinIO</text>
+  <text x="490" y="700" fill="#94a3b8" font-size="9">Dual provider (AWS or on-prem)</text>
+
+  <rect x="695" y="660" width="260" height="55" rx="4" fill="#1c1917" stroke="#eab308" stroke-width="1"/>
+  <text x="825" y="680" text-anchor="middle" fill="#fef08a" font-size="11" font-weight="600">Redis Distributed Lock</text>
+  <text x="705" y="700" fill="#94a3b8" font-size="9">Concurrency gate for lateral movement storms</text>
+
+  <!-- Vector dimension annotations -->
+  <rect x="50" y="725" width="905" height="40" rx="3" fill="#0c0a09" stroke="#334155" stroke-width="0.5"/>
+  <text x="60" y="741" fill="#64748b" font-size="8" font-weight="600">NAMED VECTOR SPACES:</text>
+  <text x="220" y="741" fill="#3b82f6" font-size="8">c2_math (8D) ← Linux C2 + Windows C2</text>
+  <text x="460" y="741" fill="#3b82f6" font-size="8">sentinel_math (5D) ← Linux Sentinel</text>
+  <text x="660" y="741" fill="#3b82f6" font-size="8">windows_math (4D) ← DeepSensor</text>
+  <text x="60" y="755" fill="#06b6d4" font-size="8">cloud_flow (5D) ← Cloud Flow</text>
+  <text x="260" y="755" fill="#06b6d4" font-size="8">network_tap (8D) ← Arkime SPI</text>
+  <text x="480" y="755" fill="#4ade80" font-size="8">Model A baseline uses network_tap 8D for LSTM-AE reconstruction</text>
+
+  <!-- Phase 3 flow arrows -->
+  <line x1="465" y1="500" x2="180" y2="563" stroke="#4ade80" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
+  <line x1="465" y1="500" x2="460" y2="563" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+  <line x1="465" y1="500" x2="740" y2="563" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <line x1="465" y1="500" x2="1055" y2="558" stroke="#4ade80" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
+  <text x="800" y="540" fill="#475569" font-size="7">network_tap flows</text>
+  <line x1="180" y1="645" x2="148" y2="658" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="460" y1="645" x2="363" y2="658" stroke="#fb7185" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="740" y1="645" x2="578" y2="658" stroke="#94a3b8" stroke-width="1" marker-end="url(#a)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 4: AGENTIC LLM SWARM                                     -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="785" width="1340" height="290" rx="6" fill="url(#llm-bg)" stroke="#4338ca" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="807" fill="#a5b4fc" font-size="10" font-weight="600" letter-spacing="2">PHASE 4 -- AGENTIC LLM SWARM (LAYER 3)</text>
+  <text x="1350" y="807" text-anchor="end" fill="#475569" font-size="9">Event-Driven · 5 Expert Agents · Multi-Model · DuckDB Pivot</text>
+
+  <!-- Orchestrator -->
+  <rect x="50" y="820" width="210" height="95" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="155" y="840" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="600">LLM Hunter Orchestrator</text>
+  <text x="60" y="858" fill="#94a3b8" font-size="9">LangGraph DAG supervisor</text>
+  <text x="60" y="873" fill="#94a3b8" font-size="9">DuckDB temporal pivot (T±300s)</text>
+  <text x="60" y="888" fill="#94a3b8" font-size="9">Cross-endpoint correlation</text>
+  <text x="60" y="903" fill="#f97316" font-size="9" font-weight="600">Blast radius caps</text>
+
+  <!-- 5 Expert Agents -->
+  <rect x="290" y="820" width="170" height="72" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1"/>
+  <text x="375" y="838" text-anchor="middle" fill="#c7d2fe" font-size="9" font-weight="600">host_expert</text>
+  <text x="300" y="855" fill="#94a3b8" font-size="8">Process lineage, memory</text>
+  <text x="300" y="868" fill="#94a3b8" font-size="8">forensics, file analysis</text>
+  <text x="300" y="881" fill="#818cf8" font-size="8" font-weight="600">→ Model C (Spatial)</text>
+
+  <rect x="475" y="820" width="170" height="72" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1"/>
+  <text x="560" y="838" text-anchor="middle" fill="#c7d2fe" font-size="9" font-weight="600">net_expert</text>
+  <text x="485" y="855" fill="#94a3b8" font-size="8">C2 beacon analysis,</text>
+  <text x="485" y="868" fill="#94a3b8" font-size="8">lateral movement</text>
+  <text x="485" y="881" fill="#818cf8" font-size="8" font-weight="600">→ Model B (Network)</text>
+
+  <rect x="660" y="820" width="170" height="72" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1"/>
+  <text x="745" y="838" text-anchor="middle" fill="#c7d2fe" font-size="9" font-weight="600">cloud_expert</text>
+  <text x="670" y="855" fill="#94a3b8" font-size="8">CloudTrail + Azure AD</text>
+  <text x="670" y="868" fill="#94a3b8" font-size="8">IAM privilege escalation</text>
+  <text x="670" y="881" fill="#818cf8" font-size="8" font-weight="600">→ Model B (Network)</text>
+
+  <rect x="845" y="820" width="185" height="72" rx="4" fill="#312e81" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="938" y="838" text-anchor="middle" fill="#67e8f9" font-size="9" font-weight="600">nettap_expert</text>
+  <text x="855" y="855" fill="#94a3b8" font-size="8">42-field SPI deep forensics</text>
+  <text x="855" y="868" fill="#94a3b8" font-size="8">JA3/cert/DNS/HTTP L7 analysis</text>
+  <text x="855" y="881" fill="#06b6d4" font-size="8" font-weight="600">Model A cross-ref + Model B</text>
+
+  <!-- Expert→Orchestrator arrows -->
+  <line x1="260" y1="856" x2="288" y2="856" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="260" y1="856" x2="473" y2="856" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="260" y1="856" x2="658" y2="856" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="260" y1="856" x2="843" y2="856" stroke="#06b6d4" stroke-width="1" marker-end="url(#ac)"/>
+
+  <!-- Model boxes -->
+  <rect x="50" y="920" width="250" height="65" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="175" y="940" text-anchor="middle" fill="#c7d2fe" font-size="10" font-weight="600">Model B: Network Adversarial</text>
+  <text x="60" y="958" fill="#94a3b8" font-size="9">Mistral-Nemo 12B (NF4 QLoRA)</text>
+  <text x="60" y="973" fill="#818cf8" font-size="9" font-weight="600">128k ctx · TTP mapping · PCAP + ATT&amp;CK</text>
+
+  <rect x="320" y="920" width="250" height="65" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="445" y="940" text-anchor="middle" fill="#c7d2fe" font-size="10" font-weight="600">Model C: Spatial Endpoint</text>
+  <text x="330" y="958" fill="#94a3b8" font-size="9">Llama-3 8B (QLoRA + Projector)</text>
+  <text x="330" y="973" fill="#818cf8" font-size="9" font-weight="600">SpatialProjector MLP per vector space</text>
+
+  <rect x="590" y="920" width="270" height="65" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="725" y="940" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600">Model D: SOAR Critic</text>
+  <text x="600" y="958" fill="#94a3b8" font-size="9">DPO/IPO alignment · disruption cost fn</text>
+  <text x="600" y="973" fill="#ef4444" font-size="9" font-weight="600">HitL circuit breaker · fleet-aware blast radius</text>
+
+  <!-- vLLM Engine -->
+  <rect x="50" y="1000" width="510" height="55" rx="4" fill="#312e81" stroke="#a78bfa" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="305" y="1020" text-anchor="middle" fill="#ddd6fe" font-size="12" font-weight="700">vLLM Inference Engine (4x A100 80GB NVLink)</text>
+  <text x="60" y="1040" fill="#c4b5fd" font-size="9">Flash Attention 2 · PagedAttention KV · Podman Quadlets</text>
+  <text x="60" y="1055" fill="#a78bfa" font-size="9" font-weight="600">Models B + C + D served via vLLM (GPU) · Model A runs independently (CPU)</text>
+
+  <!-- Phase 3→4 trigger arrows -->
+  <line x1="148" y1="715" x2="155" y2="818" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="363" y1="715" x2="155" y2="818" stroke="#fb7185" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="578" y1="715" x2="725" y2="918" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <text x="650" y="830" fill="#475569" font-size="7">DuckDB S3 pivot</text>
+
+  <!-- Model A alert trigger -->
+  <path d="M1055 652 C1055 730 1050 780 200 818" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#ag)"/>
+  <text x="630" y="750" fill="#4ade80" font-size="8" font-weight="600">nexus.alerts.baseline → triggers nettap_expert investigation</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 5: OPERATOR C&C & CONTAINMENT                            -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="1080" width="1340" height="175" rx="6" fill="url(#ops-bg)" stroke="#334155" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="1102" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">PHASE 5 -- OPERATOR COMMAND &amp; CONTROL + CONTAINMENT</text>
+  <text x="1350" y="1102" text-anchor="end" fill="#475569" font-size="9">Human-in-the-Loop · SOAR Webhooks · Active Response</text>
+
+  <rect x="50" y="1120" width="200" height="75" rx="4" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+  <text x="150" y="1140" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600">Open WebUI</text>
+  <text x="60" y="1158" fill="#94a3b8" font-size="9">Operator chat interface</text>
+  <text x="60" y="1173" fill="#94a3b8" font-size="9">RAG-enriched context</text>
+  <text x="60" y="1188" fill="#60a5fa" font-size="9" font-weight="600">HitL verdict injection</text>
+
+  <rect x="280" y="1120" width="200" height="75" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="380" y="1140" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="600">n8n Orchestrator</text>
+  <text x="290" y="1158" fill="#94a3b8" font-size="9">SOAR webhook routing</text>
+  <text x="290" y="1173" fill="#94a3b8" font-size="9">Operator bootstrap workflows</text>
+  <text x="290" y="1188" fill="#f97316" font-size="9" font-weight="600">Infra spin-up + teardown</text>
+
+  <rect x="510" y="1120" width="200" height="75" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="610" y="1140" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600">Containment Engine</text>
+  <text x="520" y="1158" fill="#94a3b8" font-size="9">XDP network quarantine</text>
+  <text x="520" y="1173" fill="#94a3b8" font-size="9">Cgroup process freeze</text>
+  <text x="520" y="1188" fill="#ef4444" font-size="9" font-weight="600">SOAR webhook → active response</text>
+
+  <rect x="740" y="1120" width="155" height="75" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="818" y="1140" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="600">Prometheus</text>
+  <text x="750" y="1158" fill="#94a3b8" font-size="9">Ring buffer saturation</text>
+  <text x="750" y="1173" fill="#94a3b8" font-size="9">ML fit latencies</text>
+  <text x="750" y="1188" fill="#4ade80" font-size="9" font-weight="600">OTLP metrics export</text>
+
+  <rect x="925" y="1120" width="225" height="75" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="1038" y="1140" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700">teardown-incident.sh</text>
+  <text x="935" y="1158" fill="#94a3b8" font-size="9">1. webui → n8n → infra down</text>
+  <text x="935" y="1173" fill="#94a3b8" font-size="9">2. Purge context + execution logs</text>
+  <text x="935" y="1188" fill="#ef4444" font-size="9" font-weight="600">--deep: wipe secrets, certs, network</text>
+
+  <line x1="725" y1="1060" x2="610" y2="1118" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="250" y1="1160" x2="278" y2="1160" stroke="#f97316" stroke-width="1" marker-end="url(#ao)"/>
+  <line x1="480" y1="1160" x2="508" y2="1160" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="710" y1="1160" x2="738" y2="1160" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="895" y1="1160" x2="923" y2="1160" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+  <!-- Scorched earth -->
+  <line x1="1038" y1="1195" x2="1038" y2="1240" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="1048" y="1230" fill="#fca5a5" font-size="8">scorched earth</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PHASE 6: SOVEREIGN MLOPS PIPELINE -- DETAILED 4-TRACK          -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="1275" width="1340" height="680" rx="6" fill="url(#mlops-bg)" stroke="#7c3aed" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="1297" fill="#c4b5fd" font-size="10" font-weight="600" letter-spacing="2">PHASE 6 -- SOVEREIGN MLOPS PIPELINE (4-TRACK + MODEL A)</text>
+  <text x="1350" y="1297" text-anchor="end" fill="#475569" font-size="9">Closed-Loop · Self-Terminating · Priority Oversampling · safetensors only</text>
+
+  <!-- RLHF feedback input -->
+  <rect x="50" y="1315" width="160" height="60" rx="4" fill="#2e1065" stroke="#a855f7" stroke-width="1"/>
+  <text x="130" y="1335" text-anchor="middle" fill="#d8b4fe" font-size="10" font-weight="600">Operator Verdict</text>
+  <text x="60" y="1353" fill="#94a3b8" font-size="9">Confirm or dismiss</text>
+  <text x="60" y="1366" fill="#a855f7" font-size="9" font-weight="600">/rlhf-feedback</text>
+
+  <rect x="230" y="1315" width="160" height="60" rx="4" fill="#2e1065" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="310" y="1335" text-anchor="middle" fill="#ddd6fe" font-size="10" font-weight="600">NATS Publish</text>
+  <text x="240" y="1353" fill="#94a3b8" font-size="9">nexus.training.rlhf</text>
+  <text x="240" y="1366" fill="#8b5cf6" font-size="9" font-weight="600">incident_id + verdict</text>
+
+  <rect x="410" y="1315" width="170" height="60" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="495" y="1335" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="600">worker_rlhf (Rust)</text>
+  <text x="420" y="1353" fill="#94a3b8" font-size="9">Gold label Parquet spooling</text>
+  <text x="420" y="1366" fill="#f97316" font-size="9" font-weight="600">→ label enrichment for DPO</text>
+
+  <line x1="210" y1="1345" x2="228" y2="1345" stroke="#8b5cf6" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="390" y1="1345" x2="408" y2="1345" stroke="#f97316" stroke-width="1" marker-end="url(#ao)"/>
+
+  <!-- Data Sources -->
+  <rect x="50" y="1395" width="530" height="55" rx="4" fill="#1c1917" stroke="#94a3b8" stroke-width="1"/>
+  <text x="315" y="1415" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">S3 Cold Storage Data Lake (Hive-Partitioned)</text>
+  <text x="60" y="1435" fill="#94a3b8" font-size="8">telemetry/linux_c2/dt=*/hour=*/*.parquet  ·  telemetry/windows_c2/  ·  telemetry/linux_sentinel/  ·  telemetry/windows_deepsensor/</text>
+  <text x="60" y="1445" fill="#06b6d4" font-size="8">telemetry/cloud_flow/dt=*/hour=*/*.parquet  ·  telemetry/network_tap/dt=*/hour=*/*.parquet  ·  Qdrant scroll API  ·  SOAR decision logs</text>
+
+  <!-- 01_spool_datasets.py -->
+  <rect x="620" y="1395" width="200" height="55" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1.5"/>
+  <text x="720" y="1415" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="600">01_spool_datasets.py</text>
+  <text x="630" y="1435" fill="#94a3b8" font-size="9">DuckDB queries + Qdrant scroll</text>
+  <text x="630" y="1445" fill="#f97316" font-size="9" font-weight="600">4-track JSONL generation</text>
+  <line x1="580" y1="1422" x2="618" y2="1422" stroke="#f97316" stroke-width="1" marker-end="url(#ao)"/>
+
+  <!-- 4 Track boxes -->
+  <text x="50" y="1475" fill="#78716c" font-size="8" letter-spacing="1">TRAINING TRACKS</text>
+
+  <!-- Track 1: Spatial -->
+  <rect x="50" y="1485" width="300" height="85" rx="4" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
+  <text x="60" y="1503" fill="#c7d2fe" font-size="10" font-weight="600">Track 1: Spatial Projection (Model C)</text>
+  <text x="60" y="1520" fill="#94a3b8" font-size="8">Source: Qdrant named vectors + payload context</text>
+  <text x="60" y="1533" fill="#94a3b8" font-size="8">Output: spatial_projection_v1.jsonl</text>
+  <text x="60" y="1546" fill="#818cf8" font-size="8" font-weight="600">02_train_qlora.py + projector.py</text>
+  <text x="60" y="1559" fill="#94a3b8" font-size="8">SpatialProjector MLP per vector space head</text>
+
+  <!-- Track 2: Network Adversarial -->
+  <rect x="370" y="1485" width="300" height="85" rx="4" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
+  <text x="380" y="1503" fill="#c7d2fe" font-size="10" font-weight="600">Track 2: Network Adversarial (Model B)</text>
+  <text x="380" y="1520" fill="#94a3b8" font-size="8">Source: linux_c2 + windows_c2 Parquet</text>
+  <text x="380" y="1533" fill="#94a3b8" font-size="8">Output: network_adversarial_v1.jsonl</text>
+  <text x="380" y="1546" fill="#818cf8" font-size="8" font-weight="600">02_train_network.py (QLoRA 128k)</text>
+  <text x="380" y="1559" fill="#94a3b8" font-size="8">C2 flow + score labels → TTP reasoning</text>
+
+  <!-- Track 3: Critic DPO -->
+  <rect x="690" y="1485" width="300" height="85" rx="4" fill="#1a0a0a" stroke="#ef4444" stroke-width="1"/>
+  <text x="700" y="1503" fill="#fca5a5" font-size="10" font-weight="600">Track 3: Critic Alignment (Model D)</text>
+  <text x="700" y="1520" fill="#94a3b8" font-size="8">Source: SOAR decision log + golden labels</text>
+  <text x="700" y="1533" fill="#94a3b8" font-size="8">Output: critic_dpo_v1.jsonl</text>
+  <text x="700" y="1546" fill="#ef4444" font-size="8" font-weight="600">02_train_dpo_critic.py (DPO/IPO)</text>
+  <text x="700" y="1559" fill="#94a3b8" font-size="8">Preference pairs → blast radius alignment</text>
+
+  <!-- Track 4: Nettap SPI -->
+  <rect x="1010" y="1485" width="340" height="85" rx="4" fill="#0c1a2e" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="1020" y="1503" fill="#67e8f9" font-size="10" font-weight="600">Track 4: Nettap SPI Sessions (Model B)</text>
+  <text x="1020" y="1520" fill="#94a3b8" font-size="8">Source: network_tap 42-field Parquet (S3)</text>
+  <text x="1020" y="1533" fill="#94a3b8" font-size="8">Output: nettap_spi_v1.jsonl</text>
+  <text x="1020" y="1546" fill="#06b6d4" font-size="8" font-weight="600">10-min windows grouped by (src_ip, dst_ip)</text>
+  <text x="1020" y="1559" fill="#94a3b8" font-size="8">Full L7 ctx: DNS/HTTP/TLS/cert/GeoIP/derived</text>
+
+  <!-- Spooler → Track arrows -->
+  <line x1="720" y1="1450" x2="200" y2="1483" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="720" y1="1450" x2="520" y2="1483" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="720" y1="1450" x2="840" y2="1483" stroke="#ef4444" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="720" y1="1450" x2="1180" y2="1483" stroke="#06b6d4" stroke-width="1" marker-end="url(#ac)"/>
+
+  <!-- Model A Pipeline (separate) -->
+  <text x="50" y="1595" fill="#78716c" font-size="8" letter-spacing="1">MODEL A PIPELINE (CPU · INDEPENDENT OF vLLM)</text>
+
+  <rect x="50" y="1605" width="260" height="65" rx="4" fill="#085041" stroke="#4ade80" stroke-width="1"/>
+  <text x="180" y="1623" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="600">build_baseline_windows.py</text>
+  <text x="60" y="1640" fill="#94a3b8" font-size="8">DuckDB → sliding windows (64x8) per IP pair</text>
+  <text x="60" y="1655" fill="#94a3b8" font-size="8">Min-max norm · 85/15 temporal split</text>
+  <text x="60" y="1665" fill="#4ade80" font-size="8" font-weight="600">→ safetensors (train + eval + norm params)</text>
+
+  <rect x="340" y="1605" width="260" height="65" rx="4" fill="#085041" stroke="#4ade80" stroke-width="1"/>
+  <text x="470" y="1623" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="600">train_lstm_ae.py</text>
+  <text x="350" y="1640" fill="#94a3b8" font-size="8">BiLSTM-AE: 8→64→32→64→8 (MSE loss)</text>
+  <text x="350" y="1655" fill="#94a3b8" font-size="8">Early stopping · cosine LR schedule</text>
+  <text x="350" y="1665" fill="#4ade80" font-size="8" font-weight="600">Threshold calibration: μ+3σ on eval set</text>
+
+  <rect x="630" y="1605" width="260" height="65" rx="4" fill="#085041" stroke="#4ade80" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="760" y="1623" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="600">serve_baseline.py</text>
+  <text x="640" y="1640" fill="#94a3b8" font-size="8">NATS consumer · per-IP deque buffers</text>
+  <text x="640" y="1655" fill="#94a3b8" font-size="8">CPU inference (no GPU required)</text>
+  <text x="640" y="1665" fill="#4ade80" font-size="8" font-weight="600">→ nexus.alerts.baseline (Phase 3)</text>
+
+  <!-- Model A flow arrows -->
+  <line x1="310" y1="1637" x2="338" y2="1637" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="600" y1="1637" x2="628" y2="1637" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <!-- Model A → Phase 3 feedback loop -->
+  <path d="M890 1637 C950 1637 1000 1620 1050 1580 C1100 1540 1200 1300 1250 1050 C1270 950 1260 850 1200 800 C1140 755 1100 700 1055 655" fill="none" stroke="#4ade80" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#ag)"/>
+  <text x="1220" y="1100" fill="#4ade80" font-size="8">deployed → Phase 3</text>
+
+  <!-- Source data → Model A arrow -->
+  <line x1="200" y1="1450" x2="180" y2="1603" stroke="#4ade80" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
+  <text x="140" y="1530" fill="#4ade80" font-size="7">network_tap</text>
+
+  <!-- Eval gates -->
+  <text x="50" y="1700" fill="#78716c" font-size="8" letter-spacing="1">EVALUATION &amp; DEPLOYMENT</text>
+
+  <rect x="50" y="1710" width="180" height="50" rx="4" fill="#1c1917" stroke="#818cf8" stroke-width="1"/>
+  <text x="140" y="1730" text-anchor="middle" fill="#c7d2fe" font-size="9" font-weight="600">03_eval_model.py</text>
+  <text x="60" y="1748" fill="#94a3b8" font-size="8">Model C spatial eval</text>
+
+  <rect x="250" y="1710" width="180" height="50" rx="4" fill="#1c1917" stroke="#818cf8" stroke-width="1"/>
+  <text x="340" y="1730" text-anchor="middle" fill="#c7d2fe" font-size="9" font-weight="600">03_eval_network.py</text>
+  <text x="260" y="1748" fill="#94a3b8" font-size="8">Model B network eval</text>
+
+  <rect x="450" y="1710" width="180" height="50" rx="4" fill="#1c1917" stroke="#ef4444" stroke-width="1"/>
+  <text x="540" y="1730" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="600">03_eval_critic.py</text>
+  <text x="460" y="1748" fill="#94a3b8" font-size="8">Model D DPO + disruption idx</text>
+
+  <rect x="650" y="1710" width="180" height="50" rx="4" fill="#1c1917" stroke="#4ade80" stroke-width="1"/>
+  <text x="740" y="1730" text-anchor="middle" fill="#bbf7d0" font-size="9" font-weight="600">03_eval_baseline.py</text>
+  <text x="660" y="1748" fill="#94a3b8" font-size="8">Model A recon error stats</text>
+
+  <!-- Track → Eval arrows -->
+  <line x1="200" y1="1570" x2="140" y2="1708" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="520" y1="1570" x2="340" y2="1708" stroke="#818cf8" stroke-width="1" marker-end="url(#ap)"/>
+  <line x1="840" y1="1570" x2="540" y2="1708" stroke="#ef4444" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="470" y1="1670" x2="740" y2="1708" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+
+  <!-- Integration Gate -->
+  <rect x="50" y="1780" width="780" height="45" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="440" y="1800" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="700">Cross-Model Integration Gate</text>
+  <text x="440" y="1818" text-anchor="middle" fill="#94a3b8" font-size="9">All 4 evals pass → merge · Any fail → halt + retrain failing track</text>
+  <line x1="140" y1="1760" x2="250" y2="1778" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="340" y1="1760" x2="350" y2="1778" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="540" y1="1760" x2="480" y2="1778" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="740" y1="1760" x2="620" y2="1778" stroke="#4ade80" stroke-width="1" marker-end="url(#ag)"/>
+
+  <!-- Deploy -->
+  <rect x="50" y="1840" width="780" height="40" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="440" y="1865" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="600">04_merge → SHA-384 sign → 05_serve (atomic symlink) → vLLM hot-reload  |  Model A: systemd restart</text>
+  <line x1="440" y1="1825" x2="440" y2="1838" stroke="#f97316" stroke-width="1" marker-end="url(#ao)"/>
+
+  <!-- Feedback loops -->
+  <path d="M50 1860 C-20 1860 -40 1500 -10 1430 C5 1410 25 1415 48 1420" fill="none" stroke="#4ade80" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#ag)"/>
+  <text x="-5" y="1600" fill="#4ade80" font-size="7" transform="rotate(-90, -5, 1600)">priority oversample</text>
+
+  <path d="M830 1860 C900 1860 920 1800 940 1200 C950 1100 960 1060 560 1060" fill="none" stroke="#4ade80" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#ag)"/>
+  <text x="950" y="1400" fill="#4ade80" font-size="8">deployed weights → vLLM</text>
+
+  <!-- Sensor Type → Training Track mapping summary -->
+  <rect x="860" y="1710" width="490" height="170" rx="4" fill="#0c0a09" stroke="#475569" stroke-width="0.5"/>
+  <text x="870" y="1730" fill="#64748b" font-size="9" font-weight="600" letter-spacing="1">SENSOR → MODEL TRAINING MAP</text>
+  <line x1="860" y1="1738" x2="1350" y2="1738" stroke="#1e293b" stroke-width="0.5"/>
+
+  <text x="870" y="1755" fill="#3b82f6" font-size="8">Linux Sentinel (5D sentinel_math)</text>
+  <text x="1150" y="1755" fill="#818cf8" font-size="8">→ Track 1 → Model C (projector head)</text>
+
+  <text x="870" y="1770" fill="#3b82f6" font-size="8">Linux C2 (8D c2_math)</text>
+  <text x="1150" y="1770" fill="#818cf8" font-size="8">→ Track 1+2 → Model C + B</text>
+
+  <text x="870" y="1785" fill="#3b82f6" font-size="8">Windows C2 (8D c2_math)</text>
+  <text x="1150" y="1785" fill="#818cf8" font-size="8">→ Track 1+2 → Model C + B</text>
+
+  <text x="870" y="1800" fill="#3b82f6" font-size="8">Windows DeepSensor (4D windows_math)</text>
+  <text x="1150" y="1800" fill="#818cf8" font-size="8">→ Track 1 → Model C (projector head)</text>
+
+  <text x="870" y="1815" fill="#06b6d4" font-size="8">Cloud Flow (5D cloud_flow)</text>
+  <text x="1150" y="1815" fill="#818cf8" font-size="8">→ Track 1 → Model C (projector head)</text>
+
+  <text x="870" y="1830" fill="#06b6d4" font-size="8">Network Tap (8D network_tap)</text>
+  <text x="1150" y="1830" fill="#06b6d4" font-size="8">→ Track 4 → Model B (nettap SPI)</text>
+
+  <text x="870" y="1850" fill="#06b6d4" font-size="8">Network Tap (8D statistical)</text>
+  <text x="1150" y="1850" fill="#4ade80" font-size="8">→ Model A (BiLSTM-AE baseline)</text>
+
+  <text x="870" y="1870" fill="#ef4444" font-size="8">SOAR Decision Log + Verdicts</text>
+  <text x="1150" y="1870" fill="#ef4444" font-size="8">→ Track 3 → Model D (DPO critic)</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ZERO STATE                                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <rect x="30" y="1975" width="1340" height="45" rx="6" fill="#0a0a0a" stroke="#475569" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="700" y="1995" text-anchor="middle" fill="#64748b" font-size="11" font-weight="600" letter-spacing="2">ZERO STATE -- ATTACK SURFACE RETURNED TO ZERO</text>
+  <text x="700" y="2013" text-anchor="middle" fill="#475569" font-size="9">Only forensic artifacts persist. All containers, databases, contexts, and secrets destroyed.</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- LEGEND                                                           -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <text x="50" y="2055" fill="#475569" font-size="9" font-weight="600" letter-spacing="1">LEGEND</text>
+  <line x1="50" y1="2063" x2="1350" y2="2063" stroke="#1e293b" stroke-width="0.5"/>
+
+  <rect x="50" y="2073" width="14" height="14" rx="2" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="72" y="2085" fill="#94a3b8" font-size="9">Rust workers / data pipeline</text>
+
+  <rect x="280" y="2073" width="14" height="14" rx="2" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="302" y="2085" fill="#94a3b8" font-size="9">ML / validation / Model A</text>
+
+  <rect x="480" y="2073" width="14" height="14" rx="2" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+  <text x="502" y="2085" fill="#94a3b8" font-size="9">API / operator interface</text>
+
+  <rect x="680" y="2073" width="14" height="14" rx="2" fill="#450a0a" stroke="#ef4444" stroke-width="1"/>
+  <text x="702" y="2085" fill="#94a3b8" font-size="9">Containment / enforcement</text>
+
+  <rect x="900" y="2073" width="14" height="14" rx="2" fill="#2e1065" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="922" y="2085" fill="#94a3b8" font-size="9">Messaging / NATS / RLHF</text>
+
+  <rect x="1100" y="2073" width="14" height="14" rx="2" fill="#0c1a2e" stroke="#06b6d4" stroke-width="1"/>
+  <text x="1122" y="2085" fill="#94a3b8" font-size="9">Network Tap / Arkime pipeline</text>
+
+  <line x1="50" y1="2110" x2="90" y2="2110" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="100" y="2114" fill="#94a3b8" font-size="9">Data flow</text>
+
+  <line x1="230" y1="2110" x2="270" y2="2110" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <text x="280" y="2114" fill="#94a3b8" font-size="9">Async / enforcement / fan-out</text>
+
+  <line x1="480" y1="2110" x2="520" y2="2110" stroke="#4ade80" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#ag)"/>
+  <text x="530" y="2114" fill="#94a3b8" font-size="9">Feedback / oversample loop</text>
+
+  <rect x="720" y="2100" width="14" height="14" rx="2" fill="#312e81" stroke="#818cf8" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="742" y="2114" fill="#94a3b8" font-size="9">LLM model / vLLM inference</text>
+
+  <rect x="940" y="2100" width="14" height="14" rx="2" fill="#1a1a2e" stroke="#eab308" stroke-width="1.5"/>
+  <text x="962" y="2114" fill="#94a3b8" font-size="9">Critical state / concurrency lock</text>
+
+  <rect x="1140" y="2100" width="14" height="14" rx="2" fill="#085041" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="1162" y="2114" fill="#94a3b8" font-size="9">Model A (LSTM-AE) pipeline</text>
+
+  <text x="50" y="2155" fill="#334155" font-size="8">PHASE 1 (6 Sensors) → PHASE 2 (Ingress/Fan-Out) → PHASE 3 (Detection + Model A Baseline) → PHASE 4 (5-Agent LLM Swarm) → PHASE 5 (Operator/Containment) → PHASE 6 (4-Track MLOps) → ZERO STATE</text>
+  <text x="1350" y="2155" text-anchor="end" fill="#334155" font-size="8">Project Empros v3.0</text>
+</svg>

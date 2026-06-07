@@ -1,0 +1,29 @@
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Ghost Calls C2 - TLS to Zoom TURN Server"; \
+flow:established,to_server; tls.sni; pcre:"/^(turn[0-9a-z-]*\.)?zoom\.us$/i"; classtype:trojan-activity; sid:3478001; rev:1;)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Ghost Calls C2 - TLS to Teams TURN Server"; \
+flow:established,to_server; tls.sni; pcre:"/^(turn[0-9a-z-]*\.)?challo\.com$/i"; classtype:trojan-activity; sid:3478002; rev:1;)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Ghost Calls C2 - TLS to Teams Alternate TURN Server"; \
+flow:established,to_server; tls.sni; pcre:"/^(turn[0-9a-z-]*\.)?(teams\.microsoft\.com|skype\.com)$/i"; classtype:trojan-activity; sid:3478003; rev:1;)
+
+alert udp $HOME_NET any -> $EXTERNAL_NET [3478,5349] (msg:"Ghost Calls C2 - TURN Allocate Request"; \
+flow:to_server; stun.msg_type:"allocate-request"; threshold:type limit, track by_src, count 5, seconds 60; classtype:trojan-activity; sid:3478004; rev:1;)
+
+alert udp $HOME_NET any -> $EXTERNAL_NET any (msg:"Ghost Calls C2 - TURN ChannelBind Request"; \
+flow:to_server; stun.msg_type:"channel-bind-request"; classtype:trojan-activity; sid:3478005; rev:1;)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Ghost Calls C2 - TURN over TLS (TURNS)"; \
+flow:established,to_server; content:"00 14"; classtype:trojan-activity; sid:3478006; rev:1;)
+
+alert udp $HOME_NET any -> $EXTERNAL_NET any (msg:"Ghost Calls C2 - DTLS Client Hello for WebRTC"; \
+dtls.handshake_type:"client_hello"; dsize:>50; classtype:trojan-activity; sid:3478007; rev:1;)
+
+alert udp $HOME_NET any -> $EXTERNAL_NET 8801 (msg:"Ghost Calls C2 - WebRTC on Non-Standard Port"; \
+flow:to_server; content:"16 fe ff"; classtype:trojan-activity; sid:3478008; rev:1;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Ghost Calls C2 - Teams TURN Credential Fetch"; \
+flow:established,to_server; http.uri; content:"/api/turn"; nocase; http.method; content:"GET|POST"; classtype:trojan-activity; sid:3478009; rev:1;)
+
+alert udp $HOME_NET any -> $EXTERNAL_NET [3478,5349] (msg:"Ghost Calls C2 - High Volume TURN Traffic"; \
+flow:to_server; byte_test:2,>,500,0,relative; threshold:type both, track by_src, count 10, seconds 300; classtype:trojan-activity; sid:3478010; rev:1;)

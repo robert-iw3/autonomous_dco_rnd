@@ -1,0 +1,9 @@
+# Generated artifacts -- do not commit
+simulation_data/**/*_sim.parquet
+reports/
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

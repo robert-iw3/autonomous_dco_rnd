@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "Robocopy WebDAV Payload Download"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Ingress Tool Transfer (T1105)"
+      procedure: "Robocopy downloading payloads via WebDAV from tunnel domains (Serpentine Cloud)"
+    match:
+      actor: "robocopy.exe"
+      type: "PROCESS_START"
+      target: "DavWWWRoot"

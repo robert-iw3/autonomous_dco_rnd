@@ -1,0 +1,161 @@
+# =============================================================================
+# APT28 (Fancy Bear / Cozy Bear) - High-Fidelity TTP Signatures
+# =============================================================================
+
+- ttp_signature:
+    name: "APT28 Covenant Loader Drop"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Spearphishing Attachment (T1566.001)"
+      procedure: "WinWord dropping ctec.dll decryption loader"
+    match:
+      actor: "winword.exe"
+      type: "FILE_EVENT"
+      target:
+        - "*.vbs"
+        - "*.ps1"
+        - "*.exe"
+        - "*.dll"
+        - "*.js"
+    filter:
+      exclude_path:
+        - "C:\\Users\\*\\AppData\\Local\\Microsoft\\Office\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "APT28 COM Hijacking via Registry"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Component Object Model Hijacking (T1546.015)"
+      procedure: "Modifying InprocServer32 for Shell Extension persistence"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "*\\CLSID\\{2227A280-3AEA-1069-A2DE-08002B30309D}\\InprocServer32*"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor:
+        - "services.exe"
+        - "msiexec.exe"
+
+- ttp_signature:
+    name: "APT28 BeardShell Sideloading"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "DLL Side-Loading (T1574.002)"
+      procedure: "Covenant loader sideloading via BeardShell.dll"
+    match:
+      actor: "winword.exe"
+      type: "MODULE_LOAD"
+      target: "BeardShell.dll"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor: "winword.exe"
+
+- ttp_signature:
+    name: "APT28 NotDoor Backdoor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Signed Binary Proxy Execution: Rundll32 (T1218.011)"
+      procedure: "rundll32.exe executing NotDoor backdoor DLL"
+    match:
+      actor: "rundll32.exe"
+      type: "PROCESS_START"
+      target: "NotDoor"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "APT28 NotDoor Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "NotDoor backdoor registering persistence via Run key"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "NotDoor"
+    filter:
+      exclude_target: "NotDoor"
+      exclude_actor: "reg.exe"
+
+- ttp_signature:
+    name: "APT28 NotDoor Outlook VBA Macro"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Office Application Startup: Outlook Rules and Forms (T1137.005)"
+      procedure: "NotDoor creating VbaProject.otm macro in Outlook"
+    match:
+      actor: "outlook.exe"
+      type: "FILE_EVENT"
+      target: "VbaProject.otm"
+    filter:
+      exclude_actor: "outlook.exe"
+      exclude_target_value: "VbaProject.otm"
+
+- ttp_signature:
+    name: "APT28 OneDrive DLL Sideloading (NotDoor)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "DLL Side-Loading (T1574.002)"
+      procedure: "OneDrive.exe sideloading malicious SSPICLI.dll"
+    match:
+      actor: "onedrive.exe"
+      type: "MODULE_LOAD"
+      target: "SSPICLI.dll"
+    filter:
+      exclude_path: "C:\\Program Files\\*"
+      exclude_actor: "onedrive.exe"
+
+- ttp_signature:
+    name: "APT28 BeardShell Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "BeardShell executing PowerShell via cloud C2"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "BeardShell"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe"
+
+- ttp_signature:
+    name: "APT28 Covenant Grunt via Filen Cloud"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol (T1071)"
+      procedure: "Covenant Grunt C2 over Filen cloud storage"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "filen"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe"
+
+- ttp_signature:
+    name: "APT28 COM Hijacking Explorer Load"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Component Object Model Hijacking (T1546.015)"
+      procedure: "COM hijack under CLSID {D9144DCD-E998-4ECA-AB6A-DCD83CCBA16D} loaded by explorer.exe"
+    match:
+      actor: "explorer.exe"
+      type: "REGISTRY_EVENT"
+      target: "{D9144DCD-E998-4ECA-AB6A-DCD83CCBA16D}"
+    filter:
+      exclude_actor: "explorer.exe"
+      exclude_target: "{D9144DCD-E998-4ECA-AB6A-DCD83CCBA16D}"

@@ -1,0 +1,40 @@
+# Name: ESXi VM Escape Toolkit Detection
+# Author: RW
+# Date: 2026-01-09
+# Description: This set of rules detects network artifacts associated with the ESXi VM Escape toolkit and related activity.
+# It targets the transfer of malicious files and potential command and control or lateral movement patterns.
+
+# Rule for MAESTRO payload transfer
+alert filemagic $EXTERNAL_NET any -> $HOME_NET any (msg:"MALWARE ESXi Escape Toolkit File Transfer (MAESTRO)"; \
+flow:to_client,established; file.sha256; content:"37972a232ac6d8c402ac4531430967c1fd458b74a52d6d1990688d88956791a7"; \
+classtype:trojan-activity; sid:1000005; rev:1; metadata: author RW, created_at 2026-01-09, updated_at 2026-01-09, \
+attack_target Client_Endpoint, deployment Perimeter, confidence High, signature_severity Critical, \
+tag Malware, tag ESXi, tag Exploit, fp_note High_fidelity_hash_match;)
+
+# Rule for GetShell Plugin transfer
+alert filemagic $EXTERNAL_NET any -> $HOME_NET any (msg:"MALWARE ESXi Escape Toolkit File Transfer (GetShell Plugin)"; \
+flow:to_client,established; file.sha256; content:"4614346fc1ff74f057d189db45aa7dc25d6e7f3d9b68c287a409a53c86dca25e"; \
+classtype:trojan-activity; sid:1000006; rev:1; metadata: author RW, created_at 2026-01-09, updated_at 2026-01-09, \
+attack_target Client_Endpoint, deployment Perimeter, confidence High, signature_severity Critical, \
+\tag Malware, tag ESXi, tag Exploit, fp_note High_fidelity_hash_match;)
+
+# Rule for MyDriver.sys transfer
+alert filemagic $EXTERNAL_NET any -> $HOME_NET any (msg:"MALWARE ESXi Escape Toolkit File Transfer (MyDriver.sys)"; \
+\flow:to_client,established; file.sha256; content:"2bc5d02774ac1778be22cace51f9e35fe7b53378f8d70143bf646b68d2c0f94c"; \
+classtype:trojan-activity; sid:1000007; rev:1; metadata: author RW, created_at 2026-01-09, updated_at 2026-01-09, \
+attack_target Client_Endpoint, deployment Perimeter, confidence High, signature_severity Critical, \
+tag Malware, tag ESXi, tag Exploit, fp_note High_fidelity_hash_match;)
+
+# Rule for the VSOCKpuppet handshake over standard TCP.
+# Note: The report states this occurs over VSOCK, which is invisible to NIDS. This rule is a speculative defense-in-depth measure in case the protocol is used over a standard network socket.
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"MALWARE Possible VSOCKpuppet-like Handshake Over TCP"; \
+flow:to_server,established; content:"test"; depth:4; content:"ok"; distance:0; depth:2; \
+classtype:trojan-activity; sid:1000008; rev:1; metadata: author RW, created_at 2026-01-09, updated_at 2026-01-09, \
+attack_target Any, deployment Internal, confidence Low, signature_severity Major, tag C2, tag ESXi, fp_note Speculative_pattern_may_be_benign;)
+
+# Rule for detecting Impacket library artifacts in DCERPC traffic, indicating lateral movement.
+alert dcerpc $HOME_NET any -> $HOME_NET [135,445]; (msg:"HACKTOOL Possible Impacket Lateral Movement"; \
+flow:to_server,established; content:"Impacket"; nocase; fast_pattern; \
+classtype:attempted-admin; sid:1000009; rev:1; metadata: author RW, created_at 2026-01-09, updated_at 2026-01-09, \
+attack_target Windows, deployment Internal, confidence Medium, signature_severity Major, \
+tag Lateral_Movement, tag Impacket, fp_note May_flag_some_admin_tools;)

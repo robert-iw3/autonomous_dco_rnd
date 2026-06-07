@@ -1,0 +1,27 @@
+[tasks.build]
+command = "cargo"
+args    = ["build", "--release", "--features=registry,threads,objects,network"]
+
+[tasks.build-dev]
+command = "cargo"
+args    = ["build", "--features=registry,threads,objects,network"]
+
+[tasks.test]
+command = "cargo"
+args    = ["test", "--features=registry,threads,objects,network"]
+
+# Sign the compiled .sys before installation
+# Requires EV certificate + signtool.exe on PATH
+[tasks.sign]
+command = "signtool"
+args = ["sign", "/fd", "SHA256", "/tr", "http://timestamp.digicert.com", "/td", "SHA256",
+        "target/release/endpoint_monitor_driver.sys"]
+
+# Install via devcon (Windows Driver Kit)
+[tasks.install]
+command = "devcon"
+args = ["install", "driver.inf", "endpoint_monitor_driver"]
+
+[tasks.uninstall]
+command = "devcon"
+args = ["remove", "endpoint_monitor_driver"]

@@ -1,0 +1,14 @@
+alert http any any -> any any (msg:"Potential Webshell Activity - Suspicious Command Execution"; \
+  flow:established,to_server; \
+  http.method; content:"POST"; \
+  http.request_body; content:"eval|28|"; content:"system|28|"; content:"exec|28|"; \
+  content:"cmd|20|/c"; content:"powershell"; content:"whoami"; content:"ipconfig"; \
+  content:"net|20|"; content:"systeminfo"; content:"quser"; content:"qwinsta"; \
+  content:"nbtstat"; content:"nltest"; content:"certutil"; content:"bitsadmin"; \
+  content:"sh|20|"; content:"bash|20|"; bsize:0; \
+  http.user_agent; content:"Mozilla/5.0"; nocase; \
+  http.uri; content:".php"; content:".asp"; content:".aspx"; content:".jsp"; bsize:0; \
+  classtype:trojan-activity; \
+  sid:7895002; \
+  rev:1; \
+  metadata:tactic TA0002, technique T1505.003, created_by RW, created_at 2025-07-27;)

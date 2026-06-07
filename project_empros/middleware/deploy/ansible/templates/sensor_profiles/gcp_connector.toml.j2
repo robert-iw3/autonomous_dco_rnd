@@ -1,0 +1,25 @@
+[transmission]
+middleware_url = "{{ 'https' if middleware_tls_enabled else 'http' }}://{{ hostvars[groups['ingress'][0]]['ansible_default_ipv4']['address'] }}:{{ middleware_ingress_port }}/api/v1/telemetry"
+auth_token = "{{ vault_middleware_auth_token }}"
+integrity_secret = "{{ vault_middleware_integrity_secret }}"
+max_backoff_sec = 60
+spool_dir = "/app/data/spool"
+
+[tls]
+enabled = {{ middleware_tls_enabled | lower }}
+ca_path = "/app/certs/ca.pem"
+verify = true
+
+[gcp]
+project_id = "{{ gcp_project_id | default('') }}"
+credentials_file = "/app/secrets/gcp-credentials.json"
+
+[gcp.sources]
+audit_logs_enabled = true
+audit_sensor_type = "gcp_audit"
+
+scc_findings_enabled = true
+scc_sensor_type = "gcp_scc"
+
+vpc_flow_enabled = true
+vpc_sensor_type = "gcp_vpc_flow"

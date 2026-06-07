@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+
+# ── Members ────────────────────────────────────────────────────────────────────
+# ring0_driver is EXCLUDED from this workspace because it requires the Windows
+# Driver Kit (WDK), Rust nightly, and special /INTEGRITYCHECK linker flags.
+# Builds separately: cd ring0_driver && cargo +nightly build --release
+members = [
+    "ml_ueba",           # xdr_ml_engine.dll  -- converged EDR/DLP/C2/IDPS ML engine
+    "nexus_integrity",   # rlib               -- HMAC-SHA256 batch integrity stamping
+    "transmission",      # xdr_nexus.dll      -- SQLite WAL → Parquet → Nexus gateway
+]
+
+[workspace.package]
+edition = "2024"
+authors = ["Robert Weber"]
+
+# ── Shared release profile ─────────────────────────────────────────────────────
+[profile.release]
+panic         = "abort"
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true

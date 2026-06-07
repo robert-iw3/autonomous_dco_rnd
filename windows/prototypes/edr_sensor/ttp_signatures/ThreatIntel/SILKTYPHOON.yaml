@@ -1,0 +1,108 @@
+# =============================================================================
+# SILK_TYPHOON (HAFNIUM / Murky Panda / UNC5221 / UNC6201)
+# =============================================================================
+
+- ttp_signature:
+    name: "Silk Typhoon BRICKSTORM Backdoor Staging"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy: Multi-hop Proxy (T1090.003)"
+      procedure: "Execution of the Go-based BRICKSTORM backdoor for stealthy SOCKS5 proxying"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "brickstorm"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Silk Typhoon GRIMBOLT Advanced Backdoor"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter (T1059)"
+      procedure: "Execution of GRIMBOLT, the successor to BRICKSTORM, often replacing older binaries"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "grimbolt"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Silk Typhoon LSASS Dump via Procdump"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping: LSASS Memory (T1003.001)"
+      procedure: "Silk Typhoon using Procdump to extract credentials for lateral movement to Cloud"
+    match:
+      actor: "procdump.exe"
+      type: "PROCESS_START"
+      target: "-ma lsass.exe"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Silk Typhoon Exchange PowerShell Mailbox Export"
+    severity: "High"
+    meta:
+      tactic: "Collection (TA0009)"
+      technique: "Email Collection: Local Email (T1114.001)"
+      procedure: "Abusing Exchange PowerShell snap-ins to export target mailboxes to PST"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "New-MailboxExportRequest"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Silk Typhoon Nishang Reverse Shell Pivot"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Using Nishang Invoke-PowerShellTcpOneLine for an interactive reverse shell"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Invoke-PowerShellTcpOneLine"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Silk Typhoon Web Shell Deployment (Exchange/IIS)"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Server Software Component: Web Shell (T1505.003)"
+      procedure: "Creation of ASPX/ASHX web shells in Microsoft Exchange auth directories"
+    match:
+      actor: "UMWorkerProcess.exe"
+      type: "FILE_EVENT"
+      target: "\\HttpProxy\\owa\\auth\\"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\"
+
+- ttp_signature:
+    name: "Silk Typhoon AD Snapshot via Ntdsutil"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping: NTDS (T1003.003)"
+      procedure: "Silk Typhoon creating an IFM (Install From Media) snapshot of the AD database"
+    match:
+      actor: "ntdsutil.exe"
+      type: "PROCESS_START"
+      target: "create full"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"

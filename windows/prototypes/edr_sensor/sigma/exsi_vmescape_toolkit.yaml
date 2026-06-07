@@ -1,0 +1,49 @@
+title: ESXi VM Escape Toolkit Attack Chain
+id: f011fd7c-6422-4d5b-864a-7dcf0d805175
+status: experimental
+description: >-
+  Detects a multi-layered attack chain associated with an ESXi VM Escape toolkit.
+  This rule identifies known malicious file hashes, specific defense evasion techniques
+  like disabling VMware drivers and isolating the host network, and the execution of a kernel driver loading utility.
+references:
+author: RW
+date: 2026-01-09
+tags:
+  - attack.privilege_escalation
+  - attack.defense_evasion
+  - attack.persistence
+  - attack.t1562.001
+  - attack.t1547.006
+  - attack.t1210
+logsource:
+  category:
+    - process_creation
+    - file_event
+detection:
+  # Layer 1: devcon.exe used to disable VMware VMCI devices
+  selection_devcon:
+    Image|endswith: '\devcon.exe'
+    CommandLine|contains: 'disable'
+    CommandLine|contains|any:
+      - 'PCI\VEN_15AD&DEV_0740'
+      - 'ROOT\VMWVMCIHOSTDEV'
+
+  # Layer 2: Kernel Driver Utility (KDU) execution
+  selection_kdu:
+    Image|endswith: '\kdu.exe'
+
+  # Layer 3: netsh.exe used to isolate the host network
+  selection_netsh:
+    Image|endswith: '\netsh.exe'
+    CommandLine|contains|all:
+      - 'advfirewall'
+      - 'add'
+      - 'rule'
+      - 'action=block'
+      - 'dir=out'
+      - 'remoteip=0.0.0.0-255.255.255.255'
+
+  condition: 1 of them
+falsepositives:
+  - The use of 'devcon.exe' or 'netsh.exe' by system administrators for legitimate purposes could cause false positives. Tuning may be required based on parent processes or specific user activity. The execution of 'kdu.exe' is highly suspicious.
+level: critical

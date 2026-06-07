@@ -1,0 +1,71 @@
+# =============================================================================
+# DIRTYBULK Multi-Stage Infection Chain
+# =============================================================================
+
+- ttp_signature:
+    name: "DIRTYBULK Encoded PowerShell Dropper"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "DIRTYBULK using encoded PowerShell for multi-stage drop"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "DIRTYBULK 7-Zip + Certutil Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "DIRTYBULK abusing 7-Zip followed by certutil for payload staging"
+    match:
+      actor:
+        - "7z.exe"
+        - "rar.exe"
+      type: "PROCESS_START"
+      target:
+        - " -p"
+        - " a -mhe"
+        - " -taes"
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\"
+
+- ttp_signature:
+    name: "DIRTYBULK Persistence via Run Key"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "DIRTYBULK maintaining persistence after infection chain"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target_value:
+        - "*Microsoft\\Teams\\*"
+        - "*OneDrive.exe*"
+      exclude_actor: "reg.exe"
+
+- ttp_signature:
+    name: "DIRTYBULK Certutil Encoded Payload"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "DIRTYBULK using certutil with encoded payload"
+    match:
+      actor: "certutil.exe"
+      type: "PROCESS_START"
+      target: "-decode"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "certutil.exe -decode"

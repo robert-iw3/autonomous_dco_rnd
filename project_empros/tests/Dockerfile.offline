@@ -1,0 +1,28 @@
+# SECTION: offline
+# Tests:   tests/test_turbovec_mlops.py  (58)
+#          tests/lab_mlops_train/test_rsi_loop.py  (49)
+# Deps:    pytest + numpy only -- duckdb/torch are stubbed at module level
+#   docker build -f project_empros/tests/Dockerfile.offline -t nexus-test-offline .
+FROM docker.io/alpine:3.23
+
+RUN apk add --no-cache python3 py3-pip py3-numpy
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN pip3 install --no-cache-dir "pytest>=7.4.0"
+
+COPY project_empros/mlops/scripts/                           /repo/project_empros/mlops/scripts/
+COPY project_empros/mlops/data/                              /repo/project_empros/mlops/data/
+COPY project_empros/tests/test_turbovec_mlops.py             /repo/project_empros/tests/
+COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py   /repo/project_empros/tests/lab_mlops_train/
+COPY project_empros/tests/pytest.ini                         /repo/project_empros/tests/
+
+ENV PYTHONPATH=/repo/project_empros/mlops/scripts
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/test_turbovec_mlops.py", \
+     "tests/lab_mlops_train/test_rsi_loop.py", \
+     "-v", "--tb=short", "--junit-xml=/reports/offline.xml"]

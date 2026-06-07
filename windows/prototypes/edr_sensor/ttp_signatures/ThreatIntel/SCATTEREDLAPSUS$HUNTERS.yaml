@@ -1,0 +1,107 @@
+# =============================================================================
+# SCATTERED LAPSUS$ HUNTERS (SLH / ShinySp1d3r / UNC3944 / UNC6040)
+# =============================================================================
+
+- ttp_signature:
+    name: "SLH ShinySp1d3r RaaS Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "Execution of the 2026 ShinySp1d3r ransomware variant, often deployed 24-48 hours after initial access"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "ShinySp1d3r.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "SLH Salesforce OAuth Malicious App Authorization"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Steal Web Session Cookie (T1539)"
+      procedure: "Authorizing malicious OAuth apps (e.g., 'Data Loader') to extract customer records via vishing-induced approval"
+    match:
+      actor: "browser_process"
+      type: "NETWORK_EVENT"
+      target: ".salesforce.com/setup/connect"
+    filter:
+      exclude_path: "C:\\Windows\\"
+
+- ttp_signature:
+    name: "SLH AWS Infrastructure Obfuscation (aws_consoler)"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Modify Cloud Compute Infrastructure (T1578)"
+      procedure: "Using aws_consoler to create temporary federated credentials and pivot from CLI to Console without MFA"
+    match:
+      actor: "aws.exe"
+      type: "PROCESS_START"
+      target: "aws_consoler"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "SLH Internal Security Slack/Teams Harvesting"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Data from Information Repositories: Messaging Applications (T1213.005)"
+      procedure: "Searching messaging platforms for 'incident', 'detection', or 'MFA' to track IR response and identify admins"
+    match:
+      actor: "Slack.exe"
+      type: "PROCESS_START"
+      target: "grep -i 'incident'"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "SLH Identity Provider Abuse (Okta/Microsoft SSO)"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Multi-Factor Authentication Request Generation (T1621)"
+      procedure: "Triggering MFA push notifications (MFA Fatigue) or calling help desks to reset tokens"
+    match:
+      actor: "lsass.exe"
+      type: "LOGON_EVENT"
+      target:
+        - "auth_method: push"
+        - "mfa_request_success"
+    filter:
+      exclude_actor:
+        - "SYSTEM"
+        - "NETWORK SERVICE"
+
+- ttp_signature:
+    name: "SLH Remote Management Tool Sideloading (AnyDesk/Teleport)"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Remote Access Software (T1219)"
+      procedure: "Forcing victims to install AnyDesk or Teleport during vishing calls to gain persistent GUI access"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "AnyDesk.exe --service"
+    filter:
+      exclude_path:
+        - "C:\\Program Files\\AnyDesk\\*"
+        - "C:\\Program Files (x86)\\AnyDesk\\*"
+
+- ttp_signature:
+    name: "SLH GitHub OAuth Token Exfiltration"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Unsecured Credentials (T1552)"
+      procedure: "Pivoting from Salesforce/Salesloft integrations to steal OAuth tokens for GitHub source code repositories"
+    match:
+      actor: "git.exe"
+      type: "PROCESS_START"
+      target: "auth-token"
+    filter:
+      exclude_path: "C:\\Windows\\*"

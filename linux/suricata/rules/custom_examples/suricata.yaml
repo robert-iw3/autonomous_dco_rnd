@@ -1,0 +1,21 @@
+datasets:
+  - name: malicious_ips_cve_2025_53770
+    type: string
+    file: ./toolshell_sharepoint/CVE-2025-53770_malicious_ips.list
+    memcap: 10mb
+    hashsize: 1024
+  - name: suspicious_ips_cve_2025_31324
+    type: ip
+    file: ./CVE-2025-31324/cve-2025-31324_ips.list
+    memcap: 10mb
+    hashsize: 1024
+  - name: suspicious_domains_cve_2025_31324
+    type: string
+    file: ./CVE-2025-31324/cve-2025-31324_domains.list
+    memcap: 10mb
+    hashsize: 1024
+  - name: arcane_door_IP_IOCs
+    type: string
+    file: ./arcane_door/arcane_door_known_IPs.list
+    memcap: 10mb
+    hashsize: 1024

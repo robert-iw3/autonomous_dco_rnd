@@ -1,0 +1,58 @@
+alert http any any -> any any (msg:"Storm-2603 SharePoint Exploitation - Suspicious HTTP Request"; \
+flow:established,to_server; http.method; content:"GET|POST"; http.uri; content:"sharepoint|onedrive"; \
+nocase; http.host; content:"sharepoint.com|onedrive.com"; nocase; content:"login|auth"; nocase; \
+sid:8888025; rev:1; reference:url,thehackernews.com/2025/07/storm-2603-exploits-sharepoint-flaws-to.html; \
+classtype:trojan-activity; metadata:mitre_attack_id T1190, attack_type Exploit_Public-Facing_Application, threat_actor Storm-2603;)
+
+alert http any any -> any any (msg:"Storm-2603 IIS Persistence - Suspicious HTTP Request to IIS Server"; \
+flow:established,to_server; http.method; content:"GET|POST"; http.host; \
+content:"microsoftonline|office365|sharepoint"; nocase; http.uri; content:".aspx|.ashx"; \
+nocase; sid:8888028; rev:1; reference:url,thehackernews.com/2025/07/storm-2603-exploits-sharepoint-flaws-to.html; \
+classtype:trojan-activity; metadata:mitre_attack_id T1505.003, mitre_tactic Persistence, threat_actor Storm-2603;)
+
+alert smb any any -> any any (msg:"Impacket Lateral Movement - Suspicious SMB to Local Admin Share"; \
+flow:established,to_server; smb.share; content:"\\127.0.0.1\\C$|\\127.0.0.1\\ADMIN$"; \
+nocase; sid:8888026; rev:1; reference:url,thehackernews.com/2025/07/storm-2603-exploits-sharepoint-flaws-to.html; \
+classtype:trojan-activity; metadata:mitre_attack_id T1047, mitre_tactic Lateral_Movement, threat_actor Storm-2603, tool Impacket;)
+
+alert smb any any -> any any (msg:"PsExec Lateral Movement - Suspicious SMB Service Creation"; \
+flow:established,to_server; smb.service; content:"PSEXESVC"; nocase; sid:8888027; rev:1; \
+reference:url,thehackernews.com/2025/07/storm-2603-exploits-sharepoint-flaws-to.html; \
+classtype:trojan-activity; metadata:mitre_attack_id T1021.002, mitre_tactic Lateral_Movement, threat_actor Storm-2603, tool PsExec;)
+
+alert http $EXTERNAL_NET any -> $HOME_NET 80,443 (msg:"Storm2603: Possible SharePoint ToolShell Exploit Attempt"; \
+flow:to_server,established; content:"POST"; http_method; content:"/sites/"; http_uri; content:"_vti_bin/"; http_uri; \
+content:"|2f|"; http_uri; depth:50; content:"Content-Type: application/xml"; http_header; content:"<Method"; http_client_body; \
+content:"<Field"; http_client_body; distance:0; within:50; flowbits:set,unit42.sharepoint_exploit; flowbits:noalert; \
+classtype:attempted-admin; sid:8888001; rev:1; \
+metadata:created_at 2025_08_06, updated_at 2025_08_06, cve CVE-2025-49704, cve CVE-2025-49706, cve CVE-2025-53770, cve CVE-2025-53771;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Storm2603: Project AK47 AK47C2 Backdoor C2 Communication"; \
+flow:to_server,established; flowbits:isset,unit42.sharepoint_exploit; content:"POST"; http_method; \
+content:"User-Agent|3a 20|AK47C2"; http_header; nocase; content:"cmd="; http_client_body; content:"|26|"; \
+http_client_body; distance:0; within:10; threshold:type both, track by_src, count 3, seconds 60; \
+classtype:trojan-activity; sid:8888002; rev:1; metadata:created_at 2025_08_06, updated_at 2025_08_06, \
+reference:url,unit42.paloaltonetworks.com/ak47-activity-linked-to-sharepoint-vulnerabilities;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Storm2603: 4L4MD4R Ransomware Note Delivery"; \
+flow:to_server,established; flowbits:isset,unit42.sharepoint_exploit; content:"4L4MD4R"; http_client_body; \
+content:"Bitcoin"; http_client_body; distance:0; within:100; content:"ransom"; http_client_body; nocase; \
+content:"decrypt"; http_client_body; nocase; threshold:type limit, track by_src, count 1, seconds 300; \
+classtype:ransomware; sid:8888003; rev:1; metadata:created_at 2025_08_06, updated_at 2025_08_06, \
+reference:url,unit42.paloaltonetworks.com/ak47-activity-linked-to-sharepoint-vulnerabilities;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Storm2603: Project AK47 PDB Filepath Artifact"; \
+flow:to_server,established; flowbits:isset,unit42.sharepoint_exploit; content:"pdb"; http_client_body; \
+content:"writenull"; http_client_body; nocase; content:"encrypt"; http_client_body; nocase; \
+content:"7zdllhijacked"; http_client_body; nocase; content:"dll_hijacked"; http_client_body; nocase; \
+fast_pattern; threshold:type limit, track by_src, count 1, seconds 300; classtype:trojan-activity; \
+sid:8888004; rev:1; metadata:created_at 2025_08_06, updated_at 2025_08_06, \
+reference:url,unit42.paloaltonetworks.com/ak47-activity-linked-to-sharepoint-vulnerabilities;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Storm2603: PowerShell Command Disabling Windows Defender"; \
+flow:to_server,established; flowbits:isset,unit42.sharepoint_exploit; content:"powershell"; http_client_body; \
+content:"Set-MpPreference"; http_client_body; content:"DisableRealtimeMonitoring"; http_client_body; \
+content:"$true"; http_client_body; distance:0; within:50; threshold:type limit, track by_src, count 1, seconds 300; \
+classtype:attempted-admin; sid:8888005; rev:1; metadata:created_at 2025_08_06, updated_at 2025_08_06, \
+reference:url,unit42.paloaltonetworks.com/ak47-activity-linked-to-sharepoint-vulnerabilities;)
+

@@ -1,0 +1,74 @@
+---
+# ==============================================================================
+# kernel.yml -- Sysctl and kernel hardening
+# Balances security with high-throughput telemetry ingestion performance.
+# ==============================================================================
+
+- name: Deploy sysctl hardening configuration
+  ansible.builtin.template:
+    src: sysctl_hardening.conf.j2
+    dest: /etc/sysctl.d/99-nexus-hardening.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload sysctl
+
+- name: Apply sysctl settings immediately
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+# ── Core dumps ────────────────────────────────────────────────────────────────
+- name: Disable core dumps via limits.conf
+  ansible.builtin.lineinfile:
+    path: /etc/security/limits.conf
+    regexp: '^\*.*hard.*core'
+    line: '*               hard    core            0'
+    state: present
+
+- name: Disable core dumps via sysctl
+  ansible.posix.sysctl:
+    name: fs.suid_dumpable
+    value: '0'
+    sysctl_set: yes
+    state: present
+
+# ── Filesystem hardening ──────────────────────────────────────────────────────
+- name: Set restrictive permissions on /etc/crontab
+  ansible.builtin.file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Set restrictive permissions on cron directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0700'
+    state: directory
+  loop:
+    - /etc/cron.d
+    - /etc/cron.daily
+    - /etc/cron.hourly
+    - /etc/cron.monthly
+    - /etc/cron.weekly
+
+# ── /tmp and /dev/shm mount options ──────────────────────────────────────────
+- name: Ensure /tmp has noexec,nosuid,nodev
+  ansible.posix.mount:
+    path: /tmp
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,noexec,nosuid,nodev,size=2G
+    state: mounted
+  failed_when: false
+
+- name: Ensure /dev/shm has noexec,nosuid,nodev
+  ansible.posix.mount:
+    path: /dev/shm
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,noexec,nosuid,nodev
+    state: mounted
+  failed_when: false

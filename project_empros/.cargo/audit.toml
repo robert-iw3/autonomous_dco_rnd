@@ -1,0 +1,25 @@
+# ==============================================================================
+# cargo-audit configuration -- Sentinel Nexus
+# Formally acknowledged accepted-risk advisories.
+# Rationale documented per entry. Review when upstream releases a fix.
+#
+# tiberius 0.12.3 chain (RUSTSEC-2026-0097/0098/0099/0104):
+#   tiberius->tokio-rustls->rustls 0.21->rustls-webpki 0.101.7 (CVEs)
+#   tiberius->winauth->rand 0.7.3 (unsound)
+#   No tiberius 0.13 exists on crates.io. Re-evaluate on next tiberius release.
+#   worker_sql is disabled by default (sql_enabled = false in production config).
+#
+# Unmaintained transitive deps (no CVE):
+#   RUSTSEC-2024-0436  paste via parquet->arrow-cast (compile-time only)
+#   RUSTSEC-2025-0134  rustls-pemfile via tiberius and qdrant-client->tonic 0.12
+# ==============================================================================
+
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0097",
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2025-0134",
+]

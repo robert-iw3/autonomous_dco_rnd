@@ -1,0 +1,24 @@
+# ==============================================================================
+# suspicious.rules -- TIER 2 (action: alert)  [SID 2100000-2100999 reserved]
+#
+# Medium-confidence behaviour. These ALERT by default. The risk-based part:
+# threshold.config contains rate_filter entries (keyed by the SIDs below) that
+# AUTO-ESCALATE a source to DROP once it crosses a frequency threshold -- so a
+# single probe is logged, but sustained scanning/brute-force gets blocked
+# without a human in the loop. Escalation is environment-agnostic (per-source).
+# ==============================================================================
+
+# --- Port / host scanning (SYN sprays) ---
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN possible TCP SYN scan"; flow:to_server; flags:S,12; sid:2100001; rev:1;)
+
+# --- SSH brute force (many new sessions from one source) ---
+alert tcp $EXTERNAL_NET any -> $HOME_NET $SSH_PORTS (msg:"BRUTE possible SSH brute force"; flow:to_server; flags:S; sid:2100010; rev:1;)
+
+# --- HTTP auth brute force / credential stuffing ---
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"BRUTE repeated HTTP 401/login POST"; flow:to_server; http.method; content:"POST"; http.uri; content:"login"; nocase; sid:2100020; rev:1;)
+
+# --- DNS exfiltration heuristic (long/odd query volume) ---
+alert dns $HOME_NET any -> $EXTERNAL_NET any (msg:"EXFIL high-volume outbound DNS (rate-tracked)"; flow:to_server; sid:2100030; rev:1;)
+
+# --- Outbound to non-standard ports often used by C2 ---
+alert tcp $HOME_NET any -> $EXTERNAL_NET [4444,1337,6666,9001] (msg:"C2 outbound to common backdoor port"; flow:to_server,established; sid:2100040; rev:1;)

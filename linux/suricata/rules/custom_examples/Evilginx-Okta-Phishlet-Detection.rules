@@ -1,0 +1,5 @@
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET WEB_CLIENT Okta Evilginx Phishlet Detected - Dynamic Tenant"; \
+flow:established,to_client; http.header; content:"Content-Type: application/ion+json"; http.host; \
+content|3a 20|[a-z0-9-]+\.okta\.com; http.uri; content:"/login/login.htm"; content|3a 20|"identifier"; \
+content|3a 20|"passcode"; classtype:trojan-activity; sid:8787002; rev:1; \
+metadata:created_at 2025_07_30, signature_severity Major, attack_target Client_Endpoint, deployment Perimeter;)

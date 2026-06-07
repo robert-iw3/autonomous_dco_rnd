@@ -1,0 +1,13 @@
+[package]
+name = "lib_middleware"
+version = "0.1.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+async-nats = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+metrics = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

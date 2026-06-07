@@ -1,0 +1,17 @@
+alert http any any -> any any (msg:"Potential MitM Proxy - Suspicious Login URI with Let’s Encrypt"; \
+flow:established,to_server; http.method; content:"GET|POST"; http.uri; content:".php|login|auth"; \
+nocase; http.host; content:"microsoftonline|office365|login|outlook|okta|github|linkedin|amazon"; \
+nocase; content:".com|.org|.eu|.shop"; nocase; http.header; content:"X-Issued-By: Let’s Encrypt"; \
+fast_pattern; sid:1000022; rev:1; classtype:trojan-activity; \
+metadata:mitre_attack_id T1192, attack_type MitM_Phishing, framework Evilginx2;)
+
+alert http any any -> any any (msg:"Potential MitM Proxy - Suspicious Redirect Response"; \
+flow:established,from_server; http.stat_code; content:"200|301|302"; file_data; content:"<html"; \
+content:"location.href"; content:"microsoft.com|office365.com|login.live.com|outlook.com"; \
+nocase; sid:1000023; rev:1; classtype:trojan-activity; \
+metadata:mitre_attack_id T1192, attack_type MitM_Phishing, framework Evilginx2;)
+
+alert dns any any -> any any (msg:"Potential MitM Proxy - Suspicious DNS Query for Phishing Domains"; \
+dns.query; content:"microsoftonline|office365|login|outlook|okta|github|linkedin|amazon"; \
+nocase; content:".com|.org|.eu|.shop"; nocase; sid:1000024; rev:1; classtype:trojan-activity; \
+metadata:mitre_attack_id T1192, attack_type MitM_Phishing, framework Evilginx2;)

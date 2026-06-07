@@ -1,0 +1,41 @@
+[package]
+name = "worker_rules"
+version = "0.1.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+# Runtime
+tokio       = { workspace = true }
+async-trait = { workspace = true }
+futures     = { workspace = true }
+
+# Serialization
+serde      = { workspace = true }
+serde_json = { workspace = true }
+toml       = { workspace = true }
+bytes      = { workspace = true }
+
+# Parquet → Arrow
+arrow   = { workspace = true }
+parquet = { workspace = true }
+
+# State
+redis = { workspace = true }
+
+# Observability
+tracing              = { workspace = true }
+tracing-subscriber   = { workspace = true }
+metrics              = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+opentelemetry        = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+
+# Resilience
+failsafe = { workspace = true }
+
+# Allocator
+tikv-jemallocator = { workspace = true }
+
+# Internal
+lib_siem_core = { workspace = true }

@@ -1,0 +1,51 @@
+# IP Filtering: Excludes RFC1918 ranges and uses a lookup file (authorized_ics_ips.csv) for authorized external IPs.
+alert ip any any -> $PLC_IPS [502,44818,2222,20000,47808,102,1911,2404] (
+  msg:"ICS: External Connection to PLC on ICS Port";
+  flow:established,to_server;
+  ip.src not in 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16;
+  ip.src not in file:authorized_ics_ips.csv;
+  sid:4545001;
+  rev:1;
+  metadata:created_at 2025_08_11, ot_ics, external_access, ports modbus ethernet_ip dnp3 bacnet s7 niagara_fox iec60870;
+  classtype:policy-violation;
+)
+
+# Destination Filtering: Excludes OT subnets (ot_subnets.csv), authorized IT destinations (authorized_it_destinations.csv), and broadcast/multicast ranges.
+alert ip $PLC_IPS any -> any any (
+  msg:"ICS: PLC to Non-OT Destination";
+  ip.dst not in file:ot_subnets.csv;
+  ip.dst not in file:authorized_it_destinations.csv;
+  ip.dst not in 224.0.0.0/4,255.255.255.255;
+  sid:4545002;
+  rev:1;
+  metadata:created_at 2025_08_11, ot_ics, plc_anomalous_traffic;
+  classtype:anomalous-traffic;
+)
+
+# Source/Destination IPs: Uses $PLC_IPS (from plc_ips.csv) and $EWS_IPS (from engineering_workstation_ips.csv) for precise filtering.
+alert ip $PLC_IPS any -> $EWS_IPS [21,22,135,139,445,3389,5985,5986] (
+  msg:"ICS: PLC to EWS on Suspicious Port";
+  flow:established,to_server;
+  sid:4545003;
+  rev:1;
+  metadata:created_at 2025_08_11, ot_ics, plc_to_ews, ports ftp ssh smb rdp winrm;
+  classtype:suspicious-traffic;
+)
+
+# Source Filtering: Excludes authorized engineering workstations (authorized_engineering_workstations.csv).
+alert ip any any -> $PLC_IPS any (
+  msg:"ICS: Unauthorized Modification Command to PLC";
+  flow:established,to_server;
+  content:"|00|"; depth:2; offset:0; fast_pattern;
+  pcre:"/^(Download|Write Tag|Modify|Program|S7_WRITE|SZL_WRITE|DOWNLOAD|BLOCK_DOWNLOAD|WRITE|OPERATE|DIRECT_OPERATE|Stop PLC|Run PLC|PLC Stop|PLC Run|Force On|Force Off|Upload\/download|[0-9]{1,2})/i";
+  ip.src not in file:authorized_engineering_workstations.csv;
+  sid:4545004;
+  rev:1;
+  metadata:created_at 2025_08_11, ot_ics, modification_command, protocols ethernet_ip s7 modbus dnp3;
+  classtype:command-control;
+)
+
+### Ensure Suricata is configured with ipvar definitions for $PLC_IPS and $EWS_IPS, mapping to plc_ips.csv and engineering_workstation_ips.csv
+### ipvar PLC_IPS file:plc_ips.csv
+### ipvar EWS_IPS file:engineering_workstation_ips.csv
+

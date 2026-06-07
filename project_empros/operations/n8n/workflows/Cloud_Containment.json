@@ -1,0 +1,172 @@
+{
+  "name": "Cloud_Containment",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "cloud-containment",
+        "responseMode": "lastNode",
+        "options": { "rawBody": true }
+      },
+      "id": "cloud-webhook",
+      "name": "Cloud Containment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize payload and classify cloud provider\nconst body = $input.first().json.body || $input.first().json;\n\nconst AWS_TYPES   = ['aws_guardduty','aws_cloudtrail','aws_vpc'];\nconst AZURE_TYPES = ['azure_entraid','azure_activity','azure_nsg'];\nconst GCP_TYPES   = ['gcp_audit','gcp_scc','gcp_vpc_flow'];\n\nconst sourceType = (body.source_type || '').toLowerCase();\n\nlet provider = 'unknown';\nif (AWS_TYPES.includes(sourceType))   provider = 'aws';\nelse if (AZURE_TYPES.includes(sourceType)) provider = 'azure';\nelse if (GCP_TYPES.includes(sourceType))  provider = 'gcp';\n\nreturn [{\n  json: {\n    incident_id:  body.incident_id  || 'UNKNOWN',\n    target_ip:    body.target_ip    || body.target || '',\n    source_type:  sourceType,\n    provider:     provider,\n    action:       body.action       || 'isolate',\n    reason:       body.reason       || 'Sentinel Nexus auto-containment',\n    raw:          body,\n  }\n}];"
+      },
+      "id": "classify-provider",
+      "name": "Classify Cloud Provider",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [{ "leftValue": "={{ $json.provider }}", "rightValue": "aws", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "aws" },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [{ "leftValue": "={{ $json.provider }}", "rightValue": "azure", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "azure" },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [{ "leftValue": "={{ $json.provider }}", "rightValue": "gcp", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "gcp" }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route-provider",
+      "name": "Route by Provider",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AWS_ISOLATE_LAMBDA_URL }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "aws",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"target_ip\":   \"{{ $json.target_ip }}\",\n  \"action\":      \"{{ $json.action }}\",\n  \"source\":      \"n8n_cloud_containment\"\n}",
+        "options": { "timeout": 65000 }
+      },
+      "id": "aws-invoke-isolate",
+      "name": "AWS Lambda: Isolate/Block",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, -200],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AZURE_NSG_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"IncidentId\":    \"{{ $json.incident_id }}\",\n  \"TargetIp\":      \"{{ $json.target_ip }}\",\n  \"Action\":        \"{{ $json.action === 'isolate' ? 'isolate' : 'release' }}\",\n  \"ResourceGroup\": \"{{ $json.raw.resource_group || '' }}\",\n  \"NsgName\":       \"{{ $json.raw.nsg_name || '' }}\",\n  \"VmName\":        \"{{ $json.raw.vm_name || '' }}\"\n}",
+        "options": { "timeout": 130000 }
+      },
+      "id": "azure-invoke-runbook",
+      "name": "Azure Automation: NSG Isolation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GCP_ISOLATE_FUNCTION_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Nexus-Signature", "value": "={{ $env.NEXUS_HMAC_SECRET }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"target_ip\":   \"{{ $json.target_ip }}\",\n  \"action\":      \"{{ $json.action }}\",\n  \"network\":     \"{{ $json.raw.gcp_network || 'default' }}\"\n}",
+        "options": { "timeout": 65000 }
+      },
+      "id": "gcp-invoke-function",
+      "name": "GCP Cloud Function: VPC Firewall",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, 200],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize response from whichever provider ran\nconst input = $input.first().json;\nconst ctx   = $('Classify Cloud Provider').first().json;\n\nlet status = 'FAILED';\nlet detail = '';\n\n// Check for success indicators across provider response formats\nif (input.status === 'CONTAINED' || input.status === 'BLOCKED' ||\n    input.status === 'RELEASED'  || input.status === 'UNBLOCKED') {\n  status = input.status;\n} else if (input.JobId || input.jobId) {\n  // Azure Automation returns a JobId for async runbook execution\n  status = 'PENDING';\n  detail = `Azure Automation job: ${input.JobId || input.jobId}`;\n} else if (typeof input === 'object' && !input.error) {\n  status = 'CONTAINED';\n}\n\nreturn [{\n  json: {\n    incident_id: ctx.incident_id,\n    target_ip:   ctx.target_ip,\n    provider:    ctx.provider,\n    source_type: ctx.source_type,\n    action:      ctx.action,\n    status:      status,\n    detail:      detail || JSON.stringify(input),\n    timestamp:   new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "normalize-result",
+      "name": "Normalize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle error output from API calls\nconst ctx = $('Classify Cloud Provider').first().json;\nreturn [{\n  json: {\n    incident_id: ctx.incident_id,\n    target_ip:   ctx.target_ip,\n    provider:    ctx.provider,\n    source_type: ctx.source_type,\n    action:      ctx.action,\n    status:      'FAILED',\n    detail:      'Cloud provider API call failed: ' + JSON.stringify($input.first().json),\n    timestamp:   new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NATS_HTTP_URL }}/publish/nexus.soar.cloud_containment_result",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "signal-soar",
+      "name": "Signal SOAR via NATS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json }];"
+      },
+      "id": "unknown-provider",
+      "name": "Unknown Provider Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 400]
+    }
+  ],
+  "connections": {
+    "Cloud Containment Webhook":  { "main": [[{ "node": "Classify Cloud Provider", "type": "main", "index": 0 }]] },
+    "Classify Cloud Provider":    { "main": [[{ "node": "Route by Provider",       "type": "main", "index": 0 }]] },
+    "Route by Provider": {
+      "aws":   [[{ "node": "AWS Lambda: Isolate/Block",       "type": "main", "index": 0 }]],
+      "azure": [[{ "node": "Azure Automation: NSG Isolation", "type": "main", "index": 0 }]],
+      "gcp":   [[{ "node": "GCP Cloud Function: VPC Firewall","type": "main", "index": 0 }]],
+      "extra": [[{ "node": "Unknown Provider Error",          "type": "main", "index": 0 }]]
+    },
+    "AWS Lambda: Isolate/Block": {
+      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
+      "error": [[{ "node": "Handle Error",     "type": "main", "index": 0 }]]
+    },
+    "Azure Automation: NSG Isolation": {
+      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
+      "error": [[{ "node": "Handle Error",     "type": "main", "index": 0 }]]
+    },
+    "GCP Cloud Function: VPC Firewall": {
+      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
+      "error": [[{ "node": "Handle Error",     "type": "main", "index": 0 }]]
+    },
+    "Normalize Result":     { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] },
+    "Handle Error":         { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] },
+    "Unknown Provider Error":{ "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

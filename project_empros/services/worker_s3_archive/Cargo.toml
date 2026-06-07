@@ -1,0 +1,33 @@
+[package]
+name = "worker_s3_archive"
+version = "0.1.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+# Runtime
+tokio   = { workspace = true }
+futures = { workspace = true }
+
+# Messaging
+async-nats = { workspace = true }
+
+# Storage
+object_store = { workspace = true }
+bytes        = { workspace = true }
+
+# Observability
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+metrics            = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+
+# Utilities
+uuid   = { workspace = true }
+chrono = { workspace = true }
+
+# Compression -- ZSTD for Parquet cold storage
+zstd = { workspace = true }
+
+# Allocator
+tikv-jemallocator = { workspace = true }

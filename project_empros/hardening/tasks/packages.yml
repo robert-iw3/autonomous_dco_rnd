@@ -1,0 +1,46 @@
+---
+# ==============================================================================
+# packages.yml -- Install security baseline packages
+# ==============================================================================
+
+- name: Install security packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - auditd
+      - audispd-plugins
+      - aide
+      - fail2ban
+      - libpam-pwquality
+      - libpam-modules
+      - cracklib-runtime
+      - rng-tools5
+      - acl
+      - apt-transport-https
+      - needrestart
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Install security packages (RHEL/Rocky/Alma)
+  ansible.builtin.dnf:
+    name:
+      - audit
+      - aide
+      - fail2ban
+      - firewalld
+      - libpwquality
+      - pam
+      - cracklib
+      - cracklib-dicts
+      - rng-tools
+      - acl
+      - policycoreutils-python-utils
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Ensure auditd is enabled and running
+  ansible.builtin.systemd:
+    name: auditd
+    state: started
+    enabled: yes

@@ -1,0 +1,21 @@
+# Detect PATCH requests to Google Drive API with specific User-Agent
+alert http any any -> any any (msg:"APT41 MoonWalk Backdoor - Suspicious PATCH Request to Google Drive API"; \
+flow:established,to_server; http.method; content:"PATCH"; http.host; content:"www.googleapis.com"; \
+http.uri; content:"/upload/drive/v3/files/"; startswith; http.user_agent; content:"curl/7.54.0"; \
+classtype:trojan-activity; sid:5757001; rev:1;)
+
+# Detect GET requests to Google Drive API with specific User-Agent
+alert http any any -> any any (msg:"APT41 MoonWalk Backdoor - Suspicious GET Request to Google Drive API"; \
+flow:established,to_server; http.method; content:"GET"; http.host; content:"www.googleapis.com"; \
+http.uri; content:"/drive/v3/files"; startswith; http.user_agent; content:"curl/7.54.0"; \
+classtype:trojan-activity; sid:5757002; rev:1;)
+
+# Detect HTTP/HTTPS traffic to drive.google.com with non-standard User-Agent
+alert http any any -> any 443 (msg:"Potential Google Drive C2 - Suspicious Connection to drive.google.com"; \
+flow:established,to_server; tls.sni; content:"drive.google.com"; http.user_agent; content:!"Mozilla/"; \
+content:!"GoogleDrive"; content:!"Google Drive"; classtype:trojan-activity; sid:5757003; rev:1;)
+
+# Detect HTTP/HTTPS traffic to www.googleapis.com with non-standard User-Agent
+alert http any any -> any 443 (msg:"Potential Google Drive C2 - Suspicious Connection to www.googleapis.com"; \
+flow:established,to_server; tls.sni; content:"www.googleapis.com"; http.user_agent; content:!"Mozilla/"; \
+content:!"GoogleDrive"; content:!"Google Drive"; classtype:trojan-activity; sid:5757004; rev:1;)

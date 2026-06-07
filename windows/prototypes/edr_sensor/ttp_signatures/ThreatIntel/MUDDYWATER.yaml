@@ -1,0 +1,95 @@
+# =============================================================================
+# MUDDYWATER (Mango Sandstorm / Seedworm / Static Kitten / TA450)
+# =============================================================================
+
+- ttp_signature:
+    name: "MuddyWater PhonyC2 DB Payload Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "PhonyC2 framework executing generated db.ps1 and db.sqlite payloads"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "programdata\\db.ps1"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "MuddyWater PhonyC2 JSE Registry Persistence"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "PhonyC2 persist module creating Run key for utils.jse backdoor"
+    match:
+      actor: "reg.exe"
+      type: "REGISTRY_EVENT"
+      target: "intel\\utils\\utils.jse"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "MuddyWater CMSTP UAC Bypass (POWERSTATS)"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "System Binary Proxy Execution: CMSTP (T1218.003)"
+      procedure: "Abusing CMSTP.exe with a malicious INF file to bypass UAC and load POWERSTATS"
+    match:
+      actor: "cmstp.exe"
+      type: "PROCESS_START"
+      target: ".inf"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "MuddyWater Fooder Loader (MuddyViper)"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "System Binary Proxy Execution: Rundll32 (T1218.011)"
+      procedure: "Rundll32 executing the Fooder loader to reflectively inject the MuddyViper backdoor"
+    match:
+      actor: "rundll32.exe"
+      type: "PROCESS_START"
+      target: "Fooder"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "MuddyWater Ligolo Tunneling Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy (T1090)"
+      procedure: "Execution of the Ligolo reverse tunneling tool for infrastructure proxying"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "ligolo"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "MuddyWater Security Software Discovery"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Security Software Discovery (T1518.001)"
+      procedure: "MuddyWater scripts checking ProgramData for ESET, Kasper, or Panda directories"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Kasper"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"

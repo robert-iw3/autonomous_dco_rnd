@@ -1,0 +1,70 @@
+# SECTION: pipeline
+# Tests:   test_phase1_pipeline, test_phase2_pipeline, test_phase3_guardrails,
+#          lab_mlops_serving/, lab_mlops_train/
+# NOTE:    test_phase1_pipeline resolves windows/ via REPO.parent -- this
+#          Dockerfile is the only one that copies windows/ from repo root.
+# Deps:    pytest, numpy, PyYAML, pandas, pyarrow, pydantic, safetensors,
+#          torch (CPU), transformers, peft, trl, accelerate
+#   docker build -f project_empros/tests/Dockerfile.pipeline -t nexus-test-pipeline .
+#
+# NOTE: Uses python:3.12-slim (Debian/glibc) instead of Alpine because PyTorch
+#       CPU wheels link against glibc symbols not present in musl libc.
+FROM docker.io/python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libffi-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_DATASETS_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
+# Layer 1 -- test + data
+RUN pip install --no-cache-dir \
+    "pytest>=7.4.0" \
+    "numpy>=2.0.0" \
+    "PyYAML>=6.0" \
+    "pandas>=2.2.0" \
+    "pyarrow>=16.0.0" \
+    "pydantic>=2.7.1" \
+    "safetensors>=0.4.2"
+
+# Layer 2 -- HuggingFace ecosystem
+RUN pip install --no-cache-dir \
+    "transformers>=4.40.0" \
+    "accelerate>=0.28.0" \
+    "peft>=0.10.0" \
+    "trl>=0.8.0"
+
+# Layer 3 -- PyTorch CPU
+RUN pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    "torch>=2.3.0"
+
+# bitsandbytes -- best-effort; QLoRA tests skip gracefully without CUDA
+RUN pip install --no-cache-dir bitsandbytes || \
+    echo "[warn] bitsandbytes skipped -- quantization tests will be skipped"
+
+# Mirror repo layout: project_empros at /repo/project_empros, windows at /repo/windows
+# so REPO.parent/windows resolves correctly for test_phase1_pipeline.py
+COPY project_empros/mlops/                          /repo/project_empros/mlops/
+COPY project_empros/services/worker_ti_ingest/      /repo/project_empros/services/worker_ti_ingest/
+COPY project_empros/tests/test_phase1_pipeline.py   /repo/project_empros/tests/
+COPY project_empros/tests/test_phase2_pipeline.py   /repo/project_empros/tests/
+COPY project_empros/tests/test_phase3_guardrails.py /repo/project_empros/tests/
+COPY project_empros/tests/lab_mlops_serving/        /repo/project_empros/tests/lab_mlops_serving/
+COPY project_empros/tests/lab_mlops_train/          /repo/project_empros/tests/lab_mlops_train/
+COPY project_empros/tests/pytest.ini                /repo/project_empros/tests/
+COPY windows/                                       /repo/windows/
+
+ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/test_phase1_pipeline.py", \
+     "tests/test_phase2_pipeline.py", \
+     "tests/test_phase3_guardrails.py", \
+     "tests/lab_mlops_serving/", \
+     "tests/lab_mlops_train/", \
+     "-v", "--tb=short", "--junit-xml=/reports/pipeline.xml"]

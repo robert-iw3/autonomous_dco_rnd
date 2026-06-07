@@ -1,0 +1,27 @@
+# ==============================================================================
+# Sentinel Nexus -- Open WebUI Configuration
+# OIDC settings are populated from .env at runtime.
+# ==============================================================================
+
+# -- Authentication (Authentik OIDC) --
+OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID}"
+OAUTH_CLIENT_SECRET: "${OAUTH_CLIENT_SECRET}"
+OPENID_PROVIDER_URL: "${OPENID_PROVIDER_URL}"
+ENABLE_OAUTH_SIGNUP: "true"
+OAUTH_MERGE_ACCOUNTS_BY_EMAIL: "true"
+ENABLE_OAUTH_ROLE_MANAGEMENT: "true"
+OAUTH_ALLOWED_ROLES: "nexus-analysts,nexus-admins"
+OAUTH_ADMIN_ROLES: "nexus-admins"
+
+# -- Local Signup Disabled (SSO-only) --
+ENABLE_SIGNUP: "false"
+ENABLE_LOGIN_FORM: "false"
+
+# -- Multi-Model Sovereign Routing --
+OLLAMA_BASE_URL: "${OLLAMA_BASE_URL}"
+OPENAI_API_BASE_URLS: "${OPENAI_API_BASE_URLS}"
+
+# -- Interface Defaults --
+DEFAULT_MODELS: ""
+DEFAULT_USER_ROLE: "pending"
+ENABLE_COMMUNITY_SHARING: "false"

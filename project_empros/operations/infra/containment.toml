@@ -1,0 +1,418 @@
+# ==============================================================================
+# Sentinel Nexus -- Containment Capability Schema
+# Master configuration for deterministic EDR/Firewall capability routing.
+# Used by worker_soar to synthesize ExecutionPlans.
+# ==============================================================================
+
+[global]
+default_callback_timeout = 300
+retry_max_attempts = 3
+retry_backoff_base_ms = 1000
+retry_backoff_max_ms = 10000
+active_edr = "custom_edr_v1"
+active_firewall = "custom_fw_v1"
+# SSH/WinRM playbook executor -- used when the endpoint has no EDR agent.
+# worker_soar routes isolate_host here when active_edr is unreachable or
+# when source_type indicates a host without a registered sensor.
+active_playbook_executor = "ssh_playbook_v1"
+
+# ── Cloud Provider Routing ─────────────────────────────────────────────────────
+# worker_soar checks source_type against this table to select the cloud provider.
+# Populated by Terraform outputs (operations/infra/terraform/containment/outputs.tf).
+# The n8n Cloud_Containment workflow handles the actual API dispatch.
+[cloud_routing]
+# source_type values that indicate AWS cloud workloads
+aws_source_types = [
+  "aws_guardduty",
+  "aws_cloudtrail",
+  "aws_vpc",
+]
+# source_type values that indicate Azure cloud workloads
+azure_source_types = [
+  "azure_entraid",
+  "azure_activity",
+  "azure_nsg",
+]
+# source_type values that indicate GCP cloud workloads
+gcp_source_types = [
+  "gcp_audit",
+  "gcp_scc",
+  "gcp_vpc_flow",
+]
+# source_type values that indicate VMware vSphere/NSX workloads
+vmware_source_types = [
+  "vmware_syslog",
+]
+# When source_type matches any cloud list above, route to the cloud n8n workflow
+# instead of EDR/firewall/SSH providers.
+cloud_containment_webhook = "http://n8n:5678/webhook/cloud-containment"
+
+# Active cloud providers -- set based on environment (rendered from Terraform outputs)
+active_aws_provider    = "aws_containment_v1"
+active_azure_provider  = "azure_containment_v1"
+active_gcp_provider    = "gcp_containment_v1"
+active_vmware_provider = "vmware_containment_v1"
+
+# ── EDR Provider: Host Isolation ──
+[providers.custom_edr_v1.actions.isolate_host]
+method = "POST"
+endpoint = "https://api.internal-edr.local/v2/devices/isolate"
+headers = { "Authorization" = "Bearer ${EDR_API_KEY}", "Content-Type" = "application/json" }
+timeout_seconds = 30
+retryable = true
+success_codes = [200, 201, 202]
+body_template = """
+{
+    "target_ip": "{{target}}",
+    "isolation_mode": "strict",
+    "audit_comment": "{{incident_id}} - {{reason}}"
+}
+"""
+
+[providers.custom_edr_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id", "reason"]
+target_format = "ipv4"
+
+# ── EDR Provider: Release Isolation ──
+[providers.custom_edr_v1.actions.release_host]
+method = "POST"
+endpoint = "https://api.internal-edr.local/v2/devices/release"
+headers = { "Authorization" = "Bearer ${EDR_API_KEY}", "Content-Type" = "application/json" }
+timeout_seconds = 30
+retryable = true
+success_codes = [200]
+body_template = """
+{
+    "target_ip": "{{target}}",
+    "audit_comment": "{{incident_id}} - Released by operator"
+}
+"""
+
+[providers.custom_edr_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format = "ipv4"
+
+# ── Firewall Provider: Block IP ──
+[providers.custom_fw_v1.actions.block_ip]
+method = "PUT"
+endpoint = "https://firewall.local/api/v1/objects/address/{{target}}"
+headers = { "X-API-Key" = "${FW_API_KEY}", "Content-Type" = "application/json" }
+timeout_seconds = 15
+retryable = true
+success_codes = [200, 201]
+body_template = """
+{
+    "name": "NEXUS_BLOCK_{{target}}",
+    "ip_netmask": "{{target}}/32",
+    "description": "{{incident_id}} - Auto-blocked by Sentinel Nexus"
+}
+"""
+
+[providers.custom_fw_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format = "ipv4"
+
+# ── Firewall Provider: Unblock IP ──
+[providers.custom_fw_v1.actions.unblock_ip]
+method = "DELETE"
+endpoint = "https://firewall.local/api/v1/objects/address/{{target}}"
+headers = { "X-API-Key" = "${FW_API_KEY}", "Content-Type" = "application/json" }
+timeout_seconds = 15
+retryable = true
+success_codes = [200, 204]
+body_template = """
+{
+    "name": "NEXUS_BLOCK_{{target}}",
+    "audit_comment": "{{incident_id}} - Unblocked by operator"
+}
+"""
+
+[providers.custom_fw_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format = "ipv4"
+
+# ==============================================================================
+# SSH/WinRM Playbook Executor -- Fallback Containment (no EDR on endpoint)
+# Routes to the n8n Fallback_Containment webhook which runs bash/PS1 playbooks
+# directly on the endpoint via SSH. Triggered when active_edr is unreachable
+# or source_type is not covered by a registered EDR sensor.
+# ==============================================================================
+
+# Endpoint uses the n8n service name (internal deepnet network) -- bypasses Traefik/Authentik.
+# n8n's webhook port 5678 is reachable directly from other deepnet containers.
+[providers.ssh_playbook_v1.actions.isolate_host]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/fallback-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 600
+retryable = false
+success_codes = [200]
+body_template = """
+{
+    "incident_id": "{{incident_id}}",
+    "target":      "{{target}}",
+    "targets":     {{targets_json}},
+    "action":      "isolate_host",
+    "action_type": "isolate_host",
+    "source_type": "{{source_type}}",
+    "reason":      "{{reason}}"
+}
+"""
+
+[providers.ssh_playbook_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id", "reason"]
+target_format = "any"
+
+[providers.ssh_playbook_v1.actions.block_ip]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/fallback-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 600
+retryable = false
+success_codes = [200]
+body_template = """
+{
+    "incident_id": "{{incident_id}}",
+    "target":      "{{target}}",
+    "targets":     {{targets_json}},
+    "action":      "block_ip",
+    "action_type": "block_ip",
+    "source_type": "{{source_type}}",
+    "reason":      "{{reason}}"
+}
+"""
+
+[providers.ssh_playbook_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+# ==============================================================================
+# Cloud Provider: AWS
+# Lambda Function URLs provisioned by operations/infra/terraform/containment/aws.tf
+# Endpoint values are rendered by 02-provision-infra.sh from Terraform outputs.
+# ==============================================================================
+
+[providers.aws_containment_v1.actions.isolate_host]
+method           = "POST"
+endpoint         = "${AWS_ISOLATE_LAMBDA_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+# IAM SigV4 auth is handled by the Lambda URL configuration (AWS_IAM authz).
+# n8n uses the execution role credentials injected via ECS/EC2 instance profile.
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "isolate",
+  "source":      "worker_soar"
+}
+"""
+
+[providers.aws_containment_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.aws_containment_v1.actions.release_host]
+method           = "POST"
+endpoint         = "${AWS_ISOLATE_LAMBDA_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "release",
+  "source":      "worker_soar"
+}
+"""
+
+[providers.aws_containment_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.aws_containment_v1.actions.block_ip]
+method           = "POST"
+endpoint         = "${AWS_BLOCK_IP_LAMBDA_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 30
+retryable        = false
+success_codes    = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "block",
+  "source":      "worker_soar"
+}
+"""
+
+[providers.aws_containment_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.aws_containment_v1.actions.unblock_ip]
+method           = "POST"
+endpoint         = "${AWS_BLOCK_IP_LAMBDA_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 30
+retryable        = false
+success_codes    = [200]
+body_template = """
+
+[providers.aws_containment_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "unblock",
+  "source":      "worker_soar"
+}
+"""
+
+# ==============================================================================
+# Cloud Provider: Azure
+# Azure Automation Runbook webhook provisioned by azure.tf
+# ==============================================================================
+
+[providers.azure_containment_v1.actions.isolate_host]
+method           = "POST"
+endpoint         = "${AZURE_NSG_WEBHOOK_URL}"
+headers          = { "Content-Type" = "application/json" }
+timeout_seconds  = 120
+retryable        = false
+success_codes    = [200, 202]
+body_template = """
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "isolate"
+}
+"""
+
+[providers.azure_containment_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.azure_containment_v1.actions.release_host]
+method           = "POST"
+endpoint         = "${AZURE_NSG_WEBHOOK_URL}"
+headers          = { "Content-Type" = "application/json" }
+timeout_seconds  = 120
+retryable        = false
+success_codes    = [200, 202]
+body_template = """
+
+[providers.azure_containment_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "release"
+}
+"""
+
+[providers.azure_containment_v1.actions.block_ip]
+method           = "POST"
+endpoint         = "${AZURE_NSG_WEBHOOK_URL}"
+headers          = { "Content-Type" = "application/json" }
+timeout_seconds  = 120
+retryable        = false
+success_codes    = [200, 202]
+body_template = """
+
+[providers.azure_containment_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "isolate",
+  "BlockMode":  "ip_only"
+}
+"""
+
+# ==============================================================================
+# Cloud Provider: GCP
+# Cloud Function URL provisioned by gcp.tf
+# ==============================================================================
+
+[providers.gcp_containment_v1.actions.isolate_host]
+method           = "POST"
+endpoint         = "${GCP_ISOLATE_FUNCTION_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "isolate"
+}
+"""
+
+[providers.gcp_containment_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.gcp_containment_v1.actions.release_host]
+method           = "POST"
+endpoint         = "${GCP_ISOLATE_FUNCTION_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+body_template = """
+
+[providers.gcp_containment_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "release"
+}
+"""
+
+[providers.gcp_containment_v1.actions.block_ip]
+method           = "POST"
+endpoint         = "${GCP_ISOLATE_FUNCTION_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+body_template = """
+
+[providers.gcp_containment_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "isolate"
+}
+"""
+
+[providers.gcp_containment_v1.actions.unblock_ip]
+method           = "POST"
+endpoint         = "${GCP_ISOLATE_FUNCTION_URL}"
+headers          = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds  = 60
+retryable        = false
+success_codes    = [200]
+body_template = """
+
+[providers.gcp_containment_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "release"
+}
+"""

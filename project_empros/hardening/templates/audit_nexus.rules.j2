@@ -1,0 +1,61 @@
+# ==============================================================================
+# Sentinel Nexus -- Audit Rules
+# Managed by Ansible -- common_hardening role
+# ==============================================================================
+
+# ── Podman / Container Runtime ────────────────────────────────────────────────
+{% for path in hardening_audit_nexus_paths %}
+-w {{ path }} -p wa -k nexus_infra
+{% endfor %}
+
+# Podman-specific binaries and configs
+-w /usr/bin/podman -k podman
+-w /usr/bin/crun -k podman_runtime
+-w /usr/bin/runc -k podman_runtime
+-w /run/podman -p war -k podman_socket
+-w /usr/share/containers/containers.conf -k podman_config
+-w /etc/containers/containers.conf -k podman_config
+-w /etc/containers/storage.conf -k podman_config
+
+# ── Privilege Escalation ──────────────────────────────────────────────────────
+-w /etc/sudoers -p wa -k sudo_changes
+-w /etc/sudoers.d -p wa -k sudo_changes
+-w /usr/bin/sudo -p x -k sudo_exec
+-w /usr/bin/su -p x -k su_exec
+
+# ── User/Group Modifications ─────────────────────────────────────────────────
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/security/opasswd -p wa -k identity
+
+# ── Authentication Events ─────────────────────────────────────────────────────
+-w /etc/pam.d -p wa -k pam_changes
+-w /etc/ssh/sshd_config -p wa -k sshd_changes
+-w /etc/ssh/sshd_config.d -p wa -k sshd_changes
+-w /var/log/faillog -p wa -k auth_log
+-w /var/log/lastlog -p wa -k auth_log
+
+# ── Network Configuration ────────────────────────────────────────────────────
+-w /etc/hosts -p wa -k network_changes
+-w /etc/sysconfig/network -p wa -k network_changes
+-w /etc/resolv.conf -p wa -k network_changes
+-a always,exit -F arch=b64 -S sethostname -S setdomainname -k network_changes
+
+# ── Firewall Changes ─────────────────────────────────────────────────────────
+-w /etc/firewalld -p wa -k firewall_changes
+-w /etc/ufw -p wa -k firewall_changes
+
+# ── System Startup ────────────────────────────────────────────────────────────
+-w /etc/systemd -p wa -k systemd_changes
+-w /lib/systemd -p wa -k systemd_changes
+
+# ── Kernel Module Loading ────────────────────────────────────────────────────
+-a always,exit -F arch=b64 -S init_module -S delete_module -k modules
+-a always,exit -F arch=b64 -S finit_module -k modules
+
+# ── Time Changes ─────────────────────────────────────────────────────────────
+-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time_change
+-a always,exit -F arch=b64 -S clock_settime -k time_change
+-w /etc/localtime -p wa -k time_change

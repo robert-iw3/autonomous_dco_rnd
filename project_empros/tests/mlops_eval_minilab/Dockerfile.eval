@@ -1,0 +1,16 @@
+FROM python:3.12-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /eval
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY sim_data_generator.py .
+COPY duckdb_validator.py .
+COPY qdrant_validator.py .
+COPY eval_runner.py .
+
+ENTRYPOINT ["python", "-u", "eval_runner.py"]

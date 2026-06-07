@@ -1,0 +1,139 @@
+# ==============================================================================
+# Sentinel Nexus -- MLOps Eval MiniLab
+#
+# USAGE:  podman-compose up   (or docker compose up)
+#
+# What happens:
+#   1. ollama    starts and exposes the inference API
+#   2. qdrant    starts and exposes the vector store
+#   3. eval-init pulls the eval model into Ollama
+#   4. eval-runner runs ALL validation steps end-to-end and exits
+#   5. Reports land in ./reports/  with a human-readable summary
+#   6. Exit code 0 = corpus PROMOTED, 1 = needs revision
+#
+# Place new corpus JSONL files in:
+#   corpus_testing/<TTP>/your_new_corpus.jsonl
+#
+# Simulation Parquet is auto-generated in:
+#   simulation_data/<TTP>/your_new_corpus_sim.parquet
+# ==============================================================================
+
+volumes:
+  ollama-eval:
+  qdrant-eval:
+  open-webui-eval:
+
+networks:
+  evalnet:
+    driver: bridge
+
+x-base: &base
+  restart: "no"
+  networks: [evalnet]
+
+services:
+
+  # ── Ollama inference backend ────────────────────────────────────────────────
+  ollama:
+    <<: *base
+    image: docker.io/ollama/ollama:latest
+    container_name: nexus-eval-ollama
+    restart: unless-stopped        # stays up for OpenWebUI inspection after tests
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-eval:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=1h
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_NUM_THREAD=${OLLAMA_NUM_THREAD:-4}
+      - OLLAMA_CONTEXT_LENGTH=4096
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/version"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+
+  # ── Qdrant vector store ─────────────────────────────────────────────────────
+  qdrant:
+    <<: *base
+    image: docker.io/qdrant/qdrant:latest
+    container_name: nexus-eval-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-eval:/qdrant/storage
+    environment:
+      - QDRANT__LOG_LEVEL=WARN
+      - QDRANT__SERVICE__TELEMETRY_DISABLED=true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+
+  # ── Open WebUI (stays up for manual inspection after eval finishes) ──────────
+  openwebui:
+    <<: *base
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: nexus-eval-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui-eval:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=false
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # ── Model pull (one-shot: pulls model, then exits) ────────────────────────────
+  eval-init:
+    <<: *base
+    image: docker.io/ollama/ollama:latest
+    container_name: nexus-eval-init
+    entrypoint: ["ollama", "pull"]
+    command: ["${EVAL_MODEL:-llama3.2:3b}"]
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # ── Eval runner (the actual test -- exits 0=pass 1=fail) ──────────────────────
+  eval-runner:
+    <<: *base
+    build:
+      context: .
+      dockerfile: Dockerfile.eval
+    container_name: nexus-eval-runner
+    depends_on:
+      ollama:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      eval-init:
+        condition: service_completed_successfully
+    volumes:
+      # Mount corpus and simulation directories read-write (sim data generated here)
+      - ./corpus_testing:/eval/corpus_testing:z
+      - ./simulation_data:/eval/simulation_data:z
+      # Mount staging data read-only (query indices, reference JSONL)
+      - ../../data/staging:/eval/staging:ro,z
+      # Reports written here -- survives container removal
+      - ./reports:/eval/reports:z
+    environment:
+      - EVAL_MODEL=${EVAL_MODEL:-llama3.2:3b}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - QDRANT_URL=http://qdrant:6333
+      - EVAL_VERBOSE=${EVAL_VERBOSE:-1}
+      - EVAL_FAIL_FAST=${EVAL_FAIL_FAST:-0}
+      - PYTHONUNBUFFERED=1
+      # Explicit staging path for sim_data_generator inside container
+      - NEXUS_STAGING_DIR=/eval/staging

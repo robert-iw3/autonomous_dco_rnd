@@ -1,0 +1,163 @@
+---
+# ==============================================================================
+# firewall.yml -- Firewall configuration
+# RHEL: firewalld with custom zone and rate limiting
+# Debian: ufw with application profiles (firewalld also supported)
+# ==============================================================================
+
+# -- RHEL / Rocky / Alma: firewalld --------------------------------------------
+- name: Install firewalld (RHEL)
+  ansible.builtin.dnf:
+    name: [firewalld, fail2ban]
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Enable and start firewalld (RHEL)
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Disable zone drifting (RHEL)
+  ansible.builtin.lineinfile:
+    path: /etc/firewalld/firewalld.conf
+    regexp: '^AllowZoneDrifting='
+    line: 'AllowZoneDrifting=no'
+    state: present
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Create custom Nexus zone (RHEL)
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_default_zone }}"
+    state: present
+    permanent: yes
+  when: ansible_os_family == 'RedHat'
+  failed_when: false
+
+- name: Set default zone target to DROP (RHEL)
+  ansible.builtin.command: >
+    firewall-cmd --permanent --zone={{ hardening_firewall_default_zone }} --set-target=DROP
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+
+- name: Allow services in Nexus zone (RHEL)
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_default_zone }}"
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop: "{{ hardening_firewall_allowed_services }}"
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Allow Nexus service ports (RHEL)
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_default_zone }}"
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop: "{{ hardening_firewall_allowed_ports }}"
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Allow trusted subnet (RHEL)
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_default_zone }}"
+    rich_rule: "rule family='ipv4' source address='{{ hardening_firewall_trusted_subnet }}' accept"
+    permanent: yes
+    state: enabled
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Rate limit SSH connections (RHEL)
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_default_zone }}"
+    rich_rule: "rule service name='ssh' log prefix='SSH_RATE: ' level='warning' limit value='{{ hardening_firewall_ssh_rate_limit }}' accept"
+    permanent: yes
+    state: enabled
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Log denied packets (RHEL)
+  ansible.builtin.lineinfile:
+    path: /etc/firewalld/firewalld.conf
+    regexp: '^LogDenied='
+    line: 'LogDenied=all'
+    state: present
+  when: ansible_os_family == 'RedHat'
+  notify: Reload firewalld
+
+- name: Set default zone (RHEL)
+  ansible.builtin.command: "firewall-cmd --set-default-zone={{ hardening_firewall_default_zone }}"
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+
+# -- Debian / Ubuntu: ufw ------------------------------------------------------
+- name: Install ufw and fail2ban (Debian)
+  ansible.builtin.apt:
+    name: [ufw, fail2ban]
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Set ufw default deny incoming (Debian)
+  community.general.ufw:
+    direction: incoming
+    default: deny
+  when: ansible_os_family == 'Debian'
+
+- name: Set ufw default allow outgoing (Debian)
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+  when: ansible_os_family == 'Debian'
+
+- name: Allow SSH with rate limiting (Debian)
+  community.general.ufw:
+    rule: limit
+    port: "{{ hardening_ssh_port }}"
+    proto: tcp
+  when: ansible_os_family == 'Debian'
+
+- name: Allow Nexus service ports (Debian)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] | default('tcp') }}"
+    src: "{{ hardening_firewall_trusted_subnet }}"
+  loop: "{{ hardening_firewall_allowed_ports }}"
+  when: ansible_os_family == 'Debian'
+
+- name: Enable ufw (Debian)
+  community.general.ufw:
+    state: enabled
+    logging: "on"
+  when: ansible_os_family == 'Debian'
+
+# -- Fail2ban (both families) --------------------------------------------------
+- name: Deploy fail2ban SSH jail
+  ansible.builtin.copy:
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 3
+
+      [sshd]
+      enabled = true
+      port = {{ hardening_ssh_port }}
+      logpath = {{ '/var/log/auth.log' if ansible_os_family == 'Debian' else '/var/log/secure' }}
+      maxretry = 3
+    dest: /etc/fail2ban/jail.d/nexus.local
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: started
+    enabled: yes
+  failed_when: false

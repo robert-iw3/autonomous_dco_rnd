@@ -1,0 +1,76 @@
+# =============================================================================
+# UAC-0057 / Ghostwriter
+# =============================================================================
+
+- ttp_signature:
+    name: "Ghostwriter Cobalt Strike Beacon"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Ghostwriter executing Cobalt Strike beacon via encoded PowerShell"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "Ghostwriter WMI Lateral Movement (Remote Process)"
+    severity: "High"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target:
+        - "/node:"
+        - "process call create"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\"
+      exclude_actor: "CcmExec.exe"
+
+- ttp_signature:
+    name: "Ghostwriter Sliver C2"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Application Layer Protocol (T1071)"
+      procedure: "Ghostwriter using Sliver C2 framework"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "sliver"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe"
+
+- ttp_signature:
+    name: "Ghostwriter Encoded PowerShell Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "Ghostwriter using encoded commands for post-exploitation"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-encodedcommand"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -encodedcommand"
+
+- ttp_signature:
+    name: "Ghostwriter WMI Process Creation"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "wmic process call create for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "process call create"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe"

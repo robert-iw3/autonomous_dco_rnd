@@ -1,0 +1,39 @@
+# Rule to detect PXA Stealer Telegram Bot Communication
+alert http any any -> any any (msg:"PXA Stealer Telegram Bot API Communication"; \
+flow:established,to_server; content:"POST"; http_method; content:"/bot"; http_uri; \
+content:"api.telegram.org"; http_host; content:"chat_id="; http_uri; content:"text="; http_uri; \
+classtype:trojan-activity; sid:4747001; rev:1; metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer malicious DLL sideloading
+alert tcp any any -> any any (msg:"PXA Stealer Malicious DLL Sideloading"; \
+flow:established,to_server; file_data; content:"svchost.exe"; nocase; content:".dll"; nocase; \
+pcre:"/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.dll$/"; \
+classtype:trojan-activity; sid:4747002; rev:1; metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer archive file delivery
+alert http any any -> any any (msg:"PXA Stealer Archive File Delivery"; \
+flow:established,to_client; file_data; content:".zip"; nocase; content:"Content-Disposition: attachment"; \
+http_header; pcre:"/filename=.*\.(zip|rar)$/i"; classtype:trojan-activity; sid:4747003; rev:1; \
+metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer Python payload execution
+alert tcp any any -> any any (msg:"PXA Stealer Python Payload Execution"; \
+flow:established,to_server; content:"python.exe"; nocase; content:"svchost.exe"; nocase; \
+pcre:"/python\.exe.*svchost\.exe/i"; classtype:trojan-activity; sid:4747004; rev:1; \
+metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer data exfiltration to Cloudflare Workers
+alert http any any -> any any (msg:"PXA Stealer Data Exfiltration to Cloudflare Workers"; \
+flow:established,to_server; content:"POST"; http_method; content:"workers.dev"; http_host; \
+content:"chat_id="; http_uri; classtype:trojan-activity; sid:4747005; rev:1; \
+metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer decoy document display
+alert http any any -> any any (msg:"PXA Stealer Decoy Document Display"; \
+flow:established,to_client; file_data; content:".pdf"; nocase; content:"copyright infringement notice"; nocase; \
+classtype:trojan-activity; sid:4747006; rev:1; metadata:created_at 2025_08_04, malware_family PXA_Stealer;)
+
+# Rule to detect PXA Stealer Telegram Bot ID
+alert http any any -> any any (msg:"PXA Stealer Telegram Bot ID Detection"; \
+flow:established,to_server; content:"7414494371:AAHsrQDkPrEVyz9z0RoiRS5fJKI-ihKJpzQ"; http_uri; \
+classtype:trojan-activity; sid:4747007; rev:1; metadata:created_at 2025_08_04, malware_family PXA_Stealer;)

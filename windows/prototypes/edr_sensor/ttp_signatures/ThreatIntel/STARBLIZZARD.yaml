@@ -1,0 +1,112 @@
+# =============================================================================
+# STAR BLIZZARD (SEABORGIUM / Callisto Group / TA446 / COLDRIVER / UNC4057)
+# =============================================================================
+
+- ttp_signature:
+    name: "Star Blizzard PDF-to-Browser Redirection"
+    severity: "High"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Phishing: Spearphishing Link (T1566.002)"
+      procedure: "PDF readers spawning browsers to access actor-controlled redirectors (e.g., bit.ly, cloudflare-ipfs.com)"
+    match:
+      actor: "AcroRd32.exe"
+      type: "PROCESS_START"
+      target: "chrome.exe"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_target_cmd:
+        - "--no-sandbox"
+
+- ttp_signature:
+    name: "Star Blizzard VBScript AppData Loader"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: Visual Basic (T1059.005)"
+      procedure: "Execution of malicious VBS loaders staged in LocalAppData by PDF or browser child processes"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "AppData\\Local\\Temp\\*.vbs"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "Star Blizzard Browser Profile Exfiltration Staging"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Credentials from Password Stores: Web Credentials (T1555.003)"
+      procedure: "Script-based access to Login Data, Cookies, or Local State for session hijacking"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Google\\Chrome\\User Data\\Default\\Network\\Cookies"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Star Blizzard Cloud-Storage Data Exfiltration"
+    severity: "High"
+    meta:
+      tactic: "Exfiltration (TA0010)"
+      technique: "Exfiltration Over Web Service (T1567)"
+      procedure: "Using curl or powershell to upload sensitive document types (.pdf, .docx) to OneDrive or Dropbox via API"
+    match:
+      actor: "curl.exe"
+      type: "PROCESS_START"
+      target: "--upload-file *.pdf"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+      exclude_actor_cmd:
+        - "-h"
+
+- ttp_signature:
+    name: "Star Blizzard Persistence via Hidden Scheduled Task"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job: Scheduled Task (T1053.005)"
+      procedure: "Creation of scheduled tasks mimicking system update names to maintain C2 beacon persistence"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create /tn \"MicrosoftUpdate\""
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Star Blizzard LNK to PowerShell Execution Chain"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "User Execution: Malicious Link (T1204.001)"
+      procedure: "LNK file execution triggering an encoded PowerShell command to download a remote payload"
+    match:
+      actor: "explorer.exe"
+      type: "PROCESS_START"
+      target: "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Star Blizzard Unauthorized SSH Client Execution"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Execution of OpenSSH or Plink from non-standard user directories for reverse tunneling"
+    match:
+      actor: "ssh.exe"
+      type: "PROCESS_START"
+      target: "-R"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\OpenSSH\\*"
+        - "C:\\Program Files\\*"

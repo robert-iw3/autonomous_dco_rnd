@@ -1,0 +1,38 @@
+alert dns $HOME_NET any -> any any (msg:"ET MALWARE UAT-6382 Campaign Domain Query"; \
+dns.query; content:"cdn.phototagx.com|www.roomako.com|lgaircon.xyz"; nocase; \
+classtype:trojan-activity; sid:8282019; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE UAT-6382 Campaign HTTP Request"; \
+flow:established,to_server; http.host; content:"cdn.phototagx.com|www.roomako.com|lgaircon.xyz"; \
+nocase; classtype:trojan-activity; sid:8282020; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE UAT-6382 Malicious jQuery Script Download from roomako.com"; \
+flow:established,to_server; http.host; content:"www.roomako.com"; nocase; http.uri; content:"/jquery-3.3.1.min.js"; nocase; \
+classtype:trojan-activity; sid:8282021; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE UAT-6382 Malicious Script Download from lgaircon.xyz"; \
+flow:established,to_server; http.host; content:"lgaircon.xyz"; nocase; http.uri;
+content:"/owa/OPWiaTU-ZEbuwIAKGPHoQAP006-PTsjBGKQUxZorq2"; nocase; \
+classtype:trojan-activity; sid:8282022; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE UAT-6382 Malicious jQuery Script Download from cdn.lgaircon.xyz"; \
+flow:established,to_server; http.host; content:"cdn.lgaircon.xyz"; nocase; http.uri; content:"/jquery-3.3.1.min.js"; nocase; \
+classtype:trojan-activity; sid:8282023; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE UAT-6382 HTTP Request to cdn.phototagx.com"; \
+flow:established,to_server; http.host; content:"cdn.phototagx.com"; nocase; \
+classtype:trojan-activity; sid:8282024; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> 192.210.239.172 any (msg:"ET MALWARE UAT-6382 Campaign Traffic to 192.210.239.172"; \
+flow:established,to_server; classtype:trojan-activity; sid:8282025; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> 192.210.239.172 any (msg:"ET MALWARE UAT-6382 Malicious Executable Download from 192.210.239.172"; \
+flow:established,to_server; http.uri; content:"/LVLWPH.exe|/MCUCAT.exe|/TJPLYT.exe|/z44.exe"; nocase; \
+classtype:trojan-activity; sid:8282026; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 45.95.147.236 any (msg:"ET MALWARE UAT-6382 QuasarRAT C2 Traffic to 45.95.147.236"; \
+flow:to_server; classtype:trojan-activity; sid:8282027; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)

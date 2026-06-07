@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 550" width="100%" height="100%" style="background-color: #0A0A0C; font-family: 'Courier New', Courier, monospace;">
+  <defs>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#39FF14" />
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#FF9900" />
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#00D2FF" />
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#B026FF" />
+    </marker>
+
+    <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <text x="550" y="40" fill="#E6EDF3" font-size="22" font-weight="bold" text-anchor="middle" letter-spacing="2">KUBERNETES THREAT DETECTION &amp; AI EVALUATION PIPELINE</text>
+  <line x1="250" y1="55" x2="850" y2="55" stroke="#333" stroke-width="2" />
+
+  <rect x="30" y="90" width="220" height="420" fill="#12161E" stroke="#00D2FF" stroke-width="2" stroke-dasharray="5,5" rx="8" />
+  <text x="140" y="120" fill="#00D2FF" font-size="14" font-weight="bold" text-anchor="middle">K8S ENVIRONMENT</text>
+
+  <rect x="50" y="150" width="180" height="40" fill="#1A1F2B" stroke="#00D2FF" stroke-width="1" rx="4" />
+  <text x="140" y="175" fill="#E6EDF3" font-size="13" text-anchor="middle">$ kubectl / workloads</text>
+
+  <rect x="50" y="230" width="180" height="50" fill="#1A1F2B" stroke="#00D2FF" stroke-width="1.5" rx="4" />
+  <text x="140" y="260" fill="#E6EDF3" font-size="14" font-weight="bold" text-anchor="middle">kube-apiserver</text>
+
+  <rect x="50" y="320" width="180" height="50" fill="#1A1F2B" stroke="#00D2FF" stroke-width="1.5" rx="4" />
+  <text x="140" y="343" fill="#E6EDF3" font-size="14" font-weight="bold" text-anchor="middle">eBPF Tracepoints</text>
+  <text x="140" y="360" fill="#A0ABB8" font-size="11" text-anchor="middle">(Kernel Syscalls)</text>
+
+  <path d="M 140 190 L 140 220" stroke="#00D2FF" stroke-width="2" marker-end="url(#arrow-blue)" />
+  <path d="M 140 280 L 140 310" stroke="#00D2FF" stroke-width="2" marker-end="url(#arrow-blue)" />
+
+  <rect x="290" y="90" width="220" height="420" fill="#0D1A18" stroke="#39FF14" stroke-width="2" rx="8" filter="url(#glow-green)" />
+  <text x="400" y="120" fill="#39FF14" font-size="14" font-weight="bold" text-anchor="middle">FALCO ENGINE</text>
+
+  <rect x="310" y="150" width="180" height="40" fill="#12241C" stroke="#39FF14" stroke-width="1" rx="4" />
+  <text x="400" y="175" fill="#E6EDF3" font-size="12" text-anchor="middle">Embedded Web Server</text>
+
+  <rect x="310" y="320" width="180" height="50" fill="#12241C" stroke="#39FF14" stroke-width="1" rx="4" />
+  <text x="400" y="343" fill="#E6EDF3" font-size="12" font-weight="bold" text-anchor="middle">modern_ebpf Probe</text>
+  <text x="400" y="360" fill="#A0ABB8" font-size="11" text-anchor="middle">8MB Ring Buffers</text>
+
+  <rect x="310" y="230" width="180" height="60" fill="#193325" stroke="#39FF14" stroke-width="2" rx="4" />
+  <text x="400" y="258" fill="#E6EDF3" font-size="14" font-weight="bold" text-anchor="middle">Rule Engine</text>
+  <text x="400" y="278" fill="#A0ABB8" font-size="11" text-anchor="middle">container metadata injection</text>
+
+  <rect x="310" y="420" width="180" height="40" fill="#1A1A1A" stroke="#E6EDF3" stroke-width="1" stroke-dasharray="3,3" rx="4" />
+  <text x="400" y="445" fill="#E6EDF3" font-size="12" text-anchor="middle">/logs/falco-events.log</text>
+
+  <path d="M 230 255 L 300 170" fill="none" stroke="#00D2FF" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrow-blue)" />
+  <text x="255" y="200" fill="#00D2FF" font-size="10" transform="rotate(-40 255 200)">Audit Logs</text>
+
+  <path d="M 230 345 L 300 345" fill="none" stroke="#00D2FF" stroke-width="2" marker-end="url(#arrow-blue)" />
+  <text x="265" y="338" fill="#00D2FF" font-size="10">Syscalls</text>
+
+  <path d="M 400 190 L 400 220" fill="none" stroke="#39FF14" stroke-width="2" marker-end="url(#arrow-green)" />
+  <path d="M 400 320 L 400 290" fill="none" stroke="#39FF14" stroke-width="2" marker-end="url(#arrow-green)" />
+  <path d="M 400 290 L 400 410" fill="none" stroke="#39FF14" stroke-width="2" marker-end="url(#arrow-green)" />
+  <rect x="403" y="380" width="80" height="20" fill="#0A0A0C" />
+  <text x="410" y="394" fill="#39FF14" font-size="11">JSON Output</text>
+
+
+  <rect x="550" y="90" width="220" height="420" fill="#1A120A" stroke="#FF9900" stroke-width="2" rx="8" filter="url(#glow-orange)" />
+  <text x="660" y="120" fill="#FF9900" font-size="14" font-weight="bold" text-anchor="middle">RUST TRANSMITTER</text>
+
+  <rect x="570" y="140" width="180" height="40" fill="#2B1D12" stroke="#FF9900" stroke-width="1" rx="4" />
+  <text x="660" y="165" fill="#E6EDF3" font-size="12" text-anchor="middle">notify::Watcher (Tailer)</text>
+
+  <rect x="570" y="210" width="180" height="40" fill="#2B1D12" stroke="#FF9900" stroke-width="1" rx="4" />
+  <text x="660" y="235" fill="#E6EDF3" font-size="12" text-anchor="middle">Arrow RecordBatcher</text>
+
+  <rect x="570" y="280" width="180" height="50" fill="#2B1D12" stroke="#FF9900" stroke-width="1" rx="4" />
+  <text x="660" y="303" fill="#E6EDF3" font-size="12" font-weight="bold" text-anchor="middle">Parquet + ZSTD</text>
+  <text x="660" y="320" fill="#A0ABB8" font-size="11" text-anchor="middle">Schema Enforcement</text>
+
+  <rect x="570" y="360" width="180" height="50" fill="#2B1D12" stroke="#FF9900" stroke-width="2" rx="4" />
+  <text x="660" y="383" fill="#E6EDF3" font-size="12" font-weight="bold" text-anchor="middle">HMAC-SHA256 Stamper</text>
+  <text x="660" y="400" fill="#A0ABB8" font-size="11" text-anchor="middle">Sequence &amp; Integrity Check</text>
+
+  <rect x="570" y="450" width="180" height="40" fill="#1A1A1A" stroke="#A0ABB8" stroke-width="1" stroke-dasharray="3,3" rx="4" />
+  <text x="660" y="475" fill="#A0ABB8" font-size="12" text-anchor="middle">/var/spool/ Offline Buffer</text>
+
+  <path d="M 490 440 L 530 440 L 530 160 L 560 160" fill="none" stroke="#FF9900" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrow-orange)" />
+
+  <path d="M 660 180 L 660 200" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)" />
+  <path d="M 660 250 L 660 270" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)" />
+  <path d="M 660 330 L 660 350" fill="none" stroke="#FF9900" stroke-width="2" marker-end="url(#arrow-orange)" />
+
+  <path d="M 640 410 L 640 440" fill="none" stroke="#A0ABB8" stroke-width="2" stroke-dasharray="2,2" marker-end="url(#arrow-orange)" />
+  <text x="615" y="430" fill="#A0ABB8" font-size="10">Fallback</text>
+  <path d="M 680 440 L 680 410" fill="none" stroke="#A0ABB8" stroke-width="2" stroke-dasharray="2,2" marker-end="url(#arrow-orange)" />
+  <text x="685" y="430" fill="#A0ABB8" font-size="10">Drain</text>
+
+
+  <rect x="810" y="90" width="260" height="420" fill="#100D1A" stroke="#B026FF" stroke-width="2" rx="8" />
+  <text x="940" y="120" fill="#B026FF" font-size="14" font-weight="bold" text-anchor="middle">SENTINEL NEXUS</text>
+
+  <rect x="840" y="150" width="200" height="50" fill="#1C142B" stroke="#B026FF" stroke-width="1.5" rx="4" />
+  <text x="940" y="173" fill="#E6EDF3" font-size="14" font-weight="bold" text-anchor="middle">Axum API Gateway</text>
+  <text x="940" y="190" fill="#A0ABB8" font-size="11" text-anchor="middle">Bearer Auth &amp; Sig Verif</text>
+
+  <rect x="840" y="240" width="200" height="60" fill="#1C142B" stroke="#B026FF" stroke-width="1" rx="4" />
+  <text x="940" y="265" fill="#E6EDF3" font-size="13" font-weight="bold" text-anchor="middle">12D Spatial MLOps</text>
+  <text x="940" y="285" fill="#A0ABB8" font-size="11" text-anchor="middle">Vector Sequence Pipeline</text>
+
+  <rect x="840" y="340" width="200" height="80" fill="#291A40" stroke="#B026FF" stroke-width="2" rx="4" />
+  <text x="940" y="370" fill="#E6EDF3" font-size="14" font-weight="bold" text-anchor="middle">Agentic AI Swarm</text>
+  <text x="940" y="390" fill="#A0ABB8" font-size="11" text-anchor="middle">Full-Spectrum Correlation &amp;</text>
+  <text x="940" y="405" fill="#A0ABB8" font-size="11" text-anchor="middle">Anomalous Behavior Analysis</text>
+
+  <path d="M 750 385 L 830 385 L 830 175 L 830 175" fill="none" stroke="#FF9900" stroke-width="3" marker-end="url(#arrow-orange)" />
+  <text x="760" y="375" fill="#FF9900" font-size="11" font-weight="bold">POST /telemetry</text>
+
+  <path d="M 940 200 L 940 230" fill="none" stroke="#B026FF" stroke-width="2" marker-end="url(#arrow-purple)" />
+  <path d="M 940 300 L 940 330" fill="none" stroke="#B026FF" stroke-width="2" marker-end="url(#arrow-purple)" />
+
+</svg>

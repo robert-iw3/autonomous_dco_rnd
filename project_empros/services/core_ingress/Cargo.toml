@@ -1,0 +1,48 @@
+[package]
+name = "core_ingress"
+version = "0.1.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+# Runtime
+tokio  = { workspace = true }
+
+# HTTP framework
+axum          = { workspace = true }
+axum-server   = { workspace = true }
+tower         = { workspace = true }
+tower-http    = { workspace = true }
+jsonwebtoken  = { workspace = true }
+
+# Messaging
+async-nats = { workspace = true }
+
+# Serialization
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+# Parquet schema introspection
+arrow   = { workspace = true }
+parquet = { workspace = true }
+bytes   = { workspace = true }
+
+# Observability
+tracing              = { workspace = true }
+tracing-subscriber   = { workspace = true }
+metrics              = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+opentelemetry        = { workspace = true }
+opentelemetry_sdk    = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+
+# Cryptography (integrity verification)
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex  = { workspace = true }
+
+# Concurrency
+dashmap = { workspace = true }
+
+# Allocator
+tikv-jemallocator = { workspace = true }

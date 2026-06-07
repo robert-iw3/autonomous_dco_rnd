@@ -1,0 +1,18 @@
+# add other logging apps to pcre regex, usually local dev environments are left unsecured and can be a vector/foothold
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"Unauthenticated Access to Logging Platform Detected"; \
+flow:established,to_server; \
+http.method; content:"GET"; \
+http.stat_code; content:"200"; \
+http.uri; content:"/app/kibana"; nocase; \
+http.uri; content:"/app/dashboards"; nocase; \
+http.uri; content:"/app/discover"; nocase; \
+http.uri; pcre:"/([a-zA-Z0-9-]+\.)?(internal|local|testing|dev|development|localhost|test)\.(local|localhost|dev|io|internal|test|corp)\/.*$/i"; \
+http.host; pcre:"/([a-zA-Z0-9-]+\.)?(kibana|logs|datadog|splunk|graylog|solarwinds|falco|sumologic|wazuh)\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/i"; \
+http.uri; content!:"|2E|css|24|"; content!:"|2E|js|24|"; content!:"|2E|png|24|"; content!:"|2E|gif|24|"; content!:"|2E|jpg|24|"; \
+content!:"|2E|ico|24|"; content!:"|2E|svg|24|"; content!:"|2E|woff|24|"; content!:"/api/status"; content!:"/status"; nocase; \
+http.header_names; content!:"Authorization"; content!:"Cookie"; \
+classtype:unauthorized-access; \
+sid:8282002; \
+rev:1; \
+metadata:created_at 2025_08_02, updated_at 2025_08_02, target dest_ip, affected_system logging_platforms; \
+)

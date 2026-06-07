@@ -1,0 +1,570 @@
+---
+# ==============================================================================
+# 1. KUBERNETES SERVICE ACCOUNTS (Zero-Trust Identity)
+# ==============================================================================
+# For HashiCorp Vault Integration
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: soar-sa
+  namespace: sentinel-nexus
+
+---
+# For AWS S3 IRSA (IAM Roles for Service Accounts)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: s3-archive-sa
+  namespace: sentinel-nexus
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/sentinel-nexus-s3-archive-role"
+
+---
+# ==============================================================================
+# 2. EDGE PROXY & INGRESS SERVICES
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-edge-svc
+  namespace: sentinel-nexus
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  type: LoadBalancer
+  selector:
+    app: haproxy-edge
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080 # Maps to unprivileged container port
+    - name: https
+      port: 443
+      targetPort: 8443 # Maps to unprivileged container port
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-ingress-svc
+  namespace: sentinel-nexus
+spec:
+  type: ClusterIP
+  selector:
+    app: core-ingress
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+# ==============================================================================
+# 3. POD DISRUPTION BUDGETS (Uptime & Stability Guarantee)
+# ==============================================================================
+# Ensures EKS node upgrades never take down the ingestion pipeline
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: core-ingress-pdb
+  namespace: sentinel-nexus
+spec:
+  minAvailable: 66%
+  selector:
+    matchLabels:
+      app: core-ingress
+
+---
+# ==============================================================================
+# 4. DEPLOYMENTS (Zero-Trust, Read-Only, Anti-Affinity)
+# ==============================================================================
+
+# ─── A. HAProxy Edge ──────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-haproxy-edge
+  namespace: sentinel-nexus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: haproxy-edge
+  template:
+    metadata:
+      labels:
+        app: haproxy-edge
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 99
+        runAsGroup: 99
+        fsGroup: 99
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["haproxy-edge"]
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: haproxy
+          image: your-registry.com/sentinel/haproxy-edge:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 8080
+            - containerPort: 8443
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+# ─── B. Core Ingress Gateway ──────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-core-ingress
+  namespace: sentinel-nexus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: core-ingress
+  template:
+    metadata:
+      labels:
+        app: core-ingress
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9000"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532 # distroless nonroot user
+        runAsGroup: 65532
+        fsGroup: 65532
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["core-ingress"]
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: core-ingress
+          image: your-registry.com/sentinel/core-ingress:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 8080
+            - containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: nexus-secrets
+          env:
+            - name: NATS_URL
+              value: "nats://nats-cluster.sentinel-nexus.svc.cluster.local:4222"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "256Mi"
+            limits:
+              cpu: "2000m"
+              memory: "1Gi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+
+---
+# ─── C. Worker: Qdrant (Layer 1 Math) ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-worker-qdrant
+  namespace: sentinel-nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-qdrant
+  template:
+    metadata:
+      labels:
+        app: worker-qdrant
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9001"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: worker-qdrant
+          image: your-registry.com/sentinel/worker-qdrant:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: nexus-secrets
+          env:
+            - name: NATS_URL
+              value: "nats://nats-cluster.sentinel-nexus.svc.cluster.local:4222"
+            - name: QDRANT_GRPC_URL
+              value: "http://qdrant-cluster-headless.sentinel-nexus.svc.cluster.local:6334"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+
+---
+# ─── D. Worker: Rules Engine (Layer 2 Strings) ───────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-worker-rules
+  namespace: sentinel-nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-rules
+  template:
+    metadata:
+      labels:
+        app: worker-rules
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: worker-rules
+          image: your-registry.com/sentinel/worker-rules:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: nexus-secrets
+          env:
+            - name: NATS_URL
+              value: "nats://nats-cluster.sentinel-nexus.svc.cluster.local:4222"
+            - name: REDIS_URL
+              value: "redis://redis-cluster.sentinel-nexus.svc.cluster.local:6379/0"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+
+---
+# ─── E. Worker: SOAR Containment (Phase 3) ───────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-worker-soar
+  namespace: sentinel-nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-soar
+  template:
+    metadata:
+      labels:
+        app: worker-soar
+    spec:
+      serviceAccountName: soar-sa # Bound for Vault integration
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: worker-soar
+          image: your-registry.com/sentinel/worker-soar:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: nexus-secrets
+          env:
+            - name: NATS_URL
+              value: "nats://nats-cluster.sentinel-nexus.svc.cluster.local:4222"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+
+---
+# ─── F. LLM Hunter Daemon (Python) ───────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-llm-hunter
+  namespace: sentinel-nexus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: llm-hunter
+  template:
+    metadata:
+      labels:
+        app: llm-hunter
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # Configured in python Dockerfile
+        fsGroup: 1000
+      containers:
+        - name: llm-hunter
+          image: your-registry.com/sentinel/llm-hunter:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: nexus-secrets
+          env:
+            - name: REDIS_URL
+              value: "redis://redis-cluster.sentinel-nexus.svc.cluster.local:6379/0"
+            - name: QDRANT_HTTP_URL
+              value: "http://qdrant-cluster.sentinel-nexus.svc.cluster.local:6333"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+---
+# ─── G. Worker: S3 / MinIO Archiver (Cold Storage) ───────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-worker-archive
+  namespace: sentinel-nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker-archive
+  template:
+    metadata:
+      labels:
+        app: worker-archive
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9002"
+    spec:
+      # Binds the Terraform-provisioned AWS IAM Role (Ignored if MinIO is active in TOML)
+      serviceAccountName: s3-archive-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      containers:
+        - name: worker-archive
+          image: your-registry.com/sentinel/worker-s3-archive:v0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          envFrom:
+            - secretRef:
+                name: nexus-secrets # Contains AWS_ACCESS_KEY_ID / SECRET_ACCESS_KEY for MinIO
+          env:
+            - name: NATS_URL
+              value: "nats://nats-cluster.sentinel-nexus.svc.cluster.local:4222"
+            - name: NEXUS_CONFIG
+              value: "/etc/nexus/nexus.toml"
+          volumeMounts:
+            - name: tmp-vol
+              mountPath: /tmp
+            - name: config-vol
+              mountPath: /etc/nexus
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: tmp-vol
+          emptyDir: {}
+        - name: config-vol
+          configMap:
+            name: nexus-configmap # Where your nexus.toml lives in Kubernetes
+
+---
+# ==============================================================================
+# 5. KEDA AUTOSCALERS (Event-Driven Elasticity)
+# ==============================================================================
+# Triggers pod scaling based on the exact NATS JetStream lag
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-qdrant-scaler
+  namespace: sentinel-nexus
+spec:
+  scaleTargetRef:
+    name: nexus-worker-qdrant
+  minReplicaCount: 2
+  maxReplicaCount: 30
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: "nats-cluster.sentinel-nexus.svc.cluster.local:8222"
+        account: "$G"
+        stream: "Tier5_Telemetry"
+        consumer: "Qdrant_Vector_Group"
+        lagThreshold: "5000"
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-rules-scaler
+  namespace: sentinel-nexus
+spec:
+  scaleTargetRef:
+    name: nexus-worker-rules
+  minReplicaCount: 2
+  maxReplicaCount: 30
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: "nats-cluster.sentinel-nexus.svc.cluster.local:8222"
+        account: "$G"
+        stream: "Tier5_Telemetry"
+        consumer: "Sigma_Rules_Group"
+        lagThreshold: "5000"
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-soar-scaler
+  namespace: sentinel-nexus
+spec:
+  scaleTargetRef:
+    name: nexus-worker-soar
+  minReplicaCount: 2
+  maxReplicaCount: 15
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: "nats-cluster.sentinel-nexus.svc.cluster.local:8222"
+        account: "$G"
+        stream: "Nexus_System"
+        consumer: "SOAR_Execution_Group"
+        lagThreshold: "100" # Scale aggressively if containment graphs stack up
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-archive-scaler
+  namespace: sentinel-nexus
+spec:
+  scaleTargetRef:
+    name: nexus-worker-archive
+  minReplicaCount: 2
+  maxReplicaCount: 15
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: "nats-cluster.sentinel-nexus.svc.cluster.local:8222"
+        account: "$G"
+        stream: "Telemetry_Stream"
+        consumer: "S3_Cold_Archive_Group"
+        # Archiving is async and high-throughput. We scale when backlog hits 10,000.
+        lagThreshold: "10000"
+
+---
+# Standard HPA for the API Ingress Gateway (CPU bound, not queue bound)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: core-ingress-hpa
+  namespace: sentinel-nexus
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nexus-core-ingress
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

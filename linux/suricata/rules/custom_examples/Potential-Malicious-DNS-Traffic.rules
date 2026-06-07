@@ -1,0 +1,31 @@
+alert dns any any -> any 53 (msg:"Potential Malicious DNS Activity - High NXDOMAIN Responses"; \
+  flow:established,to_server; \
+  dns.response; content:"NXDOMAIN"; \
+  threshold:type threshold, track by_dst, count 50, seconds 60; \
+  classtype:command-and-control; \
+  sid:5353008; \
+  rev:1; \
+  metadata:tactic TA0011, technique T1071.001, created_by RW, created_at 2025-07-27;)
+alert dns any any -> any 53 (msg:"Potential DNS Tunneling - Large TXT Record"; \
+  flow:established,to_server; \
+  dns.query; content:"TXT"; \
+  dns.response; content:"|00|"; bsize>255; \
+  classtype:command-and-control; \
+  sid:5353009; \
+  rev:1; \
+  metadata:tactic TA0011, technique T1071.001, technique T1090, created_by RW, created_at 2025-07-27;)
+alert dns any any -> any !53 (msg:"Unusual DNS Communication - Non-Standard Port"; \
+  flow:established,to_server; \
+  dns.query; \
+  classtype:command-and-control; \
+  sid:1000010; \
+  rev:1; \
+  metadata:tactic TA0011, technique T1071.001, created_by RW, created_at 2025-07-27;)
+alert dns any any -> any 53 (msg:"Potential Fast-Flux DNS - Short TTL"; \
+  flow:established,to_server; \
+  dns.rrtype; content:"A"; \
+  dns.ttl; content:"|00 00 01 2c|"; bsize<300; \
+  classtype:command-and-control; \
+  sid:1000011; \
+  rev:1; \
+  metadata:tactic TA0011, technique T1071.001, created_by RW, created_at 2025-07-27;)

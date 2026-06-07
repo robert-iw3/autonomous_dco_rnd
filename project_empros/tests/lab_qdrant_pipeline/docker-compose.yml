@@ -1,0 +1,70 @@
+---
+# Lab 4: Qdrant Vector Worker Pipeline
+# Run from project_empros/tests/lab_qdrant_pipeline/:
+#   docker compose up -d
+#   pytest test_qdrant_pipeline.py -v
+
+services:
+  nats:
+    image: docker.io/library/nats:2.10-alpine
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ./nats-test.conf:/etc/nats/nats-server.conf:ro
+      - nats-data:/data
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  qdrant:
+    image: docker.io/qdrant/qdrant:latest
+    environment:
+      QDRANT__STORAGE__ON_DISK_PAYLOAD: "true"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+    restart: unless-stopped
+
+  qdrant-init:
+    image: docker.io/curlimages/curl:latest
+    volumes:
+      - ./qdrant_init.sh:/qdrant_init.sh:ro
+    entrypoint: ["/bin/sh", "/qdrant_init.sh"]
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - COLLECTION_NAME=ueba_vectors
+    depends_on:
+      - qdrant
+    restart: on-failure
+
+  worker-qdrant:
+    build:
+      context: ../../
+      dockerfile: services/worker_qdrant/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - QDRANT_GRPC_URL=http://qdrant:6334
+      - NEXUS_CONFIG=/config/nexus.toml
+      - WORKER_BATCH_DEADLINE_SECS=5
+      - WORKER_ACK_WAIT_SECS=15
+    volumes:
+      - ./nexus-lab4.toml:/config/nexus.toml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  nats-data:
+  qdrant-data:

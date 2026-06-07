@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1020" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="natsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4338ca" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="mathGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="rulesGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#be123c" />
+      <stop offset="100%" stop-color="#e11d48" />
+    </linearGradient>
+    <linearGradient id="llmGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#b45309" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="storageGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+
+    <marker id="arrowSolid" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrowMath" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399" />
+    </marker>
+    <marker id="arrowRules" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb7185" />
+    </marker>
+  </defs>
+
+  <rect width="1200" height="1020" fill="url(#bgGrad)" />
+
+  <style>
+    .title { font-family: 'Segoe UI', system-ui, sans-serif; fill: #f8fafc; font-size: 28px; font-weight: 700; }
+    .subtitle { font-family: 'Segoe UI', system-ui, sans-serif; fill: #94a3b8; font-size: 16px; }
+    .box-title { font-family: 'Segoe UI', system-ui, sans-serif; fill: #ffffff; font-size: 18px; font-weight: 600; text-anchor: middle; }
+    .box-sub { font-family: 'Segoe UI', system-ui, sans-serif; fill: #cbd5e1; font-size: 13px; text-anchor: middle; }
+    .detail-text { font-family: 'Courier New', monospace; fill: #a7f3d0; font-size: 12px; }
+    .detail-text-rules { font-family: 'Courier New', monospace; fill: #fecdd3; font-size: 12px; }
+    .detail-text-llm { font-family: 'Courier New', monospace; fill: #fde68a; font-size: 12px; }
+    .line-solid { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#arrowSolid); }
+    .line-math { stroke: #34d399; stroke-width: 2; stroke-dasharray: 5,5; fill: none; marker-end: url(#arrowMath); }
+    .line-rules { stroke: #fb7185; stroke-width: 2; stroke-dasharray: 5,5; fill: none; marker-end: url(#arrowRules); }
+    .box { rx: 6; ry: 6; stroke-width: 1; }
+  </style>
+
+  <text x="50" y="50" class="title">Project Empros: Sentinel Nexus</text>
+  <text x="50" y="75" class="subtitle">The Autonomous Triad: Red AI vs. Blue AI Engagement Architecture</text>
+
+  <g transform="translate(50, 120)">
+    <rect width="220" height="70" class="box" fill="url(#edgeGrad)" stroke="#60a5fa" />
+    <text x="110" y="30" class="box-title">Endpoint Fleet (Rust)</text>
+    <text x="110" y="50" class="box-sub">Sentinel (5D) &amp; C2 (8D)</text>
+    <rect y="70" width="220" height="40" fill="none" stroke="#60a5fa" stroke-dasharray="4" />
+    <text x="10" y="88" class="detail-text">► eBPF Ring-0 Probes</text>
+    <text x="10" y="103" class="detail-text">► ZSTD Parquet Gen</text>
+
+    <rect x="280" width="200" height="70" class="box" fill="#ea580c" stroke="#fdba74" />
+    <text x="380" y="30" class="box-title">HAProxy Edge</text>
+    <text x="380" y="50" class="box-sub">L4 Load Balancer</text>
+    <rect x="280" y="70" width="200" height="40" fill="none" stroke="#fdba74" stroke-dasharray="4" />
+    <text x="290" y="88" class="detail-text" fill="#fed7aa">► TLS 1.3 Termination</text>
+    <text x="290" y="103" class="detail-text" fill="#fed7aa">► DDoS Shielding</text>
+
+    <rect x="540" width="240" height="70" class="box" fill="#0369a1" stroke="#7dd3fc" />
+    <text x="660" y="30" class="box-title">Core Ingress Fleet</text>
+    <text x="660" y="50" class="box-sub">Axum Zero-Trust Gateway</text>
+    <rect x="540" y="70" width="240" height="60" fill="none" stroke="#7dd3fc" stroke-dasharray="4" />
+    <text x="550" y="88" class="detail-text" fill="#bae6fd">► Cryptographic JWT Check</text>
+    <text x="550" y="103" class="detail-text" fill="#bae6fd">► Binary Schema Neutrality</text>
+    <text x="550" y="118" class="detail-text" fill="#bae6fd">► NATS Topic Routing</text>
+
+    <path d="M 220 35 L 270 35" class="line-solid" />
+    <path d="M 480 35 L 530 35" class="line-solid" />
+  </g>
+
+  <g transform="translate(250, 310)">
+    <rect width="600" height="60" class="box" fill="url(#natsGrad)" stroke="#818cf8" />
+    <text x="300" y="25" class="box-title">NATS JetStream Cluster</text>
+    <text x="300" y="45" class="box-sub">Persistent High-Velocity Binary Bus</text>
+    <rect y="60" width="600" height="40" fill="none" stroke="#818cf8" stroke-dasharray="4" />
+    <text x="10" y="78" class="detail-text" fill="#c7d2fe">► Immutable Parquet Streams</text>
+    <text x="10" y="93" class="detail-text" fill="#c7d2fe">► Parallel Fan-Out Consumer Groups (Math, Rules, S3)</text>
+
+    <path d="M 410 -60 L 410 -10" class="line-solid" />
+  </g>
+
+  <g transform="translate(100, 480)">
+    <rect width="260" height="60" class="box" fill="url(#mathGrad)" stroke="#6ee7b7" />
+    <text x="130" y="25" class="box-title">Worker: Qdrant</text>
+    <text x="130" y="45" class="box-sub">Layer 1: Vector Tripwires</text>
+    <rect y="60" width="260" height="40" fill="none" stroke="#6ee7b7" stroke-dasharray="4" />
+    <text x="10" y="78" class="detail-text">► In-Flight Normalization</text>
+    <text x="10" y="93" class="detail-text">► High-Speed Memory Map</text>
+
+    <rect x="320" width="260" height="60" class="box" fill="url(#rulesGrad)" stroke="#fda4af" />
+    <text x="450" y="25" class="box-title">Worker: Rules Engine</text>
+    <text x="450" y="45" class="box-sub">Layer 2: Deterministic Engine</text>
+    <rect x="320" y="60" width="260" height="40" fill="none" stroke="#fda4af" stroke-dasharray="4" />
+    <text x="330" y="78" class="detail-text-rules">► Zero-Copy Sigma Strings</text>
+    <text x="330" y="93" class="detail-text-rules">► In-Memory Parquet Parsing</text>
+
+    <rect x="640" width="260" height="60" class="box" fill="url(#storageGrad)" stroke="#94a3b8" />
+    <text x="770" y="25" class="box-title">Worker: S3 Archive</text>
+    <text x="770" y="45" class="box-sub">Cold Forensic Lake Spooling</text>
+    <rect x="640" y="60" width="260" height="40" fill="none" stroke="#94a3b8" stroke-dasharray="4" />
+    <text x="650" y="78" class="detail-text" fill="#cbd5e1">► Immutable Batch Spooling</text>
+    <text x="650" y="93" class="detail-text" fill="#cbd5e1">► Golden Dataset Foundation</text>
+
+    <path d="M 450 -70 L 130 -10" class="line-math" />
+    <path d="M 450 -70 L 450 -10" class="line-rules" />
+    <path d="M 450 -70 L 770 -10" class="line-solid" />
+  </g>
+
+  <g transform="translate(100, 640)">
+    <rect width="260" height="60" class="box" fill="#065f46" stroke="#6ee7b7" />
+    <text x="130" y="25" class="box-title">Qdrant Vector DB</text>
+    <text x="130" y="45" class="box-sub">Unknown Unknowns (Math)</text>
+    <rect y="60" width="260" height="40" fill="none" stroke="#6ee7b7" stroke-dasharray="4" />
+    <text x="10" y="78" class="detail-text">► Named Vectors (5D/8D)</text>
+    <text x="10" y="93" class="detail-text">► Cosine Similarity Triggers</text>
+
+    <rect x="320" width="260" height="60" class="box" fill="#9f1239" stroke="#fda4af" />
+    <text x="450" y="25" class="box-title">Redis Cluster</text>
+    <text x="450" y="45" class="box-sub">Known Unknowns (Rules)</text>
+    <rect x="320" y="60" width="260" height="40" fill="none" stroke="#fda4af" stroke-dasharray="4" />
+    <text x="330" y="78" class="detail-text-rules">► High-Speed FIFO Queue</text>
+    <text x="330" y="93" class="detail-text-rules">► Exact Match Alert State</text>
+
+    <rect x="640" width="260" height="60" class="box" fill="#1e293b" stroke="#94a3b8" />
+    <text x="770" y="25" class="box-title">AWS S3 / MinIO</text>
+    <text x="770" y="45" class="box-sub">Historical Data Lake</text>
+
+    <path d="M 130 -60 L 130 -10" class="line-math" />
+    <path d="M 450 -60 L 450 -10" class="line-rules" />
+    <path d="M 770 -60 L 770 -10" class="line-solid" />
+  </g>
+
+  <g transform="translate(240, 800)">
+    <rect width="520" height="60" class="box" fill="url(#llmGrad)" stroke="#fcd34d" />
+    <text x="260" y="25" class="box-title">LLM Hunter Fleet (Agentic Swarm)</text>
+    <text x="260" y="45" class="box-sub">Layer 3: Multi-Agent DAG w/ False Positive Rejection</text>
+
+    <rect y="60" width="520" height="110" fill="none" stroke="#fcd34d" stroke-dasharray="4" />
+    <text x="10" y="78" class="detail-text-llm">► Dual-Loop: Asynchronous Redis (Rules) &amp; Qdrant (Math) Polling</text>
+    <text x="10" y="93" class="detail-text-llm">► Supervisor: Dynamic Entity State Routing &amp; Blast Radius Caps</text>
+    <text x="10" y="108" class="detail-text-llm">► Experts: DuckDB Forensics via Multi-Hypothesis Prompting</text>
+    <text x="10" y="123" class="detail-text-llm">► Red Team Critic: 3-Axis Diamond Model Scoring (Anti-Sycophancy)</text>
+    <text x="10" y="138" class="detail-text-llm">► Response: Stateful Markdown Audits &amp; SOAR HitL Checkpoints</text>
+
+    <path d="M -10 -60 L 120 -10" class="line-math" />
+    <path d="M 310 -60 L 310 -10" class="line-rules" />
+
+    <path d="M 520 30 L 640 30 L 640 -100" class="line-solid" fill="none" stroke="#94a3b8" stroke-dasharray="2,2"/>
+    <text x="530" y="25" class="detail-text" fill="#cbd5e1">DuckDB Pivot</text>
+  </g>
+
+</svg>

@@ -1,0 +1,27 @@
+# guarddog-config.yaml
+# Whitelist configuration for Project Empros ML dependencies
+
+rules:
+  # ML frameworks dynamically dispatch methods to hardware backends
+  - id: api-obfuscation
+    exclude: true
+
+  # ML frameworks bundle compiled C++ and CUDA libraries
+  - id: bundled_binary
+    exclude: true
+
+  # ML frameworks use ctypes to load NCCL, FlashAttention, etc.
+  - id: dll-hijacking
+    exclude: true
+
+  # Required by PyArrow and vllm for compilation/system checks
+  - id: code-execution
+    exclude: true
+
+  # Required for pulling models (Mitigated via network air-gap)
+  - id: exfiltrate-sensitive-data
+    exclude: true
+
+  # vLLM requires OpenCV which triggers this for video parsing
+  - id: screenshot
+    exclude: true

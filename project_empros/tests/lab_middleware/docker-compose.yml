@@ -1,0 +1,124 @@
+---
+# Lab 5: Middleware ETL Fanout Pipeline
+# Run from project_empros/tests/lab_middleware/:
+#   docker compose up -d --build
+#   pytest test_middleware_etl.py -v
+
+services:
+  nats:
+    image: docker.io/library/nats:2.10-alpine
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ./nats-test.conf:/etc/nats/nats-server.conf:ro
+      - nats-data:/data
+    ports:
+      - "4224:4222"
+      - "8224:8222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  mock-endpoints:
+    image: docker.io/library/python:3.12-slim-bookworm
+    command: ["python3", "/app/mock_servers.py"]
+    volumes:
+      - ./mock_servers.py:/app/mock_servers.py:ro
+    ports:
+      - "8088:8088"    # Splunk HEC
+      - "8089:8089"    # Nexus gateway mock
+      - "9201:9201"    # Elastic bulk mock
+      - "9202:9202"    # Control API (toggle failure modes)
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:9202/health\")' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  middleware-ingress:
+    build:
+      context: ../../middleware/
+      dockerfile: Dockerfile
+    entrypoint: ["/app/core_ingress"]
+    environment:
+      - MIDDLEWARE_CONFIG=/config/middleware.toml
+      - RUST_LOG=info
+    volumes:
+      - ./middleware-lab5.toml:/config/middleware.toml:ro
+      - ./cim_mappings.yaml:/config/cim_mappings.yaml:ro
+      - ./ecs_mappings.yaml:/config/ecs_mappings.yaml:ro
+    ports:
+      - "8081:8080"
+    depends_on:
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  worker-splunk:
+    build:
+      context: ../../middleware/
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_splunk"]
+    environment:
+      - MIDDLEWARE_CONFIG=/config/middleware.toml
+      - RUST_LOG=info
+    volumes:
+      - ./middleware-lab5.toml:/config/middleware.toml:ro
+      - ./cim_mappings.yaml:/config/cim_mappings.yaml:ro
+      - ./ecs_mappings.yaml:/config/ecs_mappings.yaml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      mock-endpoints:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker-elastic:
+    build:
+      context: ../../middleware/
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_elastic"]
+    environment:
+      - MIDDLEWARE_CONFIG=/config/middleware.toml
+      - RUST_LOG=info
+    volumes:
+      - ./middleware-lab5.toml:/config/middleware.toml:ro
+      - ./cim_mappings.yaml:/config/cim_mappings.yaml:ro
+      - ./ecs_mappings.yaml:/config/ecs_mappings.yaml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      mock-endpoints:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker-nexus:
+    build:
+      context: ../../middleware/
+      dockerfile: Dockerfile
+    entrypoint: ["/app/worker_nexus"]
+    environment:
+      - MIDDLEWARE_CONFIG=/config/middleware.toml
+      - RUST_LOG=info
+      - STATE_DIR=/tmp/nexus-state
+    volumes:
+      - ./middleware-lab5.toml:/config/middleware.toml:ro
+      - ./cim_mappings.yaml:/config/cim_mappings.yaml:ro
+      - ./ecs_mappings.yaml:/config/ecs_mappings.yaml:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      mock-endpoints:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  nats-data:

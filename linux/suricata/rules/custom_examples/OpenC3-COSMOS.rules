@@ -1,0 +1,33 @@
+# Rule 1: Detect XSS payloads in HTTP URIs (e.g., for Documentation tool parameters)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"OpenC3 COSMOS XSS Attempt in Documentation or Telemetry Viewer"; \
+flow:established,to_server; http.uri; content:"<script>"; nocase; classtype:web-application-attack; sid:3737001; rev:1;)
+
+# Rule 2: Detect base64-encoded payloads in POST requests to Script Runner (chained RCE from XSS)
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"OpenC3 COSMOS Potential RCE via XSS-Chained Script Runner"; \
+flow:established,to_server; http.method; content:"POST"; http.uri; content:"/script-api/scripts"; http.request_body; \
+pcre:"/^[A-Za-z0-9+/=]{20,}$/"; classtype:web-application-attack; sid:3737002; rev:1;)
+
+# Rule 3: Detect malicious plugin uploads with RCE indicators
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"OpenC3 COSMOS RCE Attempt via Plugin Install"; \
+flow:established,to_server; http.method; content:"POST"; http.request_body; content:"requirements.txt"; \
+within:100; http.request_body; content:"/gems/gems/"; classtype:attempted-admin; sid:3737003; rev:1;)
+
+# Rule 4: Detect outbound reverse shell from COSMOS container (post-RCE)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"OpenC3 COSMOS Potential Reverse Shell Outbound"; \
+flow:established,to_server; content:"bash -i >& /dev/tcp/"; dsize:<500; classtype:trojan-activity; sid:3737004; rev:1;)
+
+# Rule 5: Detect path traversal in Script-API endpoint
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"OpenC3 COSMOS Arbitrary File Read Attempt via Script-API"; \
+flow:established,to_server; http.method; content:"GET"; http.uri; content:"/script-api/scripts/"; http.uri; \
+pcre:"/(\.\./){2,}/"; classtype:web-application-attack; sid:3737005; rev:1;)
+
+# Rule 6: Detect path traversal in OpenC3-API tables endpoint
+
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"OpenC3 COSMOS Arbitrary File Read Attempt via OpenC3-API Tables"; \
+flow:established,to_server; http.method; content:"GET"; http.uri; content:"/openc3-api/tables"; http.uri; \
+pcre:"/(\.\./){2,}/"; classtype:web-application-attack; sid:3737006; rev:1;)

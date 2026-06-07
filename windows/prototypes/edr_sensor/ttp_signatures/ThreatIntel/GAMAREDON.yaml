@@ -1,0 +1,116 @@
+# =============================================================================
+# GAMAREDON (Armageddon / Shuckworm / UAC-0010 / Primitive Bear)
+# =============================================================================
+
+- ttp_signature:
+    name: "Gamaredon Pterodo VBScript Loader Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: Visual Basic (T1059.005)"
+      procedure: "Silent, batched execution of Pterodo VBScript payloads from user directories"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "//b"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "Gamaredon Scheduled Task Persistence (Pterodo)"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job: Scheduled Task (T1053.005)"
+      procedure: "Creating scheduled tasks to execute VBScript backdoors every 10 to 15 minutes"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create /sc minute /mo"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Gamaredon USB Propagation (LitterDrifter / Giddome)"
+    severity: "Critical"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Replication Through Removable Media (T1091)"
+      procedure: "WScript executing VBS payload from a removable USB drive (trash.vbs / trash.bat)"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "trash.vbs"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Gamaredon Malicious LNK Command Execution"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "User Execution: Malicious Link (T1204.001)"
+      procedure: "CMD.exe launched by LNK to execute WScript payload and simultaneously open a decoy document"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "/c start wscript.exe"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Gamaredon GammaDrop PowerShell C2 Retrieval"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Ingress Tool Transfer (T1105)"
+      procedure: "PowerShell executing WebClient to download next-stage Pterodo modules from Fast-Flux C2"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Net.WebClient).DownloadString"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Gamaredon PowerShell Office Document Exfiltration"
+    severity: "Critical"
+    meta:
+      tactic: "Collection (TA0009)"
+      technique: "Data from Local System (T1005)"
+      procedure: "PowerShell script scanning and copying target documents (.doc, .xls, .rtf) for exfiltration staging"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target:
+        - ".doc"
+        - ".xls"
+        - ".rtf"
+        - ".pdf"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\"
+        - "C:\\Program Files\\"
+      exclude_actor_cmd:
+        - "Get-ChildItem"
+
+- ttp_signature:
+    name: "Gamaredon Obfuscated Command Line Execution (Base64)"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Obfuscated Files or Information (T1027)"
+      procedure: "Execution of Gamaredon encoded payloads utilizing FromBase64String conversion"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "::FromBase64String"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"

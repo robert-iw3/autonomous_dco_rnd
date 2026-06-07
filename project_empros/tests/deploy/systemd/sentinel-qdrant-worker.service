@@ -1,0 +1,32 @@
+[Unit]
+Description=Sentinel Nexus Qdrant Vector Worker
+After=network-online.target nats.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+WorkingDirectory=/opt/sentinel-nexus/dist
+EnvironmentFile=/opt/sentinel-nexus/nexus.env
+Environment=NEXUS_CONFIG=/opt/sentinel-nexus/config/nexus.toml
+Environment="MALLOC_CONF=background_thread:true,metadata_thp:auto"
+ExecStart=/opt/sentinel-nexus/dist/worker_qdrant
+
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+LimitNOFILE=65536
+MemoryMax=2G
+CPUQuota=200%
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/sentinel-nexus/dist
+
+[Install]
+WantedBy=multi-user.target

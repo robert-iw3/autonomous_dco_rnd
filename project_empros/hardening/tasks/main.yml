@@ -1,0 +1,39 @@
+---
+# ==============================================================================
+# common_hardening -- main orchestrator
+#
+# Applies in order: packages → kernel → ssh → users → firewall → audit → services
+# Each sub-task file handles Debian vs RedHat detection internally.
+# ==============================================================================
+
+- name: Display target OS family
+  ansible.builtin.debug:
+    msg: "Hardening {{ inventory_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_version }}, family: {{ ansible_os_family }})"
+
+- name: Validate supported OS family
+  ansible.builtin.assert:
+    that: ansible_os_family in ['Debian', 'RedHat']
+    fail_msg: "Unsupported OS family: {{ ansible_os_family }}. This role supports Debian/Ubuntu and RHEL/Rocky/Alma."
+
+- name: Install security baseline packages
+  ansible.builtin.include_tasks: packages.yml
+
+- name: Apply kernel and sysctl hardening
+  ansible.builtin.include_tasks: kernel.yml
+
+- name: Apply SSH hardening
+  ansible.builtin.include_tasks: ssh.yml
+
+- name: Apply user and PAM hardening
+  ansible.builtin.include_tasks: users.yml
+
+- name: Apply firewall configuration
+  ansible.builtin.include_tasks: firewall.yml
+  when: hardening_firewall_enabled
+
+- name: Apply audit rules
+  ansible.builtin.include_tasks: audit.yml
+  when: hardening_audit_enabled
+
+- name: Disable unnecessary services
+  ansible.builtin.include_tasks: services.yml

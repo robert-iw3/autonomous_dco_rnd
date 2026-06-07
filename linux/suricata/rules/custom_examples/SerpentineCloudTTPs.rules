@@ -1,0 +1,26 @@
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"TROJAN SERPENTINE#CLOUD C2 Domain Observed in TLS SNI"; \
+flow:to_server,established; tls.sni; content:".duckdns.org"; pcre:"/^(nhvncpurekfl|ncmomenthv|hvncmomentpure|nhvncpure)\.duckdns\.org$/"; \
+reference:url,https://www.securonix.com/blog/analyzing_serpentinecloud-threat-actors-abuse-cloudflare-tunnels-threat-research/; \
+classtype:trojan-activity; sid:1000001; rev:1; metadata: author RW, created_at 2026-01-10, updated_at 2026-01-10, \
+malware_family SERPENTINE#CLOUD, confidence High, signature_severity Major, tag C2, mitre_tactic_id TA0011, mitre_tactic_name Command_and_Control, \
+mitre_technique_id T1071.001, mitre_technique_name Application_Layer_Protocol_Web_Protocols, fp_note Known_malware_C2_domains;)
+
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"TROJAN SERPENTINE#CLOUD C2 Domain Observed in TLS SNI"; \
+flow:to_server,established; tls.sni; content:"nhvncpure."; \
+fast_pattern; pcre:"/^(nhvncpure\.(shop|sbs|click)|nhvncpure\.twilightparadox\.com|nhvncpure1\.strangled\.net|nhvncpure2\.mooo\.com)$/"; \
+reference:url,https://www.securonix.com/blog/analyzing_serpentinecloud-threat-actors-abuse-cloudflare-tunnels-threat-research/; \
+classtype:trojan-activity; sid:1000002; rev:1; metadata: author RW, created_at 2026-01-10, updated_at 2026-01-10, \
+malware_family SERPENTINE#CLOUD, confidence High, signature_severity Major, tag C2, mitre_tactic_id TA0011, mitre_tactic_name Command_and_Control, \
+mitre_technique_id T1071.001, mitre_technique_name Application_Layer_Protocol_Web_Protocols, fp_note Known_malware_C2_domains;)
+
+alert ip $HOME_NET any -> [51.89.212.145] any (msg:"TROJAN SERPENTINE#CLOUD C2 IP Traffic"; \
+flow:to_server,established; reference:url,https://www.securonix.com/blog/analyzing_serpentinecloud-threat-actors-abuse-cloudflare-tunnels-threat-research/; \
+classtype:trojan-activity; sid:1000003; rev:1; metadata: author RW, created_at 2026-01-10, updated_at 2026-01-10, malware_family SERPENTINE#CLOUD, \
+confidence High, signature_severity Major, tag C2, mitre_tactic_id TA0011, mitre_tactic_name Command_and_Control, fp_note Known_malware_C2_IP;)
+
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"TROJAN SERPENTINE#CLOUD Initial Access via Cloudflare Tunnel (tls.sni)"; \
+flow:to_server,established; tls.sni; content:".trycloudflare.com"; endswith; fast_pattern; \
+reference:url,https://www.securonix.com/blog/analyzing_serpentinecloud-threat-actors-abuse-cloudflare-tunnels-threat-research/; \
+classtype:trojan-activity; sid:1000004; rev:1; metadata: author RW, created_at 2026-01-10, updated_at 2026-01-10, \
+malware_family SERPENTINE#CLOUD, confidence Medium, signature_severity Major, tag Initial_Access, mitre_tactic_id TA0001, \
+mitre_tactic_name Initial_Access, mitre_technique_id T1105, mitre_technique_name Ingress_Tool_Transfer, fp_note Legitimate_dev_service_abused;)

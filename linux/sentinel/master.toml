@@ -1,0 +1,532 @@
+# ==============================================================================
+# LINUX SENTINEL - MASTER CONFIGURATION
+# ==============================================================================
+# Philosophy: This file dictates the operational boundaries of the Linux Sentinel
+# agent. The primary goal is to maintain absolute execution visibility while
+# naturally filtering out architecturally impossible or deterministic OS noise.
+# ==============================================================================
+
+[engine]
+# Core Subsystem Toggles: Allows operators to disable specific engines to save
+# memory or troubleshoot performance bottlenecks.
+enable_ebpf = true               # Native Ring-0 telemetry collection via bpf_core_read
+enable_yara = true               # File Integrity and static memory scanning via C-FFI
+enable_honeypots = true          # Asynchronous tarpit listeners on highly targeted ports
+enable_anti_evasion = true       # The UEBA pipeline, Welford math engine, and Isolation Forest
+enable_fim = true                # Global toggle to enable/disable FIM background engine
+enable_active_mitigation = false # DANGEROUS: Automatically SIGKILL malicious PIDs based on ML score
+performance_mode = false         # Disables deep payload capture to save CPU cycles on heavy nodes
+enable_api_server = true         # Embedded Axum API for forensic dashboard and orchestration
+
+# ML/UEBA Engine Tuning & Persistence
+ml_feature_dimensions = 19         # Dimensionality of the tracking vectors (currently 5D: entropy, rarity, path, vel, max_vel)
+ml_adaptive_thresholds = true      # Dynamic P95 thresholds
+ml_deduplication_window_sec = 60   # Seconds to suppress identical alerts to prevent SIEM flooding
+ml_forest_training_timeout_sec = 60 # Maximum seconds allowed for Isolation Forest background training
+ml_persistent_store_path = "/var/log/linux-sentinel/baselines.db" # Secondary SQLite WAL path to persist execution profiles across restarts
+
+# Threat Intelligence Paths: Locations mapped into the container during boot.
+# The YARA and Sigma engines will actively monitor these directories and hot-swap
+# signatures into memory if the files are updated.
+yara_rules_path = "/opt/linux-sentinel/intel_staging/yara"
+sigma_rules_path = "/opt/linux-sentinel/intel_staging/sigma/rules"
+malicious_ips_path = "/opt/linux-sentinel/intel_staging/lists/malicious-ips.txt"
+
+[clamav]
+enable_clamav = true
+enable_freshclam_sync = false
+scan_interval_sec = 86400       # 24 hours
+sync_interval_sec = 43200       # 12 hours
+armed_mode_only = true          # Only initialize heavy scans when ArmedMode is active
+target_paths = [
+    "/tmp/",
+    "/var/tmp/",
+    "/dev/shm/",
+    "/opt/linux-sentinel/intel_staging/"
+]
+
+[api]
+# Local Orchestration Control Plane
+bind_addr = "0.0.0.0"                          # Interface to bind the Axum API (0.0.0.0 for containers)
+port = 8080                                    # Port for API traffic and UI delivery
+tls_cert = "/opt/linux-sentinel/certs/tls.crt" # Path to 4096-bit RSA Cert
+tls_key = "/opt/linux-sentinel/certs/tls.key"  # Path to Private Key
+
+[honeypot]
+# Active Defense Parameters
+# These listeners act as tarpits. If an attacker scans or attempts to brute force
+# these ports, their connection is tarpitted (delayed) and an alert is generated.
+honeypot_bind_addr = "127.0.0.1" # Interface for honeypot (Loopback for local testing)
+max_concurrent_per_port = 10     # Max simultaneous connections to prevent resource exhaustion
+max_connections_per_minute = 100 # Tarpit rate-limit to prevent DOS attacks
+
+[monitoring]
+# Telemetry Scopes: Allows disabling specific telemetry types prior to eBPF parsing.
+# Useful if a specific subsystem is generating too much noise before exceptions can be tuned.
+monitor_network = true           # EVENT_CONNECT, EVENT_BIND, EVENT_UDP_SEND
+monitor_processes = true         # EVENT_EXEC, EVENT_PTRACE
+monitor_files = true             # EVENT_OPEN_CRIT, EVENT_UNLINK, EVENT_RENAME
+monitor_users = true             # EVENT_SETUID and /etc/passwd integrity
+monitor_rootkits = true          # EVENT_MODULE, EVENT_BPF, and /proc desync logic
+monitor_memory = true            # EVENT_MEMFD and system RAM exhaustion checks
+
+[storage]
+# File System Mappings: Must match the volume mounts in your container orchestrator.
+central_log_dir = "/var/log/linux-sentinel/diagnostics"    # Text-based engine logs
+output_dir = "/var/log/linux-sentinel/Behavior/Categories" # Generic outputs
+sqlite_db_path = "/var/log/linux-sentinel/sentinel.db"     # The WAL telemetry database
+enable_parquet = true
+parquet_directory = "/var/backups/linux-sentinel/parquet"
+
+[siem]
+# Upstream Forwarder Configuration
+#middleware_gateway_url = "https://siem-gateway.local/api/ingest" # Target SIEM endpoint
+middleware_gateway_url = "https://nexus-edge.local:443/api/v1/sentinel/telemetry" # Target HAProxy -> Axum Gateway
+tls_ca_cert = "/opt/linux-sentinel/certs/nexus-ca.pem"
+auth_token = "${SENTINEL_AUTH_TOKEN}" # Environment variable resolved at runtime
+batch_size = 100 # Max number of events per payload sent via JetStream/HTTP micro-batching
+#integrity_secret = "${SENTINEL_INTEGRITY_SECRET}"
+
+# Parquet Spooling Vars
+parquet_batch_size = 500 # Creates .parquet file after 500events
+parquet_flush_interval_sec = 60 # Creates a .parquet file after 60s (ensures no stale data to Nexus - balance for near real-time)
+parquet_compression = "zstd" # Compression Options: (snappy, lz4, zstd, or uncompressed)
+
+[network]
+# Fast-Path Network Whitelist: Drops events connecting to these IPs before ML scoring.
+# Used to silence standard loopback traffic and container interconnects.
+whitelist_connections = [
+    "127.0.0.1",
+    "::1"
+]
+
+[process]
+# Fast-Path Process Whitelist: Drops ALL telemetry generated by these processes.
+# NOTE: Evaluated bidirectionally to survive the kernel's 15-character TASK_COMM_LEN truncation.
+whitelist_processes = [
+    "linux-sentinel-agent",
+    "linux-sentinel",
+    "tokio-runtime-w",
+    "tokio-rt-worker"
+]
+
+
+# ==============================================================================
+# LINUX SENTINEL - UNIVERSAL BASELINE EXCEPTIONS (2D GRANULAR EXCLUSIONS)
+# ==============================================================================
+# Philosophy: We NEVER whitelist generic interpreters (bash, python) or execution
+# wrappers. We only exclude 2D tuples (Process + Target) that represent
+# mathematically or architecturally impossible attack paths.
+#
+# For example: If 'podman' mounts an overlay filesystem, it is ignored. If
+# an attacker renames their malware to 'podman' and attempts to mount '/root',
+# the exception fails because the target does not match, and Sentinel blocks it.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. CORE OS & WAYLAND IPC (T1620 - Reflective Code Loading)
+# Rationale: 'memfd_create' used for graphics/audio buffers. These buffers are
+# mapped as PROT_READ|PROT_WRITE. Any attempt by an attacker to flip them to
+# PROT_EXEC will trigger a separate memory anomaly alert.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "Xwayland"
+technique = "T1620"
+targets = ["xwayland-shared", "wayland-cursor", "wayland-shm"]
+
+[[exceptions]]
+comm = "gnome-shell"
+technique = "T1620"
+targets = ["mutter-anonymous-file-selection-source", "lp_dma_buf", "wayland-cursor"]
+
+[[exceptions]]
+comm = "pipewire"
+technique = "T1620"
+targets = ["pipewire-memfd"]
+
+[[exceptions]]
+comm = "pulseaudio"
+technique = "T1620"
+targets = ["pulseaudio-shm"]
+
+# ------------------------------------------------------------------------------
+# 2. CONTAINER ORCHESTRATION (T1006, T1036, T1070)
+# Rationale: Runtimes MUST mount and rename overlayfs layers to start containers.
+# We restrict the exception strictly to the daemon's dedicated storage paths.
+# Escapes (T1611) or malicious mounts (e.g., mounting / to /mnt/host) remain caught.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "podman"
+technique = "T1006"
+targets = [
+    "/var/lib/containers/storage/overlay/",
+    "shm -> /var/lib/containers/storage"
+]
+
+[[exceptions]]
+comm = "podman"
+technique = "T1036"
+targets = ["/var/lib/containers/storage/overlay-layers/", "/run/containers/storage/overlay-layers/"]
+
+[[exceptions]]
+comm = "podman"
+technique = "T1560.001"
+targets = ["Zip", "tar"]
+
+[[exceptions]]
+comm = "podman"
+technique = "T1070.004"
+targets = ["/run/netns/"]
+
+[[exceptions]]
+comm = "podman"
+technique = "ANY"
+targets = ["id", "env", "Hostname"]
+
+[[exceptions]]
+comm = "containerd"
+technique = "T1006"
+targets = [
+    "/run/containerd/io.containerd.runtime.v2.task/",
+    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/"
+]
+
+[[exceptions]]
+comm = "dockerd"
+technique = "T1006"
+targets = ["/var/lib/docker/overlay2/"]
+
+[[exceptions]]
+comm = "crun"
+technique = "ANY"
+targets = ["unshare_flags:", "."]
+
+[[exceptions]]
+comm = "runc"
+technique = "ANY"
+targets = ["unshare_flags:", "."]
+
+# ------------------------------------------------------------------------------
+# 3. NETWORKING & SYSTEM DAEMONS (T1571 - Non-Standard Ports)
+# Rationale: Ignore RFC-standard internal broadcast/discovery protocols tied
+# strictly to their respective daemons. NetworkManager binding to 546 is DHCPv6,
+# not a malicious backdoor listener.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "NetworkManager"
+technique = "T1571"
+targets = ["546"] # DHCPv6 Client
+
+[[exceptions]]
+comm = "dhclient"
+technique = "T1571"
+targets = ["68", "546"] # DHCPv4/v6
+
+[[exceptions]]
+comm = "avahi-daemon"
+technique = "T1571"
+targets = ["5353"] # mDNS
+
+[[exceptions]]
+comm = "systemd-resolve"
+technique = "T1571"
+targets = ["53", "5355"] # DNS & LLMNR
+
+# ------------------------------------------------------------------------------
+# 4. EPHEMERAL PACKAGE MANAGEMENT (T1070.004 - Indicator Removal)
+# Rationale: Package managers natively delete temporary state files and lock files
+# multiple times per second. We exclude ONLY their locked cache directories.
+# An attacker using 'apt' to delete evidence outside these folders will be caught.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "systemd-resolve"
+technique = "T1070.004"
+targets = ["/run/systemd/resolve/"]
+
+[[exceptions]]
+comm = "apt-get"
+technique = "T1070.004"
+targets = ["/var/cache/apt/archives/partial/"]
+
+[[exceptions]]
+comm = "dpkg"
+technique = "T1070.004"
+targets = ["/var/lib/dpkg/tmp.ci/", "/var/lib/dpkg/updates/"]
+
+[[exceptions]]
+comm = "dnf"
+technique = "T1070.004"
+targets = ["/var/cache/dnf/"]
+
+[[exceptions]]
+comm = "apk"
+technique = "T1070.004"
+targets = ["/lib/apk/db/lock", ".apk."]
+
+[[exceptions]]
+comm = "apk"
+technique = "T1036"
+targets = [".apk."]
+
+[[exceptions]]
+comm = "apk"
+technique = "T1571"
+targets = ["0"]
+
+# ------------------------------------------------------------------------------
+# 5. CORE SYSTEMD IPC & SANDBOXING (T1562.001)
+# Rationale: SystemD frequently loads BPF programs to enforce IPAddressDeny
+# cgroup restrictions on services. Attackers loading eBPF rootkits use custom
+# ELF loaders or 'bpftool', not the init daemon.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "systemd"
+technique = "T1562.001"
+targets = ["bpf_cmd:5", "bpf_cmd:8"] # PROG_LOAD and PROG_ATTACH for cgroups
+
+# ------------------------------------------------------------------------------
+# 6. STANDARD TIME & LOG ROTATIONS (T1070.004, T1571)
+# Rationale: Daemons rotating logs or managing tmpfiles aren't hiding tracks.
+# NTP binding to port 123 is standard operation.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "systemd-journal"
+technique = "T1070.004"
+targets = ["/var/log/journal/"]
+
+[[exceptions]]
+comm = "systemd-timesyn"
+technique = "T1571"
+targets = ["123"] # NTP
+
+[[exceptions]]
+comm = "systemd-tmpfile"
+technique = "T1070.004"
+targets = ["/tmp/", "/var/tmp/", "/run/"]
+
+# ------------------------------------------------------------------------------
+# 7. EPHEMERAL IPC MOUNTS (T1006)
+# Rationale: Daemons natively mount and unmount tmpfs, mqueue, and bpf filesystems
+# for internal IPC. Direct volume access alerts (T1006) should be reserved for
+# physical disk mapping (e.g., mapping /etc/ to a container).
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "systemd"
+technique = "T1006"
+targets = ["tmpfs", "mqueue", "bpf", "cgroup2"]
+
+[[exceptions]]
+comm = "rpcbind"
+technique = "T1571"
+targets = ["111"] # Standard RPC mapping
+
+[[exceptions]]
+comm = "(udev-worker)"
+technique = "T1574.001"
+targets = ["/run/udev/data/.#"]
+
+# ------------------------------------------------------------------------------
+# 8. SNAP / FLATPAK ORCHESTRATION (T1006)
+# Rationale: Desktop and server sandboxing technologies constantly mount read-only
+# loop devices for packaged applications.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "snapd"
+technique = "T1006"
+targets = ["/var/lib/snapd/snaps/"]
+
+[[exceptions]]
+comm = "flatpak-system-"
+technique = "T1006"
+targets = ["/var/lib/flatpak/"]
+
+# ------------------------------------------------------------------------------
+# 9. BROWSER IPC SHARED MEMORY (T1620 - Reflective Code Loading)
+# Rationale: Firefox forks content/rendering into isolated child processes and
+# uses memfd_create to allocate PROT_READ|PROT_WRITE shared memory for IPC
+# message passing (mozilla-ipc). These buffers are never mapped executable.
+# Any attempt to flip protections to PROT_EXEC triggers a separate memory
+# anomaly alert. Architecturally identical to the Wayland/PipeWire exceptions.
+# NOTE: Thread names are kernel-truncated to 15 chars via TASK_COMM_LEN.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "firefox-bin"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "Renderer"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "Isolated Web Co"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "Privileged Cont"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "CanvasRenderer"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "IPDL Background"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "TaskCon~ller"
+technique = "T1620"
+targets = ["mozilla-ipc"]
+
+[[exceptions]]
+comm = "Chrome_IOThread"
+technique = "T1574.001"
+targets = ["/dev/shm/.org.chromium"]
+
+[[exceptions]]
+comm = "Chrome_ChildIOT"
+technique = "T1574.001"
+targets = ["/dev/shm/.org.chromium"]
+
+[[exceptions]]
+comm = "code"
+technique = "T1574.001"
+targets = ["/dev/shm/.org.chromium"]
+
+# ------------------------------------------------------------------------------
+# 10. ELECTRON / GTK WAYLAND BUFFERS (T1620 - Reflective Code Loading)
+# Rationale: Electron-based applications (VS Code, Signal, Discord) use
+# memfd_create to allocate GDK Wayland display buffers for compositor IPC.
+# Same PROT_READ|PROT_WRITE constraint as Section 1. An attacker spoofing
+# 'code' as comm would still need a target matching 'gdk-wayland' exactly,
+# and any PROT_EXEC escalation is caught independently.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "code"
+technique = "T1620"
+targets = ["gdk-wayland"]
+
+# ------------------------------------------------------------------------------
+# 11. EXPECTED PRIVILEGE ESCALATION (T1548)
+# Rationale: Standard administrative utilities naturally elevate to UID 0.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "sudo"
+technique = "T1548"
+targets = ["setresuid:0", "setreuid:0"]
+
+[[exceptions]]
+comm = "su"
+technique = "T1548"
+targets = ["setresuid:0", "setreuid:0"]
+
+[[exceptions]]
+comm = "fwupdmgr"
+technique = "T1548"
+targets = ["setreuid:0"]
+
+# ------------------------------------------------------------------------------
+# 12. LEGITIMATE NAMESPACE SANDBOXING (T1611 - Escape to Host)
+# Rationale: Modern desktop daemons, container runtimes, and browsers use
+# 'unshare' to create isolated namespaces. This is defensive, not an escape.
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "podman"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "crun"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "snap-confine"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "firefox-bin"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "github-desktop"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "(fwupd)"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "(fwupdmgr)"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "(fprintd)"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "(ostnamed)"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+[[exceptions]]
+comm = "(imedated)"
+technique = "T1611"
+targets = ["unshare_flags:"]
+
+# ------------------------------------------------------------------------------
+# 13. ADDITIONAL SNAP/PODMAN NOISE
+# ------------------------------------------------------------------------------
+[[exceptions]]
+comm = "snap-confine"
+technique = "T1562.001"
+targets = ["bpf_cmd:0", "bpf_cmd:5"]
+
+[[exceptions]]
+comm = "podman"
+technique = "T1006"
+targets = ["shm -> /var/lib/containers/storage"]
+
+[files]
+# ------------------------------------------------------------------------------
+# eBPF NOISE REDUCTION (Exclude Paths)
+# Virtual filesystems and high-churn directories excluded from kernel telemetry
+# to prevent CPU spikes and eBPF ring-buffer exhaustion.
+# REMEDIATION: /sys, /proc, and /var/log have been removed from this list.
+# This restores visibility to cgroup escapes, log wiping, and rootkit hiding.
+# ------------------------------------------------------------------------------
+exclude_paths = [
+    "/proc/self",                   # The agent reading its own memory maps
+    "/dev/null",                    # OS bit bucket
+    "/dev/zero",                    # Null byte source
+    "/dev/urandom",                 # Hardware RNG fetches
+    "/var/lib/containers/storage",  # Podman persistent image/layer storage (YARA handles this)
+    "/run/containers/storage",      # Podman transient runtime/overlay mounts
+    "/var/lib/docker/overlay2"      # Docker persistent image/layer storage (YARA handles this)
+]
+
+# ------------------------------------------------------------------------------
+# STATIC INTEGRITY TARGETS (Critical Paths)
+# High-value assets cryptographically baselined by the FIM module on startup.
+# Monitored via asynchronous spawn_blocking threads to prevent async starvation.
+# Any unauthorized modification triggers an immediate Critical Alert (T1562/T1098).
+# ------------------------------------------------------------------------------
+critical_paths = [
+    "/etc/shadow",
+    "/etc/passwd",
+    "/root/.ssh/authorized_keys",
+    "/etc/sudoers",
+    "/opt/linux-sentinel/linux-sentinel"  # Agent self-protection
+]

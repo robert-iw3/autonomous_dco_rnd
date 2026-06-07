@@ -1,0 +1,33 @@
+alert http $HOME_NET any -> 31.57.243.29 any (msg:"ET MALWARE PylangGhost RAT C2 Traffic to 31.57.243.29"; \
+flow:established,to_server; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434011; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> 154.58.204.15 any (msg:"ET MALWARE PylangGhost RAT C2 Traffic to 154.58.204.15"; \
+flow:established,to_server; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434012; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> 212.81.47.217 any (msg:"ET MALWARE PylangGhost RAT C2 Traffic to 212.81.47.217"; \
+flow:established,to_server; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434013; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> 31.57.243.190 any (msg:"ET MALWARE PylangGhost RAT C2 Traffic to 31.57.243.190"; \
+flow:established,to_server; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434014; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert dns $HOME_NET any -> any any (msg:"ET MALWARE PylangGhost RAT C2 Domain Query"; dns.query; \
+content:"quickcamfix.online|auto-fixer.online|quickdriverupdate.online|camtuneup.online|driversofthub.online|drive-release.cloud|vcamfixer.online|nvidia-drive.cloud|nvidia-release.us|autodriverfix.online|camdriversupport.com|smartdriverfix.cloud|drivercams.cloud|camtechdrivers.com|web-cam.cloud|camera-drive.org|nvidia-release.org|fixdiskpro.online|autocamfixer.online"; nocase; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434015; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE PylangGhost RAT C2 HTTP Request"; flow:established,to_server; http.host; \
+content:"quickcamfix.online|auto-fixer.online|quickdriverupdate.online|camtuneup.online|driversofthub.online|drive-release.cloud|vcamfixer.online|nvidia-drive.cloud|nvidia-release.us|autodriverfix.online|camdriversupport.com|smartdriverfix.cloud|drivercams.cloud|camtechdrivers.com|web-cam.cloud|camera-drive.org|nvidia-release.org|fixdiskpro.online|autocamfixer.online"; nocase; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; \
+classtype:trojan-activity; sid:3434016; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert dns $HOME_NET any -> any any (msg:"ET MALWARE PylangGhost Fake Job Recruitment Domain Query"; dns.query; \
+content:"krakenhire.com|yuga.skillquestions.com|uniswap.speakure.com|doodles.skillquestions.com|hireviavideo.com|kraken.livehiringpro.com|quiz-nest.com|smartvideohire.com|talent-hiringstep.com|provevidskillcheck.com|skill.vidintermaster.com|digitaltalent.review|robinhood.ecareerscan.com|evalswift.com|livetalentpro.com|quantumnodespro.com|evalassesso.com|parallel.eskillora.com|coinbase.talentmonitoringtool.com|uniswap.testforhire.com|coinbase.talenthiringtool.com|crosstheages.skillence360.com|parallel.eskillprov.com|assesstrack.com|talent-hiringtalk.com|uniswap.prehireiq.com|fast-video-recording.com"; \
+nocase; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; classtype:trojan-activity; \
+sid:3434017; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE PylangGhost Fake Job Recruitment HTTP Request"; flow:established,to_server; http.host; \
+content:"krakenhire.com|yuga.skillquestions.com|uniswap.speakure.com|doodles.skillquestions.com|hireviavideo.com|kraken.livehiringpro.com|quiz-nest.com|smartvideohire.com|talent-hiringstep.com|provevidskillcheck.com|skill.vidintermaster.com|digitaltalent.review|robinhood.ecareerscan.com|evalswift.com|livetalentpro.com|quantumnodespro.com|evalassesso.com|parallel.eskillora.com|coinbase.talentmonitoringtool.com|uniswap.testforhire.com|coinbase.talenthiringtool.com|crosstheages.skillence360.com|parallel.eskillprov.com|assesstrack.com|talent-hiringtalk.com|uniswap.prehireiq.com|fast-video-recording.com"; \
+nocase; reference:url,blog.talosintelligence.com/python-version-of-golangghost-rat/; classtype:trojan-activity; \
+sid:3434018; rev:1; metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)

@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680" font-family="'JetBrains Mono', 'Fira Code', 'SF Mono', monospace">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+    </marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#22c55e"/>
+    </marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+    </marker>
+    <marker id="ay" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
+    </marker>
+    <filter id="gl">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter>
+  </defs>
+
+  <rect width="1100" height="680" fill="#09090b" rx="8"/>
+  <text x="550" y="36" text-anchor="middle" fill="#f8fafc" font-size="16" font-weight="700" letter-spacing="3">ML / UEBA DETECTION PIPELINE</text>
+  <line x1="350" y1="46" x2="750" y2="46" stroke="#334155" stroke-width="1"/>
+
+  <!-- ═══ STAGE 1: DATA COLLECTION ═══ -->
+  <text x="50" y="75" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">STAGE 1 -- DATA COLLECTION</text>
+
+  <rect x="50" y="85" width="310" height="85" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="205" y="105" text-anchor="middle" fill="#fed7aa" font-size="11" font-weight="600">telemetry_ingest → SQLite flows</text>
+  <text x="60" y="125" fill="#94a3b8" font-size="9">Per-event: interval, entropy, packet_size, outbound, dns_query</text>
+  <text x="60" y="140" fill="#94a3b8" font-size="9">Aggregated: Welford mean/std/min/max/CV per (pid,dst,port)</text>
+  <text x="60" y="155" fill="#94a3b8" font-size="9">Enriched: process_hash (SHA256), event_type, dns_flags</text>
+
+  <rect x="400" y="85" width="310" height="85" rx="4" fill="#1c1917" stroke="#a855f7" stroke-width="1"/>
+  <text x="555" y="105" text-anchor="middle" fill="#d8b4fe" font-size="11" font-weight="600">core_hunter → Heuristic Scoring</text>
+  <text x="410" y="125" fill="#94a3b8" font-size="9">Process tree + cmd_snippet from /proc</text>
+  <text x="410" y="140" fill="#94a3b8" font-size="9">7-rule engine: score 0-100+, MITRE mapped</text>
+  <text x="410" y="155" fill="#94a3b8" font-size="9">DGA (domain entropy), NXDOMAIN correlation</text>
+
+  <rect x="750" y="85" width="310" height="85" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="905" y="105" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">baseline_learner → Profiling</text>
+  <text x="760" y="125" fill="#94a3b8" font-size="9">Hourly SELECT (10K rows, unsuppressed)</text>
+  <text x="760" y="140" fill="#94a3b8" font-size="9">Allowlist check → auto-suppress known hashes</text>
+  <text x="760" y="155" fill="#94a3b8" font-size="9">30-day retention with incremental vacuum</text>
+
+  <!-- ═══ STAGE 2: PROFILE GROUPING ═══ -->
+  <text x="50" y="200" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">STAGE 2 -- BEHAVIORAL PROFILE GROUPING</text>
+
+  <rect x="50" y="210" width="1010" height="75" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+  <text x="555" y="233" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700">Profile Key: {uid} | {process_name} | {ip_prefix} | {hour} | {weekday/weekend}</text>
+  <text x="100" y="255" fill="#94a3b8" font-size="9">IPv4: /24 prefix grouping</text>
+  <text x="330" y="255" fill="#94a3b8" font-size="9">IPv6: /48 prefix grouping</text>
+  <text x="560" y="255" fill="#94a3b8" font-size="9">Hour: 00-23 (local time)</text>
+  <text x="790" y="255" fill="#94a3b8" font-size="9">Day type: weekday vs weekend</text>
+  <text x="555" y="275" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">Minimum 5 samples per profile required for ML analysis</text>
+
+  <!-- ═══ STAGE 3: FEATURE EXTRACTION ═══ -->
+  <text x="50" y="315" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">STAGE 3 -- FEATURE VECTORS</text>
+
+  <!-- 3D Feature Space -->
+  <rect x="50" y="325" width="320" height="100" rx="4" fill="#1a1a2e" stroke="#eab308" stroke-width="1"/>
+  <text x="210" y="345" text-anchor="middle" fill="#fef08a" font-size="11" font-weight="600">3D Clustering Features (BeaconML)</text>
+  <rect x="70" y="355" width="80" height="55" rx="3" fill="#292524" stroke="#78716c" stroke-width="0.5"/>
+  <text x="110" y="373" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">intervals</text>
+  <text x="110" y="390" text-anchor="middle" fill="#94a3b8" font-size="8">Δt seconds</text>
+  <text x="110" y="403" text-anchor="middle" fill="#94a3b8" font-size="8">between events</text>
+  <rect x="170" y="355" width="80" height="55" rx="3" fill="#292524" stroke="#78716c" stroke-width="0.5"/>
+  <text x="210" y="373" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">entropies</text>
+  <text x="210" y="390" text-anchor="middle" fill="#94a3b8" font-size="8">Shannon H(x)</text>
+  <text x="210" y="403" text-anchor="middle" fill="#94a3b8" font-size="8">of payload</text>
+  <rect x="270" y="355" width="80" height="55" rx="3" fill="#292524" stroke="#78716c" stroke-width="0.5"/>
+  <text x="310" y="373" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">pkt CV</text>
+  <text x="310" y="390" text-anchor="middle" fill="#94a3b8" font-size="8">std / mean</text>
+  <text x="310" y="403" text-anchor="middle" fill="#94a3b8" font-size="8">packet size</text>
+
+  <!-- Isolation Forest Features -->
+  <rect x="400" y="325" width="660" height="100" rx="4" fill="#1a1a2e" stroke="#eab308" stroke-width="1"/>
+  <text x="730" y="345" text-anchor="middle" fill="#fef08a" font-size="11" font-weight="600">8D Isolation Forest Features</text>
+  <text x="420" y="370" fill="#94a3b8" font-size="9">intervals · cvs · outbound_ratios · entropies · packet_means · packet_stds · packet_mins · packet_maxs</text>
+  <text x="420" y="390" fill="#fde047" font-size="9" font-weight="600">StandardScaler normalization before fitting</text>
+  <text x="420" y="408" fill="#94a3b8" font-size="9">Contamination: 0.05 (5% expected anomaly rate) · Random state: 42 (deterministic)</text>
+
+  <!-- ═══ STAGE 4: ML MODELS ═══ -->
+  <text x="50" y="455" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">STAGE 4 -- MODEL EXECUTION</text>
+
+  <!-- Fast Path -->
+  <rect x="50" y="465" width="220" height="90" rx="4" fill="#052e16" stroke="#22c55e" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="160" y="485" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700">Fast-Path Check</text>
+  <text x="60" y="503" fill="#94a3b8" font-size="9">σ(intervals) &lt; max(1.5, 0.3·μ)</text>
+  <text x="60" y="518" fill="#22c55e" font-size="9" font-weight="600">→ Confidence 78 (timing only)</text>
+  <text x="60" y="533" fill="#22c55e" font-size="9" font-weight="600">→ Confidence 92 (+ high entropy)</text>
+  <text x="60" y="548" fill="#64748b" font-size="8">Bypasses clustering when jitter is low</text>
+
+  <!-- K-Means -->
+  <rect x="290" y="465" width="180" height="90" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="380" y="485" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">K-Means</text>
+  <text x="300" y="503" fill="#94a3b8" font-size="9">k = 2..min(10, n-1)</text>
+  <text x="300" y="518" fill="#94a3b8" font-size="9">Silhouette score &gt; 0.5</text>
+  <text x="300" y="533" fill="#94a3b8" font-size="9">Parallel via joblib</text>
+  <text x="300" y="548" fill="#4ade80" font-size="9" font-weight="600">Min cluster σ ≤ threshold</text>
+
+  <!-- DBSCAN -->
+  <rect x="490" y="465" width="180" height="90" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="580" y="485" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">Adaptive DBSCAN</text>
+  <text x="500" y="503" fill="#94a3b8" font-size="9">ε from k-NN 90th %ile</text>
+  <text x="500" y="518" fill="#94a3b8" font-size="9">min_samples = 3</text>
+  <text x="500" y="533" fill="#94a3b8" font-size="9">Core cluster σ ≤ threshold</text>
+  <text x="500" y="548" fill="#4ade80" font-size="9" font-weight="600">Density-based grouping</text>
+
+  <!-- Isolation Forest -->
+  <rect x="690" y="465" width="180" height="90" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="780" y="485" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">Isolation Forest</text>
+  <text x="700" y="503" fill="#94a3b8" font-size="9">Contamination: 0.05</text>
+  <text x="700" y="518" fill="#94a3b8" font-size="9">Anomaly ratio &gt; 5%</text>
+  <text x="700" y="533" fill="#94a3b8" font-size="9">Per-profile + global</text>
+  <text x="700" y="548" fill="#4ade80" font-size="9" font-weight="600">Outlier detection</text>
+
+  <!-- DGA -->
+  <rect x="890" y="465" width="170" height="90" rx="4" fill="#451a03" stroke="#f97316" stroke-width="1"/>
+  <text x="975" y="485" text-anchor="middle" fill="#fed7aa" font-size="11" font-weight="600">DGA Classifier</text>
+  <text x="900" y="503" fill="#94a3b8" font-size="9">Domain char entropy</text>
+  <text x="900" y="518" fill="#94a3b8" font-size="9">Label length analysis</text>
+  <text x="900" y="523" fill="#94a3b8" font-size="9"></text>
+  <text x="900" y="533" fill="#94a3b8" font-size="9">Subdomain depth</text>
+  <text x="900" y="548" fill="#f97316" font-size="9" font-weight="600">Consonant ratio scoring</text>
+
+  <!-- ═══ STAGE 5: SCORING + ACTIONS ═══ -->
+  <text x="50" y="590" fill="#94a3b8" font-size="10" font-weight="600" letter-spacing="2">STAGE 5 -- SCORING &amp; RESPONSE</text>
+
+  <!-- Confidence -->
+  <rect x="50" y="600" width="250" height="55" rx="4" fill="#1a1a2e" stroke="#eab308" stroke-width="1"/>
+  <text x="175" y="620" text-anchor="middle" fill="#fef08a" font-size="11" font-weight="600">Confidence Score (0-95)</text>
+  <text x="60" y="640" fill="#94a3b8" font-size="9">base 40 + (18 × model_count) · ml_result + confidence → DB</text>
+  <text x="60" y="650" fill="#94a3b8" font-size="8"> </text>
+
+  <!-- Suppression -->
+  <rect x="320" y="600" width="250" height="55" rx="4" fill="#052e16" stroke="#22c55e" stroke-width="1"/>
+  <text x="445" y="620" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600">False-Positive Suppression</text>
+  <text x="330" y="640" fill="#94a3b8" font-size="9">Stability = 1 - (σ/μ) · If &gt; 0.85 → suppressed = 1</text>
+
+  <!-- Exfiltration -->
+  <rect x="590" y="600" width="250" height="55" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1"/>
+  <text x="715" y="620" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600">Exfiltration Detection</text>
+  <text x="600" y="640" fill="#94a3b8" font-size="9">Volumetric: Σ outbound &gt; baseline + 3σ per hour window</text>
+
+  <!-- UEBA Profiles -->
+  <rect x="860" y="600" width="200" height="55" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+  <text x="960" y="620" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600">UEBA Profiles</text>
+  <text x="870" y="640" fill="#94a3b8" font-size="9">process_profiles: Welford δ stats</text>
+  <text x="870" y="650" fill="#94a3b8" font-size="9">role_profiles: velocity + entropy</text>
+
+  <!-- Flow arrows -->
+  <line x1="205" y1="170" x2="205" y2="208" stroke="#64748b" stroke-width="1" marker-end="url(#a)"/>
+  <line x1="555" y1="170" x2="555" y2="208" stroke="#64748b" stroke-width="1" marker-end="url(#a)"/>
+  <line x1="905" y1="170" x2="905" y2="208" stroke="#64748b" stroke-width="1" marker-end="url(#a)"/>
+  <line x1="555" y1="287" x2="210" y2="323" stroke="#eab308" stroke-width="1" marker-end="url(#ay)"/>
+  <line x1="555" y1="287" x2="730" y2="323" stroke="#eab308" stroke-width="1" marker-end="url(#ay)"/>
+  <line x1="160" y1="427" x2="160" y2="463" stroke="#22c55e" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="380" y1="427" x2="380" y2="463" stroke="#22c55e" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="580" y1="427" x2="580" y2="463" stroke="#22c55e" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="730" y1="427" x2="780" y2="463" stroke="#22c55e" stroke-width="1" marker-end="url(#ag)"/>
+
+  <line x1="160" y1="557" x2="175" y2="598" stroke="#eab308" stroke-width="1" marker-end="url(#ay)"/>
+  <line x1="380" y1="557" x2="370" y2="598" stroke="#eab308" stroke-width="1" marker-end="url(#ay)"/>
+  <line x1="580" y1="557" x2="445" y2="598" stroke="#22c55e" stroke-width="1" marker-end="url(#ag)"/>
+  <line x1="780" y1="557" x2="715" y2="598" stroke="#ef4444" stroke-width="1" marker-end="url(#ar)"/>
+
+  <text x="50" y="675" fill="#475569" font-size="8">Cycle: hourly (baseline_learner) · Models: joblib-persisted · Retention: 30 days · Max samples per profile: 2000</text>
+</svg>

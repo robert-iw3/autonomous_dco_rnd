@@ -1,0 +1,41 @@
+[package]
+name    = "endpoint_monitor_driver"
+version = "0.0.3"
+edition = "2024"
+
+[package.metadata.wdk.driver-model]
+driver-type = "WDM"
+
+[lib]
+name       = "endpoint_monitor_driver"
+path       = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+wdk-build = "0.5.1"
+
+[dependencies]
+wdk       = "0.5.1"
+wdk-sys   = "0.5.1"
+wdk-alloc = "0.5.1"
+wdk-panic = "0.5.1"
+
+[features]
+# All features on by default. Disable individually to reduce kernel surface for
+# environments that don't need a specific interception layer (e.g. disable
+# "network" on isolated management networks).
+default  = ["registry", "threads", "objects", "network"]
+registry = []
+network  = []
+ai_agent = []
+threads  = []
+objects  = []
+memory   = []
+power    = []
+
+[profile.release]
+panic         = "abort"
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true

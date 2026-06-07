@@ -1,0 +1,8 @@
+[TRANSMISSION]
+MiddlewareEndpoint = "https://middleware.internal:8443/api/v1/telemetry"
+AuthToken = "ChangeMe-Rotate-In-Production"
+SensorType = "windows_deepsensor"
+IntegritySecret = "Nexus-Integrity-SharedKey-Rotate-Me"
+MaxBatchSize = "500"
+QueueDbPath = "C:\ProgramData\DeepSensor\Data\TransmissionQueue.db"
+TrustSelfSignedCert = "False"

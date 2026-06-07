@@ -1,0 +1,59 @@
+alert ip $HOME_NET any -> 209.141.43.37 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 209.141.43.37"; \
+flow:to_server; classtype:trojan-activity; sid:2828028; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 194.156.98.155 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 194.156.98.155"; \
+flow:to_server; classtype:trojan-activity; sid:2828029; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 158.247.211.51 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 158.247.211.51"; \
+flow:to_server; classtype:trojan-activity; sid:2828030; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 39.106.141.68 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 39.106.141.68"; \
+flow:to_server; classtype:trojan-activity; sid:2828031; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 47.117.165.166 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 47.117.165.166"; \
+flow:to_server; classtype:trojan-activity; sid:2828032; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 195.123.240.2 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 195.123.240.2"; \
+flow:to_server; classtype:trojan-activity; sid:2828033; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 75.127.0.235 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 75.127.0.235"; \
+flow:to_server; classtype:trojan-activity; sid:2828034; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 149.102.243.100 any (msg:"ET MALWARE ToyMaker LAGTOY C2 Traffic to 149.102.243.100"; \
+flow:to_server; classtype:trojan-activity; sid:2828035; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 206.188.196.20 any (msg:"ET MALWARE Cactus Ransomware Traffic to 206.188.196.20"; \
+flow:to_server; classtype:trojan-activity; sid:2828036; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 51.81.42.234 any (msg:"ET MALWARE Cactus Ransomware Traffic to 51.81.42.234"; \
+flow:to_server; classtype:trojan-activity; sid:2828037; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 178.175.134.52 any (msg:"ET MALWARE Cactus Ransomware Traffic to 178.175.134.52"; \
+flow:to_server; classtype:trojan-activity; sid:2828038; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 162.33.177.56 any (msg:"ET MALWARE Cactus Ransomware Traffic to 162.33.177.56"; \
+flow:to_server; classtype:trojan-activity; sid:2828039; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 64.52.80.252 any (msg:"ET MALWARE Cactus Ransomware Traffic to 64.52.80.252"; \
+flow:to_server; classtype:trojan-activity; sid:2828040; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 162.33.178.196 any (msg:"ET MALWARE Cactus Ransomware Traffic to 162.33.178.196"; \
+flow:to_server; classtype:trojan-activity; sid:2828041; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)
+
+alert ip $HOME_NET any -> 103.199.16.92 any (msg:"ET MALWARE Cactus Ransomware Traffic to 103.199.16.92"; \
+flow:to_server; classtype:trojan-activity; sid:2828042; rev:1; \
+metadata:created_at 2025_08_01, attack_target Client_Endpoint, deployment Perimeter;)

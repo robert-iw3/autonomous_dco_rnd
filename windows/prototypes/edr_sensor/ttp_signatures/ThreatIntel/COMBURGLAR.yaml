@@ -1,0 +1,33 @@
+# =============================================================================
+# Comburglar (UKC-1230)
+# =============================================================================
+
+- ttp_signature:
+    name: "Comburglar GUID DLL Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Component Object Model Hijacking (T1546.015)"
+      procedure: "Creation of GUID-named DLL in ProgramData"
+    match:
+      actor: "**"
+      type: "FILE_EVENT"
+      target: "{*-*-*-*-*}.dll"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_target: "{*-*-*-*-*}.dll"
+
+- ttp_signature:
+    name: "Comburglar COM Surrogate Execution"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Inter-Process Communication: Component Object Model (T1559.001)"
+      procedure: "dllhost.exe surrogate launched by svchost.exe for hijacked COM tasks"
+    match:
+      actor: "svchost.exe"
+      type: "PROCESS_START"
+      target: "dllhost.exe /Processid:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "dllhost.exe /Processid:"

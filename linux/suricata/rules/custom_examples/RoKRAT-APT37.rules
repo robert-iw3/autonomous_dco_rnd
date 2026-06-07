@@ -1,0 +1,30 @@
+# Rule to detect RoKRAT shellcode injection via steganography in JPEG files
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET MALWARE RoKRAT Steganographic JPEG Shellcode Detected"; \
+flow:established,from_server; file_data; content:"|FF D8 FF E0|"; within:4; content:"InjectShellcode"; nocase; \
+reference:md5,c9869431ad760912a553a63266173442; classtype:trojan-activity; sid:3535001; rev:1;)
+
+# Rule to detect RoKRAT XOR-encrypted shellcode with key 0xAE
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET MALWARE RoKRAT XOR Shellcode Key 0xAE Detected"; \
+flow:established,from_server; file_data; content:"|AE|"; fast_pattern; pcre:"/^[^\x00-\x1F\x7F-\xFF]{0,589}\xAE/s"; \
+reference:md5,bc74dd7e0350ad7ad8f75ca0de6fb9dc; classtype:trojan-activity; sid:3535002; rev:1;)
+
+# Rule to detect RoKRAT second-stage XOR with key 0x29
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET MALWARE RoKRAT Second Stage XOR Shellcode Key 0x29 Detected"; \
+flow:established,from_server; file_data; content:"|29|"; fast_pattern; pcre:"/^[^\x00-\x1F\x7F-\xFF]{0,589}\x29/s"; \
+classtype:trojan-activity; sid:3535003; rev:1;)
+
+# Rule to detect RoKRAT Dropbox C2 communication
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE RoKRAT Dropbox C2 Communication"; \
+flow:established,to_server; content:"POST"; http_method; content:"dropbox.com"; http_host; \
+content:"hFkFeKn8jJIAAAAAAAAAAZr14zutJmQzoOx-g5k9SV9vy7phb9QiNCIEO7SAp1Ch|gYQs1sJ0etEAAAAAAAAAAUsEYLCFpEUR38u0SxDzsfL2F8ZCLokJPGpPsq4OTNUX|Q54LEwmIgyAAAAAAAAAIIMytoGW3__MIEynCsFRSwohgvHI_fjViYK5ZfrG28teC"; \
+http_header; classtype:trojan-activity; sid:3535004; rev:1;)
+
+# Rule to detect RoKRAT LNK file execution with PowerShell
+alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET MALWARE RoKRAT LNK File PowerShell Execution"; \
+flow:established,from_server; file_data; content:".lnk"; nocase; content:"powershell.exe"; nocase; \
+content:"cmd.exe"; nocase; reference:md5,c9869431ad760912a553a63266173442; classtype:trojan-activity; sid:3535005; rev:1;)
+
+# Rule to detect RoKRAT fileless attack via rundll32.exe
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE RoKRAT Fileless rundll32.exe Execution"; \
+flow:established,to_server; content:"rundll32.exe"; nocase; content:"version1.0.tmp"; nocase; \
+content:"mspaint.exe"; nocase; classtype:trojan-activity; sid:3535006; rev:1;)

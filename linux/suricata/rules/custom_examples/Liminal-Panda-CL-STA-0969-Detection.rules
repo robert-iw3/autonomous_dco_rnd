@@ -1,0 +1,25 @@
+alert tcp any any -> any any (msg:"CL-STA-0969 Liminal Panda Cordscan IMSI Scan Attempt"; \
+content:"--imsi"; nocase; flow:established; pcre:"/(--imsi\s+[0-9]{15}\b)/i"; \
+classtype:trojan-activity; sid:1096901; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)
+alert tcp any any -> any any (msg:"CL-STA-0969 Liminal Panda Cordscan Operator Code Scan Attempt"; \
+content:"--oper"; nocase; flow:established; pcre:"/(--oper\s+[0-9]{6}\b)/i"; \
+classtype:trojan-activity; sid:1096902; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)
+alert gtp any any -> any any (msg:"CL-STA-0969 Liminal Panda Suspicious GTP Protocol Activity"; \
+content:"|32|"; depth:1; flow:established; classtype:attempted-recon; \
+metadata:service gtp; sid:1096903; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)
+alert ssh any any -> any any (msg:"CL-STA-0969 Liminal Panda Suspicious SSH Tunneling"; \
+content:"SSH-2.0-"; flow:established; content:"|00 00 00 04|port"; distance:0; \
+within:20; classtype:policy-violation; sid:1096904; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)
+alert dns any any -> any any (msg:"CL-STA-0969 Liminal Panda DNS Tunneling Suspicious Query"; \
+content:"|00 01 00 01|"; depth:4; offset:2; flow:established; \
+pcre:"/^[a-zA-Z0-9\-]{50,}\.[a-zA-Z]{2,}$/"; classtype:trojan-activity; \
+metadata:service dns; sid:1096905; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)
+alert icmp any any -> any any (msg:"CL-STA-0969 Liminal Panda ICMP Tunneling Suspicious Payload"; \
+content:"|08 00|"; depth:2; flow:established; content:"|00 00|"; distance:2; within:2; \
+byte_test:4,>,256,8,relative; classtype:trojan-activity; sid:1096906; rev:2; \
+reference:url,unit42.paloaltonetworks.com/infiltration-of-global-telecom-networks/)

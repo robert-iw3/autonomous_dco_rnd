@@ -1,0 +1,30 @@
+[Unit]
+Description=Sentinel Nexus Autonomous LLM Hunter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+WorkingDirectory=/opt/sentinel-nexus/analytics/llm_hunter
+EnvironmentFile=/opt/sentinel-nexus/nexus.env
+Environment=NEXUS_CONFIG=/opt/sentinel-nexus/config/nexus.toml
+ExecStart=/usr/bin/python3 /opt/sentinel-nexus/analytics/llm_hunter/hunter.py
+
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=3
+StartLimitIntervalSec=120
+
+MemoryMax=1G
+CPUQuota=100%
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/sentinel-nexus/analytics/llm_hunter/data
+
+[Install]
+WantedBy=multi-user.target

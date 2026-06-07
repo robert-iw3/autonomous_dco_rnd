@@ -1,0 +1,56 @@
+title: SharePoint Webshell Execution via Encoded PowerShell from w3wp.exe
+id: 46a17355-d1d2-478f-a99f-df0125dfcba1
+status: experimental
+description: |
+  Detects suspicious PowerShell execution via cmd.exe spawned by w3wp.exe (IIS worker process),
+  using encoded payloads that decode to indicators like 'spinstall0', '.aspx', or SharePoint layouts paths.
+  This technique has been observed in post-exploitation of SharePoint CVEs (CVE-2025-53770).
+author: RW
+date: 2025-07-21
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    ParentImage|endswith: '\w3wp.exe'
+    InitiatingProcessCommandLine|contains|all:
+      - 'w3wp.exe'
+    InitiatingProcessCommandLine|contains|none:
+      - 'DefaultAppPool'
+    Image|endswith: '\cmd.exe'
+    CommandLine|contains|all:
+      - 'cmd.exe'
+      - 'powershell'
+    CommandLine|contains|any:
+      - '-EncodedCommand'
+      - '-ec'
+      - '/enc'
+      - '/EncodedCommand'
+  condition: selection
+falsepositives:
+  - Developers or admin scripts using encoded PowerShell legitimately under IIS
+level: high
+tags:
+  - attack.execution
+  - attack.t1059.001
+  - attack.defense_evasion
+  - attack.t1140
+  - sharepoint
+  - cve.2025.53770
+  - webshell
+  - detection.lolbin
+references:
+  - https://msrc.microsoft.com/blog/2025/07/customer-guidance-for-sharepoint-vulnerability-cve-2025-53770/
+fields:
+  - Timestamp
+  - DeviceName
+  - FileName
+  - FolderPath
+  - ProcessCommandLine
+  - InitiatingProcessFileName
+  - InitiatingProcessCommandLine
+  - ReportId
+x_mitre_data_sources:
+  - Process command-line parameters
+  - Process metadata
+  - Base64-decoded PowerShell payloads (custom extraction)

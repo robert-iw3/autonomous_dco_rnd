@@ -1,0 +1,210 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720" font-family="'JetBrains Mono', 'Fira Code', 'SF Mono', monospace">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#22c55e"/>
+    </marker>
+    <linearGradient id="kernel-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="rust-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c0a09"/>
+      <stop offset="100%" stop-color="#1c1917"/>
+    </linearGradient>
+    <linearGradient id="python-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#052e16"/>
+      <stop offset="100%" stop-color="#14532d"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="720" fill="#09090b" rx="8"/>
+
+  <!-- Title -->
+  <text x="550" y="36" text-anchor="middle" fill="#f8fafc" font-size="16" font-weight="700" letter-spacing="3">C2 SENSOR -- SYSTEM ARCHITECTURE</text>
+  <line x1="350" y1="46" x2="750" y2="46" stroke="#334155" stroke-width="1"/>
+
+  <!-- ═══ KERNEL SPACE ═══ -->
+  <rect x="30" y="60" width="1040" height="175" rx="6" fill="url(#kernel-bg)" stroke="#4338ca" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="82" fill="#a5b4fc" font-size="10" font-weight="600" letter-spacing="2">KERNEL SPACE</text>
+
+  <!-- Tracepoints -->
+  <rect x="50" y="95" width="200" height="125" rx="4" fill="#1e1b4b" stroke="#6366f1" stroke-width="1"/>
+  <text x="150" y="115" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">Tracepoints</text>
+  <text x="60" y="133" fill="#94a3b8" font-size="9">sys_enter_execve</text>
+  <text x="60" y="148" fill="#94a3b8" font-size="9">sys_enter_openat</text>
+  <text x="60" y="163" fill="#94a3b8" font-size="9">sys_enter_memfd_create</text>
+  <text x="60" y="183" fill="#818cf8" font-size="9" font-weight="600">Filtered: PID>100, !trusted</text>
+  <text x="60" y="198" fill="#818cf8" font-size="9" font-weight="600">openat: sensitive paths only</text>
+
+  <!-- Kprobes -->
+  <rect x="270" y="95" width="200" height="125" rx="4" fill="#1e1b4b" stroke="#6366f1" stroke-width="1"/>
+  <text x="370" y="115" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">Kprobes</text>
+  <text x="280" y="133" fill="#94a3b8" font-size="9">tcp_v4_connect / tcp_v6_connect</text>
+  <text x="280" y="148" fill="#94a3b8" font-size="9">tcp_sendmsg / tcp_recvmsg</text>
+  <text x="280" y="163" fill="#94a3b8" font-size="9">udp_sendmsg / udp_recvmsg</text>
+  <text x="280" y="183" fill="#818cf8" font-size="9" font-weight="600">Payload: DNS (port 53)</text>
+  <text x="280" y="198" fill="#818cf8" font-size="9" font-weight="600">Payload: HTTP(S) 80/443/8080</text>
+
+  <!-- Ring Buffer -->
+  <rect x="500" y="110" width="130" height="95" rx="4" fill="#312e81" stroke="#818cf8" stroke-width="1.5" filter="url(#glow)"/>
+  <text x="565" y="140" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="700">RING BUFFER</text>
+  <text x="565" y="158" text-anchor="middle" fill="#a5b4fc" font-size="9">1 MB mmap</text>
+  <text x="565" y="173" text-anchor="middle" fill="#a5b4fc" font-size="9">struct event_t</text>
+  <text x="565" y="188" text-anchor="middle" fill="#a5b4fc" font-size="9">160 bytes/event</text>
+
+  <!-- XDP -->
+  <rect x="660" y="95" width="170" height="125" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="1"/>
+  <text x="745" y="115" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600">XDP Enforcement</text>
+  <text x="670" y="135" fill="#f87171" font-size="9">xdp_drop_malicious</text>
+  <text x="670" y="155" fill="#94a3b8" font-size="9">blocklist_v4  LRU_HASH</text>
+  <text x="670" y="170" fill="#94a3b8" font-size="9">blocklist_v6  LRU_HASH</text>
+  <text x="670" y="190" fill="#fca5a5" font-size="9" font-weight="600">Wire-speed DROP on match</text>
+  <text x="670" y="205" fill="#fca5a5" font-size="9" font-weight="600">+ bpf_send_signal(SIGKILL)</text>
+
+  <!-- Interval Maps -->
+  <rect x="860" y="95" width="190" height="125" rx="4" fill="#1e1b4b" stroke="#6366f1" stroke-width="1"/>
+  <text x="955" y="115" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">State Maps</text>
+  <text x="870" y="135" fill="#94a3b8" font-size="9">last_seen_ts    LRU_HASH</text>
+  <text x="870" y="150" fill="#94a3b8" font-size="9">trusted_pids    LRU_HASH</text>
+  <text x="870" y="165" fill="#94a3b8" font-size="9">drop_metrics    PERCPU_ARRAY</text>
+  <text x="870" y="185" fill="#818cf8" font-size="9" font-weight="600">Interval Δ computed in-kernel</text>
+  <text x="870" y="200" fill="#818cf8" font-size="9" font-weight="600">per (PID, dst_addr) pair</text>
+
+  <!-- Arrows: Tracepoints/Kprobes → Ring Buffer -->
+  <line x1="250" y1="155" x2="498" y2="155" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="470" y1="155" x2="498" y2="155" stroke="#64748b" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- ═══ USERSPACE -- RUST ═══ -->
+  <rect x="30" y="250" width="1040" height="195" rx="6" fill="url(#rust-bg)" stroke="#78716c" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="272" fill="#d6d3d1" font-size="10" font-weight="600" letter-spacing="2">USERSPACE -- RUST</text>
+
+  <!-- Telemetry Ingest -->
+  <rect x="50" y="285" width="220" height="145" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1"/>
+  <text x="160" y="305" text-anchor="middle" fill="#fed7aa" font-size="11" font-weight="600">telemetry_ingest</text>
+  <text x="60" y="323" fill="#94a3b8" font-size="9">RawEvent → KernelEvent parse</text>
+  <text x="60" y="338" fill="#94a3b8" font-size="9">SHA256 process hashing (LRU)</text>
+  <text x="60" y="353" fill="#94a3b8" font-size="9">Shannon entropy computation</text>
+  <text x="60" y="368" fill="#94a3b8" font-size="9">DNS wire format → domain string</text>
+  <text x="60" y="383" fill="#94a3b8" font-size="9">Welford's online aggregation</text>
+  <text x="60" y="398" fill="#94a3b8" font-size="9">crossbeam 100K bounded channel</text>
+  <text x="60" y="415" fill="#f97316" font-size="9" font-weight="600">Batch INSERT (500 events/tx)</text>
+
+  <!-- SQLite -->
+  <rect x="310" y="295" width="160" height="125" rx="4" fill="#1a1a2e" stroke="#eab308" stroke-width="1.5" filter="url(#glow)"/>
+  <text x="390" y="318" text-anchor="middle" fill="#fef08a" font-size="12" font-weight="700">SQLite WAL</text>
+  <text x="390" y="336" text-anchor="middle" fill="#fde047" font-size="9">baseline.db</text>
+  <text x="320" y="356" fill="#94a3b8" font-size="9">flows (telemetry)</text>
+  <text x="320" y="371" fill="#94a3b8" font-size="9">mitigations (defense)</text>
+  <text x="320" y="386" fill="#94a3b8" font-size="9">ueba_*_profiles</text>
+  <text x="320" y="401" fill="#94a3b8" font-size="9">flow_volumes (exfil)</text>
+  <text x="320" y="416" fill="#94a3b8" font-size="9">allowlist (hashes)</text>
+
+  <!-- Core Hunter -->
+  <rect x="510" y="285" width="210" height="145" rx="4" fill="#1c1917" stroke="#a855f7" stroke-width="1"/>
+  <text x="615" y="305" text-anchor="middle" fill="#d8b4fe" font-size="11" font-weight="600">core_hunter</text>
+  <text x="520" y="323" fill="#94a3b8" font-size="9">Process tree reconstruction</text>
+  <text x="520" y="338" fill="#94a3b8" font-size="9">7-rule heuristic engine:</text>
+  <text x="530" y="353" fill="#94a3b8" font-size="8">R1: Encrypted payload (entropy)</text>
+  <text x="530" y="366" fill="#94a3b8" font-size="8">R2: Beacon interval analysis</text>
+  <text x="530" y="379" fill="#94a3b8" font-size="8">R3: LOLBin detection</text>
+  <text x="530" y="392" fill="#94a3b8" font-size="8">R4: DNS tunneling  R5: DGA/NXDOMAIN</text>
+  <text x="530" y="405" fill="#94a3b8" font-size="8">R6: Masquerading  R7: Exfiltration</text>
+  <text x="520" y="422" fill="#a855f7" font-size="9" font-weight="600">MITRE ATT&amp;CK mapping per row</text>
+
+  <!-- Active Defender -->
+  <rect x="760" y="285" width="200" height="145" rx="4" fill="#1c1917" stroke="#ef4444" stroke-width="1"/>
+  <text x="860" y="305" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600">active_defender</text>
+  <text x="770" y="323" fill="#94a3b8" font-size="9">Polls score ≥ threshold</text>
+  <text x="770" y="338" fill="#94a3b8" font-size="9">SIGKILL via nix::signal</text>
+  <text x="770" y="353" fill="#94a3b8" font-size="9">XDP map mutation (v4 + v6)</text>
+  <text x="770" y="368" fill="#94a3b8" font-size="9">Persisted mitigation history</text>
+  <text x="770" y="383" fill="#94a3b8" font-size="9">Restored on restart</text>
+  <text x="770" y="403" fill="#ef4444" font-size="9" font-weight="600">DRY-RUN or ACTIVE mode</text>
+  <text x="770" y="418" fill="#ef4444" font-size="9" font-weight="600">via config.toml threshold</text>
+
+  <!-- Arrows: Ring Buffer → Ingest -->
+  <line x1="565" y1="207" x2="160" y2="283" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Arrows: Ingest → SQLite -->
+  <line x1="272" y1="360" x2="308" y2="360" stroke="#eab308" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Arrows: SQLite → Core Hunter -->
+  <line x1="472" y1="360" x2="508" y2="360" stroke="#a855f7" stroke-width="1" marker-end="url(#arrow)"/>
+  <!-- Arrows: SQLite → Active Defender -->
+  <line x1="472" y1="390" x2="758" y2="390" stroke="#ef4444" stroke-width="1" marker-end="url(#arrow-red)"/>
+  <!-- Arrows: Active Defender → XDP maps (up to kernel) -->
+  <line x1="860" y1="283" x2="745" y2="222" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-red)"/>
+  <text x="820" y="255" fill="#fca5a5" font-size="8" transform="rotate(-35,820,255)">map inject</text>
+
+  <!-- ═══ USERSPACE -- PYTHON ═══ -->
+  <rect x="30" y="460" width="540" height="120" rx="6" fill="url(#python-bg)" stroke="#22c55e" stroke-width="1" opacity="0.9"/>
+  <text x="50" y="482" fill="#86efac" font-size="10" font-weight="600" letter-spacing="2">USERSPACE -- PYTHON ML</text>
+
+  <!-- Baseline Learner -->
+  <rect x="50" y="493" width="240" height="75" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="170" y="513" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">baseline_learner</text>
+  <text x="60" y="530" fill="#94a3b8" font-size="9">UEBA profiling (uid|proc|prefix|hour|day)</text>
+  <text x="60" y="545" fill="#94a3b8" font-size="9">IsolationForest per-profile fitting</text>
+  <text x="60" y="560" fill="#94a3b8" font-size="9">False-positive suppression (stability&gt;0.85)</text>
+
+  <!-- BeaconML -->
+  <rect x="310" y="493" width="240" height="75" rx="4" fill="#14532d" stroke="#4ade80" stroke-width="1"/>
+  <text x="430" y="513" text-anchor="middle" fill="#bbf7d0" font-size="11" font-weight="600">BeaconML</text>
+  <text x="320" y="530" fill="#94a3b8" font-size="9">K-Means (adaptive k via silhouette)</text>
+  <text x="320" y="545" fill="#94a3b8" font-size="9">DBSCAN (ε from k-NN 90th percentile)</text>
+  <text x="320" y="560" fill="#94a3b8" font-size="9">3D: interval × entropy × packet CV</text>
+
+  <!-- Arrows: SQLite → Python -->
+  <line x1="390" y1="422" x2="170" y2="491" stroke="#22c55e" stroke-width="1" marker-end="url(#arrow-green)"/>
+  <line x1="390" y1="422" x2="430" y2="491" stroke="#22c55e" stroke-width="1" marker-end="url(#arrow-green)"/>
+
+  <!-- ═══ API + DASHBOARD ═══ -->
+  <rect x="600" y="460" width="470" height="120" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1" opacity="0.9"/>
+  <text x="620" y="482" fill="#93c5fd" font-size="10" font-weight="600" letter-spacing="2">API + DASHBOARD</text>
+
+  <!-- API Server -->
+  <rect x="620" y="493" width="200" height="75" rx="4" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+  <text x="720" y="513" text-anchor="middle" fill="#bfdbfe" font-size="11" font-weight="600">api_server (Axum)</text>
+  <text x="630" y="530" fill="#94a3b8" font-size="9">TLS + JWT auth + rate limiting</text>
+  <text x="630" y="545" fill="#94a3b8" font-size="9">/api/v2/metrics</text>
+  <text x="630" y="560" fill="#94a3b8" font-size="9">/api/v2/anomalies + /profiles</text>
+
+  <!-- Dashboard -->
+  <rect x="840" y="493" width="210" height="75" rx="4" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+  <text x="945" y="513" text-anchor="middle" fill="#bfdbfe" font-size="11" font-weight="600">Dashboard (Chart.js)</text>
+  <text x="850" y="530" fill="#94a3b8" font-size="9">Summary metrics + hourly dist.</text>
+  <text x="850" y="545" fill="#94a3b8" font-size="9">Deep drill-down (MITRE, tree)</text>
+  <text x="850" y="560" fill="#94a3b8" font-size="9">ML confidence tracking</text>
+
+  <!-- Arrow: SQLite → API -->
+  <line x1="472" y1="400" x2="618" y2="530" stroke="#3b82f6" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- ═══ NEXUS FORWARDER ═══ -->
+  <rect x="30" y="600" width="540" height="95" rx="6" fill="#1a1523" stroke="#8b5cf6" stroke-width="1" opacity="0.8"/>
+  <text x="50" y="622" fill="#c4b5fd" font-size="10" font-weight="600" letter-spacing="2">OFF-SENSOR FORWARDING</text>
+  <rect x="50" y="633" width="500" height="50" rx="4" fill="#2e1065" stroke="#7c3aed" stroke-width="1"/>
+  <text x="300" y="653" text-anchor="middle" fill="#ddd6fe" font-size="11" font-weight="600">nexus_forwarder → Parquet Spool → NATS JetStream</text>
+  <text x="300" y="670" text-anchor="middle" fill="#94a3b8" font-size="9">Async extraction (10s cycle) · Snappy compression · Sensor metadata embedding · Exponential backoff</text>
+
+  <!-- Arrow: SQLite → Nexus -->
+  <line x1="390" y1="422" x2="300" y2="631" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+  <!-- ═══ CONTAINER BOUNDARY ═══ -->
+  <rect x="600" y="610" width="470" height="85" rx="6" fill="#0a0a0a" stroke="#475569" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="620" y="632" fill="#64748b" font-size="10" font-weight="600" letter-spacing="2">CONTAINER ORCHESTRATION</text>
+  <text x="620" y="652" fill="#94a3b8" font-size="9">c2-sensor-core: eBPF + Rust daemons + Python ML (host network, host PID)</text>
+  <text x="620" y="667" fill="#94a3b8" font-size="9">c2-api-dashboard: Axum API + static UI (port-mapped, non-root)</text>
+  <text x="620" y="682" fill="#94a3b8" font-size="9">Podman/Docker · CAP_BPF + CAP_NET_ADMIN + CAP_SYS_ADMIN · SQLite WAL shared volume</text>
+
+  <!-- Legend -->
+  <text x="50" y="710" fill="#475569" font-size="8">■ Kernel eBPF    ■ Rust Userspace    ■ Python ML    ■ API/UI    ── Data Flow    - - Enforcement/Async</text>
+</svg>

@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 950" width="100%" height="100%">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b0bec5" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#80d8ff" />
+    </marker>
+    <marker id="arrow-pink" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f48fb1" />
+    </marker>
+  </defs>
+
+  <style>
+    .box { rx: 6px; ry: 6px; stroke-width: 1.5; }
+    .sensor { fill: #1a237e; stroke: #3f51b5; }
+    .proxy { fill: #e65100; stroke: #ffb300; }
+    .ingress { fill: #004d40; stroke: #1de9b6; }
+    .nats { fill: #311b92; stroke: #b388ff; }
+    .worker-math { fill: #00695c; stroke: #80cbc4; }
+    .worker-rules { fill: #880e4f; stroke: #f48fb1; }
+    .worker-cold { fill: #37474f; stroke: #90a4ae; }
+    .qdrant { fill: #0d47a1; stroke: #82b1ff; }
+    .redis { fill: #b71c1c; stroke: #ff8a80; }
+    .s3 { fill: #006064; stroke: #84ffff; }
+    .hunter { fill: #bf360c; stroke: #ffab91; }
+
+    .text-title { fill: #ffffff; font-family: sans-serif; font-size: 15px; font-weight: bold; text-anchor: middle; }
+    .text-sub { fill: #cfd8dc; font-family: sans-serif; font-size: 12px; text-anchor: middle; }
+
+    .annotation-box { fill: rgba(105, 240, 174, 0.05); stroke: #69f0ae; stroke-width: 1.5; stroke-dasharray: 4,4; rx: 4px; ry: 4px; }
+    .annotation-text { fill: #69f0ae; font-family: monospace; font-size: 11px; font-weight: 600; }
+    .annotation-text-pink { fill: #f48fb1; font-family: monospace; font-size: 11px; font-weight: 600; }
+
+    .line { stroke: #b0bec5; stroke-width: 2; fill: none; }
+    .line-blue { stroke: #80d8ff; stroke-width: 2; stroke-dasharray: 4,4; fill: none; }
+    .line-pink { stroke: #f48fb1; stroke-width: 2; stroke-dasharray: 4,4; fill: none; }
+    .header { font-family: sans-serif; font-size: 24px; font-weight: bold; fill: #ffffff; text-anchor: middle; }
+  </style>
+
+  <text x="500" y="40" class="header">Sentinel Nexus: The Autonomous Triad Pipeline</text>
+
+  <rect x="20" y="80" width="180" height="60" class="box sensor" />
+  <text x="110" y="105" class="text-title">Endpoint Fleet (Rust)</text>
+  <text x="110" y="125" class="text-sub">Sentinel (5D) &amp; C2 (8D)</text>
+  <rect x="20" y="145" width="180" height="40" class="annotation-box" />
+  <text x="30" y="160" class="annotation-text">✓ eBPF Ring-0 Probes</text>
+  <text x="30" y="175" class="annotation-text">✓ ZSTD Parquet Gen</text>
+
+  <rect x="240" y="80" width="180" height="60" class="box proxy" />
+  <text x="330" y="105" class="text-title">HAProxy Edge</text>
+  <text x="330" y="125" class="text-sub">L4 Load Balancer</text>
+  <rect x="240" y="145" width="180" height="40" class="annotation-box" />
+  <text x="250" y="160" class="annotation-text">✓ TLS 1.3 Termination</text>
+  <text x="250" y="175" class="annotation-text">✓ DDoS Shielding</text>
+
+  <rect x="460" y="80" width="240" height="60" class="box ingress" />
+  <text x="580" y="105" class="text-title">Core Ingress Fleet</text>
+  <text x="580" y="125" class="text-sub">Axum Zero-Trust Gateway</text>
+  <rect x="460" y="145" width="240" height="55" class="annotation-box" />
+  <text x="470" y="160" class="annotation-text">✓ Cryptographic JWT Check</text>
+  <text x="470" y="175" class="annotation-text">✓ Binary Schema Neutrality</text>
+  <text x="470" y="190" class="annotation-text">✓ NATS Topic Routing</text>
+
+  <rect x="300" y="260" width="450" height="60" class="box nats" />
+  <text x="525" y="285" class="text-title">NATS JetStream Cluster</text>
+  <text x="525" y="305" class="text-sub">Persistent High-Velocity Binary Bus</text>
+  <rect x="300" y="325" width="450" height="40" class="annotation-box" />
+  <text x="310" y="340" class="annotation-text">✓ Immutable Parquet Streams</text>
+  <text x="310" y="355" class="annotation-text">✓ Parallel Fan-Out Consumer Groups (Math, Rules, S3)</text>
+
+  <rect x="60" y="440" width="240" height="50" class="box worker-math" />
+  <text x="180" y="460" class="text-title">Worker: Qdrant</text>
+  <text x="180" y="478" class="text-sub">Layer 1: Math Tripwires</text>
+  <rect x="60" y="495" width="240" height="40" class="annotation-box" />
+  <text x="70" y="510" class="annotation-text">✓ In-Flight Normalization</text>
+  <text x="70" y="525" class="annotation-text">✓ Magnitude Safety Bounds</text>
+
+  <rect x="360" y="440" width="260" height="50" class="box worker-rules" />
+  <text x="490" y="460" class="text-title">Worker: Rules Engine</text>
+  <text x="490" y="478" class="text-sub">Layer 2: Deterministic Engine</text>
+  <rect x="360" y="495" width="260" height="40" class="annotation-box" style="stroke:#f48fb1;" />
+  <text x="370" y="510" class="annotation-text-pink">✓ Zero-Copy Sigma Strings</text>
+  <text x="370" y="525" class="annotation-text-pink">✓ In-Memory Parquet Parsing</text>
+
+  <rect x="680" y="440" width="240" height="50" class="box worker-cold" />
+  <text x="800" y="460" class="text-title">Worker: S3 Archive</text>
+  <text x="800" y="478" class="text-sub">Cold Forensic Lake Spooling</text>
+  <rect x="680" y="495" width="240" height="40" class="annotation-box" />
+  <text x="690" y="510" class="annotation-text">✓ Immutable Batch Spooling</text>
+  <text x="690" y="525" class="annotation-text">✓ Golden Dataset Foundation</text>
+
+  <rect x="60" y="580" width="240" height="60" class="box qdrant" />
+  <text x="180" y="605" class="text-title">Qdrant Vector DB</text>
+  <text x="180" y="625" class="text-sub">Unknown Unknowns (Math)</text>
+  <rect x="60" y="645" width="240" height="40" class="annotation-box" />
+  <text x="70" y="660" class="annotation-text">✓ Named Vectors (5D/8D)</text>
+  <text x="70" y="675" class="annotation-text">✓ Memory-Mapped HNSW</text>
+
+  <rect x="360" y="580" width="260" height="60" class="box redis" />
+  <text x="490" y="605" class="text-title">Redis Cluster</text>
+  <text x="490" y="625" class="text-sub">Known Unknowns (Rules)</text>
+  <rect x="360" y="645" width="260" height="40" class="annotation-box" style="stroke:#ff8a80; fill:rgba(255,138,128,0.05);" />
+  <text x="370" y="660" style="fill:#ff8a80; font-family:monospace; font-size:11px; font-weight:600;">✓ High-Speed FIFO Queue</text>
+  <text x="370" y="675" style="fill:#ff8a80; font-family:monospace; font-size:11px; font-weight:600;">✓ Exact Match Alert State</text>
+
+  <rect x="680" y="580" width="240" height="60" class="box s3" />
+  <text x="800" y="605" class="text-title">AWS S3 / MinIO</text>
+  <text x="800" y="625" class="text-sub">Historical Data Lake</text>
+
+  <rect x="150" y="760" width="440" height="60" class="box hunter" />
+  <text x="370" y="785" class="text-title">LLM Hunter Fleet (Python)</text>
+  <text x="370" y="805" class="text-sub">Layer 3: Agentic Closer &amp; Attack Graph Builder</text>
+  <rect x="150" y="825" width="440" height="70" class="annotation-box" style="stroke:#ffab91; fill:rgba(255,171,145,0.05);" />
+  <text x="160" y="845" style="fill:#ffab91; font-family:monospace; font-size:12px; font-weight:600;">✓ Consumes Math Anchors AND Sigma Alerts</text>
+  <text x="160" y="863" style="fill:#ffab91; font-family:monospace; font-size:12px; font-weight:600;">✓ Time-Bounded Network Pivot (±5 Minutes)</text>
+  <text x="160" y="881" style="fill:#ffab91; font-family:monospace; font-size:12px; font-weight:600;">✓ Generates Zero-Hallucination C2 Attack Graphs</text>
+
+  <path d="M 200 110 L 240 110" class="line" marker-end="url(#arrow)" />
+  <path d="M 420 110 L 460 110" class="line" marker-end="url(#arrow)" />
+  <path d="M 580 205 L 580 260" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 450 365 L 180 440" class="line-blue" marker-end="url(#arrow-blue)" />
+  <path d="M 525 365 L 490 440" class="line-pink" marker-end="url(#arrow-pink)" />
+  <path d="M 600 365 L 800 440" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 180 535 L 180 580" class="line-blue" marker-end="url(#arrow-blue)" />
+  <path d="M 490 535 L 490 580" class="line-pink" marker-end="url(#arrow-pink)" />
+  <path d="M 800 535 L 800 580" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 180 685 L 260 760" class="line-blue" marker-end="url(#arrow-blue)" />
+  <path d="M 490 685 L 410 760" class="line-pink" marker-end="url(#arrow-pink)" />
+</svg>

@@ -1,0 +1,97 @@
+# =============================================================================
+# APT42 (Charming Kitten / TA453 / Mint Sandstorm / Yellow Garuda)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT42 PowerLess Backdoor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "PowerLess backdoor dynamically compiling AES decryption routines for C2"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "System.Security.Cryptography.AesCryptoServiceProvider"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+      exclude_actor_cmd:
+        - "*chocolatey*"
+
+- ttp_signature:
+    name: "APT42 Plink Reverse SSH Tunneling"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "APT42 utilizing Plink to establish a reverse SSH tunnel for persistent RDP access"
+    match:
+      actor: "plink.exe"
+      type: "PROCESS_START"
+      target: "-N -R"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT42 Ngrok RDP Port Forwarding"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy: External Proxy (T1090.002)"
+      procedure: "Execution of Ngrok to expose local RDP (3389) to actor-controlled infrastructure"
+    match:
+      actor: "ngrok.exe"
+      type: "PROCESS_START"
+      target: "tcp 3389"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT42 Browser Credential Database Theft"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "Credentials from Password Stores: Web Credentials (T1555.003)"
+      procedure: "PowerShell script copying Chromium Login Data and Cookies databases for exfiltration"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "\\User Data\\Default\\Login Data"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "APT42 AnyDesk RMM Silent Deployment"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Remote Access Software (T1219)"
+      procedure: "Silent installation of AnyDesk via MSIExec for persistent graphical remote access"
+    match:
+      actor: "msiexec.exe"
+      type: "PROCESS_START"
+      target: "AnyDesk.msi /q"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "APT42 VBScript Startup Persistence (TameCat)"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder (T1547.001)"
+      procedure: "WScript executing a malicious VBS dropper staged in the Windows Startup folder"
+    match:
+      actor: "wscript.exe"
+      type: "PROCESS_START"
+      target: "\\Start Menu\\Programs\\Startup\\"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"

@@ -1,0 +1,22 @@
+# Linux Sentinel Forensic Workbench - Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8443
+  ssl_keyfile: "/certs/dashboard_key.pem"
+  ssl_certfile: "/certs/dashboard_cert.pem"
+
+database:
+  # The read-only eBPF kernel telemetry database
+  core_db_path: "/var/log/linux-sentinel/sentinel.db"
+  # The read-write user authentication database
+  auth_db_path: "/app/data/auth.db"
+
+security:
+  jwt_secret_key: "c1704211db9110332cc6378e509bb68db20db17cfefd34990138a30836a7de863800bc369ef24d3d9275295d469d1499"
+  jwt_algorithm: "HS256"
+  access_token_expire_minutes: 60
+
+  # Security Headers
+  cors_origins: ["*"]
+  frame_options: "DENY"

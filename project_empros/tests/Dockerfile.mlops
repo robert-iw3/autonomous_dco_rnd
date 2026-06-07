@@ -1,0 +1,72 @@
+# SECTION: mlops
+# Tests:   test_turbovec_mlops, test_data_flow, test_track6_dryrun,
+#          test_s3_query_alignment, test_cross_source_temporal,
+#          test_worker_ti_ingest, mlops_eval_minilab/
+# Deps:    pytest, numpy, pandas, pyarrow, duckdb, fakeredis, safetensors,
+#          torch (CPU), requests, qdrant-client, rich, python-dotenv
+#   docker build -f project_empros/tests/Dockerfile.mlops -t nexus-test-mlops .
+#
+# NOTE: Uses python:3.12-slim (Debian/glibc) instead of Alpine because PyTorch
+#       CPU wheels link against glibc symbols (pthread_attr_setaffinity_np) that
+#       musl libc does not provide even with gcompat.
+FROM docker.io/python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libffi-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_DATASETS_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+
+# Layer 1 -- test framework + lightweight
+RUN pip install --no-cache-dir \
+    "pytest>=7.4.0" \
+    "numpy>=2.0.0" \
+    "PyYAML>=6.0" \
+    "pandas>=2.2.0" \
+    "pyarrow>=16.0.0" \
+    "duckdb>=0.10.2" \
+    "fakeredis>=2.20.0" \
+    "redis>=5.0.0" \
+    "requests>=2.31.0" \
+    "pydantic>=2.7.1" \
+    "qdrant-client>=1.9.0" \
+    "rich>=13.0.0" \
+    "python-dotenv>=1.0.0"
+
+# Layer 2 -- serialization
+RUN pip install --no-cache-dir "safetensors>=0.4.2"
+
+# Layer 3 -- PyTorch CPU
+RUN pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    "torch>=2.3.0"
+
+COPY project_empros/mlops/                                  /repo/project_empros/mlops/
+COPY project_empros/services/worker_ti_ingest/              /repo/project_empros/services/worker_ti_ingest/
+COPY project_empros/adversarial_corpus_templates/           /repo/project_empros/adversarial_corpus_templates/
+COPY project_empros/tests/test_turbovec_mlops.py            /repo/project_empros/tests/
+COPY project_empros/tests/test_data_flow.py                 /repo/project_empros/tests/
+COPY project_empros/tests/test_track6_dryrun.py             /repo/project_empros/tests/
+COPY project_empros/tests/test_s3_query_alignment.py        /repo/project_empros/tests/
+COPY project_empros/tests/test_cross_source_temporal.py     /repo/project_empros/tests/
+COPY project_empros/tests/test_worker_ti_ingest.py          /repo/project_empros/tests/
+COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py  /repo/project_empros/tests/lab_mlops_train/
+COPY project_empros/tests/mlops_eval_minilab/               /repo/project_empros/tests/mlops_eval_minilab/
+COPY project_empros/tests/pytest.ini                        /repo/project_empros/tests/
+
+ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/test_turbovec_mlops.py", \
+     "tests/test_data_flow.py", \
+     "tests/test_track6_dryrun.py", \
+     "tests/test_s3_query_alignment.py", \
+     "tests/test_cross_source_temporal.py", \
+     "tests/test_worker_ti_ingest.py", \
+     "tests/lab_mlops_train/test_rsi_loop.py", \
+     "tests/mlops_eval_minilab/", \
+     "-v", "--tb=short", "-m", "not s3_live", "--junit-xml=/reports/mlops.xml"]

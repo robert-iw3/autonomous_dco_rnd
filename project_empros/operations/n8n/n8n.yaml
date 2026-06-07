@@ -1,0 +1,15 @@
+http:
+  routers:
+    n8n:
+      entryPoints: ["websecure"]
+      rule: "Host(`n8n.nexus`)"
+      middlewares:
+        - authentik-auth
+        - n8n-headers
+      service: n8n
+      tls: {}
+  services:
+    n8n:
+      loadBalancer:
+        servers:
+          - url: "http://n8n:5678"

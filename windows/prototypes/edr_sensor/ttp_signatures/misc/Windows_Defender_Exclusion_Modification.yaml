@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "Windows Defender Exclusion Modification"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Impair Defenses: Disable or Modify Tools (T1562.001)"
+      procedure: "PowerShell adding exclusions to Windows Defender (GRU Unit 29155)"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "Set-MpPreference -ExclusionPath"

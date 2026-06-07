@@ -1,0 +1,5 @@
+alert dns $HOME_NET any -> any any (msg:"TROJAN UKC-1230 (Comburglar) C2 DNS Query (techdataservice.us)"; flow:to_server; dns.query; \
+content:"techdataservice.us"; nocase; endswith; fast_pattern; reference:url,https://www.blackhillsinfosec.com/the-curious-case-of-the-comburglar/; \
+classtype:trojan-activity; sid:1000005; rev:1; metadata: author RW, created_at 2026-01-10, updated_at 2026-01-10, attack_target Client_Endpoint, \
+confidence High, deployment Perimeter, fp_note Known_malicious_C2_domain, malware_family Comburglar, signature_severity Major, \
+tag C2, tag UKC_1230, mitre_tactic_id TA0011, mitre_tactic_name Command_and_Control, mitre_technique_id T1071.004, mitre_technique_name Application_Layer_Protocol_DNS;)

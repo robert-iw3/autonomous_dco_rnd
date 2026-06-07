@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 950" width="100%" height="100%" style="background-color: #050505; font-family: 'Inter', sans-serif;">
+  <defs>
+    <style>
+      .title { font-family: 'Fira Code', monospace; fill: #ec4899; font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+      .box { fill: #0f172a; stroke-width: 2px; rx: 6px; }
+      .box-input { stroke: #a855f7; }
+      .box-extract { stroke: #3b82f6; }
+      .box-state { stroke: #f59e0b; }
+      .box-ml { stroke: #ec4899; }
+      .box-db { stroke: #4ade80; }
+      .box-alert { stroke: #ef4444; }
+      .text-title { fill: #f8fafc; font-size: 13px; font-weight: bold; }
+      .text-tech { fill: #38bdf8; font-size: 11px; font-family: 'Fira Code', monospace; }
+      .text-desc { fill: #94a3b8; font-size: 10px; font-family: 'Fira Code', monospace; }
+      .zone-label { fill: #475569; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+      .link-flow { fill: none; stroke: #06b6d4; stroke-width: 2.5px; }
+      .link-alert { fill: none; stroke: #ef4444; stroke-width: 2.5px; }
+    </style>
+    <marker id="arrow-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+    </marker>
+    <marker id="arrow-alert" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+    </marker>
+  </defs>
+
+  <text x="50" y="50" class="title">UEBA / ML PIPELINE: ALGORITHMIC DATA FLOW</text>
+
+  <g transform="translate(450, 80)">
+    <rect width="200" height="60" class="box box-input" />
+    <text x="100" y="25" class="text-title" text-anchor="middle">Raw Kernel Event</text>
+    <text x="100" y="45" class="text-desc" text-anchor="middle">Deserialized sys_enter context</text>
+  </g>
+  <path d="M 550 140 L 550 180" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <text x="50" y="200" class="zone-label">Phase 1: Real-Time Feature Extraction</text>
+  <rect x="40" y="210" width="1020" height="90" fill="#0a0a0a" stroke="#1e293b" stroke-dasharray="4 4" rx="8" />
+
+  <path d="M 160 180 L 940 180" class="link-flow" />
+  <path d="M 160 180 L 160 220" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 420 180 L 420 220" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 680 180 L 680 220" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 940 180 L 940 220" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <g transform="translate(60, 220)">
+    <rect width="200" height="70" class="box box-extract" />
+    <text x="100" y="25" class="text-title" text-anchor="middle">Execution Velocity</text>
+    <text x="100" y="45" class="text-tech" text-anchor="middle">ΔT = T_current - T_prev</text>
+    <text x="100" y="60" class="text-desc" text-anchor="middle">Calculated in nanoseconds</text>
+  </g>
+  <g transform="translate(320, 220)">
+    <rect width="200" height="70" class="box box-extract" />
+    <text x="100" y="25" class="text-title" text-anchor="middle">Shannon Entropy</text>
+    <text x="100" y="45" class="text-tech" text-anchor="middle">H(X) = -Σ P(x) log P(x)</text>
+    <text x="100" y="60" class="text-desc" text-anchor="middle">Analyzes Command Line strings</text>
+  </g>
+  <g transform="translate(580, 220)">
+    <rect width="200" height="70" class="box box-extract" />
+    <text x="100" y="25" class="text-title" text-anchor="middle">Path Depth</text>
+    <text x="100" y="45" class="text-tech" text-anchor="middle">depth = path.matches('/').count()</text>
+    <text x="100" y="60" class="text-desc" text-anchor="middle">Identifies deep directory hiding</text>
+  </g>
+  <g transform="translate(840, 220)">
+    <rect width="200" height="70" class="box box-extract" />
+    <text x="100" y="25" class="text-title" text-anchor="middle">Network Fanout</text>
+    <text x="100" y="45" class="text-tech" text-anchor="middle">HyperLogLog Sketch (64B)</text>
+    <text x="100" y="60" class="text-desc" text-anchor="middle">Estimates distinct target IPs</text>
+  </g>
+
+  <text x="50" y="340" class="zone-label">Phase 2: Persistent State &amp; Baseline Management</text>
+  <rect x="40" y="350" width="1020" height="100" fill="#0a0a0a" stroke="#1e293b" stroke-dasharray="4 4" rx="8" />
+
+  <path d="M 160 290 L 160 320" class="link-flow" />
+  <path d="M 420 290 L 420 320" class="link-flow" />
+  <path d="M 680 290 L 680 320" class="link-flow" />
+  <path d="M 940 290 L 940 320" class="link-flow" />
+
+  <path d="M 160 320 L 940 320" class="link-flow" />
+  <path d="M 280 320 L 280 370" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 550 320 L 550 370" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 820 320 L 820 370" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <g transform="translate(160, 370)">
+    <rect width="240" height="70" class="box box-state" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">Welford's Variance Alg</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">M2 += (x - mean_prev) * (x - mean)</text>
+    <text x="120" y="60" class="text-desc" text-anchor="middle">O(1) memory per-process baselining</text>
+  </g>
+  <g transform="translate(430, 370)">
+    <rect width="240" height="70" class="box box-state" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">Global Role Profiles</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">HashMap&lt;String, RoleProfile&gt;</text>
+    <text x="120" y="60" class="text-desc" text-anchor="middle">Tracks aggregate binary behaviors</text>
+  </g>
+  <g transform="translate(700, 370)">
+    <rect width="240" height="70" class="box box-state" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">Markov Transition Matrix</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">16x16 State Machine</text>
+    <text x="120" y="60" class="text-desc" text-anchor="middle">Detects anomalous sequence chains</text>
+  </g>
+
+  <text x="50" y="500" class="zone-label">Phase 3: Extended Isolation Forest</text>
+
+  <path d="M 280 440 L 280 480" class="link-flow" />
+  <path d="M 550 440 L 550 480" class="link-flow" />
+  <path d="M 820 440 L 820 480" class="link-flow" />
+  <path d="M 280 480 L 820 480" class="link-flow" />
+  <path d="M 550 480 L 550 520" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <g transform="translate(430, 520)">
+    <rect width="240" height="60" class="box box-ml" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">19D Feature Vector</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">vec![vel, ent, var, seq...]</text>
+  </g>
+  <path d="M 550 580 L 550 630" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <g transform="translate(350, 630)">
+    <rect width="400" height="80" class="box box-ml" />
+    <text x="200" y="25" class="text-title" text-anchor="middle">Path Length Evaluation</text>
+    <text x="200" y="45" class="text-tech" text-anchor="middle">c(n) = 2H(n-1) - (2(n-1)/n)</text>
+    <text x="200" y="65" class="text-desc" text-anchor="middle">Outputs Anomaly Score: 0.00 to 1.00</text>
+  </g>
+
+  <text x="50" y="760" class="zone-label">Phase 4 &amp; 5: Dynamic Thresholding &amp; Persistence</text>
+  <path d="M 550 710 L 550 780" class="link-flow" marker-end="url(#arrow-flow)" />
+
+  <g transform="translate(430, 780)">
+    <rect width="240" height="80" class="box box-ml" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">P² Streaming Percentile</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">p = 0.95 (Adaptive Target)</text>
+    <text x="120" y="65" class="text-desc" text-anchor="middle">Evaluates Score against live Threshold</text>
+  </g>
+
+  <path d="M 430 820 L 260 820 L 260 860" class="link-flow" marker-end="url(#arrow-flow)" />
+  <path d="M 670 820 L 840 820 L 840 860" class="link-alert" marker-end="url(#arrow-alert)" />
+
+  <g transform="translate(140, 860)">
+    <rect width="240" height="70" class="box box-db" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">baselines.db WAL</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">Normal State &lt; Threshold</text>
+    <text x="120" y="60" class="text-desc" text-anchor="middle">Flush Vectors asynchronously</text>
+  </g>
+
+  <g transform="translate(720, 860)">
+    <rect width="240" height="70" class="box box-alert" />
+    <text x="120" y="25" class="text-title" text-anchor="middle">sentinel.db WAL</text>
+    <text x="120" y="45" class="text-tech" text-anchor="middle">Anomaly &gt; Threshold</text>
+    <text x="120" y="60" class="text-desc" text-anchor="middle">Trigger High-Priority Security Alert</text>
+  </g>
+</svg>

@@ -1,0 +1,92 @@
+# -- Secrets -------------------------------------------------------------------
+nexus.env
+.vault_pass
+*.env.local
+infrastructure/certs/*.crt
+infrastructure/certs/*.key
+infrastructure/certs/*.pem
+
+# -- Terraform state -----------------------------------------------------------
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.auto.tfvars.json
+.terraform.lock.hcl
+orchestration/rendered/
+
+# -- Rust build artifacts ------------------------------------------------------
+target/
+dist/
+
+# -- Python --------------------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# -- MLOps data (large/generated) ---------------------------------------------
+mlops/data/staging/
+mlops/data/training/*.safetensors
+mlops/data/archive/
+mlops/models/base_model/
+mlops/models/adapters/
+mlops/models/baseline/*.safetensors
+mlops/adversarial_edge_cases.jsonl.bak
+
+# -- Node / SvelteKit ---------------------------------------------------------
+node_modules/
+.svelte-kit/
+build/
+
+# -- IDE -----------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+
+# -- Test environment artifacts ------------------------------------------------
+.pytest_cache/
+tests/__pycache__/
+# Sensor pipeline / anchore scan logs (auto-generated, not for version control)
+tests/anchore_scan_*.log
+anchore_scan_*.log
+
+# -- SQLite queue databases (sensor durable buffers -- never commit) ------------
+*.db
+*.sqlite
+*.sqlite3
+
+# -- Deployment prep bundle artifacts ------------------------------------------
+# (also in deployment_prep/.gitignore -- defence-in-depth)
+deployment_prep/images/
+deployment_prep/custom-images/
+deployment_prep/wheels/
+deployment_prep/collections/
+deployment_prep/providers/
+deployment_prep/scan/reports/
+deployment_prep/scan/anchore_scan_*.log
+deployment_prep/manifests/sha256sums.txt
+deployment_prep/manifests/deployment_manifest.json
+deployment_prep/nexus_bundle_*.tar.gz
+deployment_prep/nexus_bundle_*.tar.gz.sha256
+
+# -- Log files ----------------------------------------------------------------
+# Raw .log files are never committed; structured .md test reports in logs/ are kept
+*.log
+!logs/*.md
+
+# -- Operations ephemeral secrets and runtime state ---------------------------
+operations/ssh/*.pem
+operations/ssh/*.key
+operations/scripts/nexus.env
+operations/infra/traefik/acme.json
+operations/n8n/logs/
+
+# -- Container / compose runtime state ----------------------------------------
+.docker/
+compose-override.yml
+
+# -- Ansible vault files (must never be committed unencrypted) -----------------
+infrastructure/ansible/group_vars/**/vault.yml
+!infrastructure/ansible/group_vars/**/vault.yml.example

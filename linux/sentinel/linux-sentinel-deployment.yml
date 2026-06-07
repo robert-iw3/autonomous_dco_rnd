@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: linux-sentinel
+  namespace: security
+  labels:
+    app: linux-sentinel
+spec:
+  selector:
+    matchLabels:
+      app: linux-sentinel
+  template:
+    metadata:
+      labels:
+        app: linux-sentinel
+    spec:
+      hostPID: true
+      hostNetwork: false
+      automountServiceAccountToken: false
+      containers:
+      - name: linux-sentinel
+        image: linux-sentinel:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/opt/linux-sentinel/linux-sentinel"]
+        securityContext:
+          privileged: false
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_BIND_SERVICE
+            - DAC_READ_SEARCH
+            - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - BPF
+            - PERFMON
+            - KILL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: Unconfined
+        ports:
+        - containerPort: 8080
+          name: api
+        env:
+        - name: DASHBOARD_PORT
+          value: "8080"
+        - name: SENTINEL_API_TLS_CERT
+          value: "/opt/linux-sentinel/certs/tls.crt"
+        - name: SENTINEL_API_TLS_KEY
+          value: "/opt/linux-sentinel/certs/tls.key"
+        resources:
+          limits:
+            cpu: "400m"
+            memory: "512Mi"
+          requests:
+            cpu: "150m"
+            memory: "256Mi"
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /opt/linux-sentinel/certs
+          readOnly: true
+        - name: log-volume
+          mountPath: /var/log/linux-sentinel
+        - name: backup-volume
+          mountPath: /var/backups/linux-sentinel
+        - name: debugfs
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: master-config
+          mountPath: /opt/linux-sentinel/master.toml
+          subPath: master.toml
+          readOnly: true
+        - name: intel-staging
+          mountPath: /opt/linux-sentinel/intel_staging
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: api
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: api
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: sentinel-api-tls
+      - name: log-volume
+        emptyDir: {}
+      - name: backup-volume
+        emptyDir: {}
+      - name: debugfs
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
+      - name: proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: master-config
+        configMap:
+          name: sentinel-master-config
+      - name: intel-staging
+        hostPath:
+          path: /opt/linux-sentinel/intel_staging
+          type: Directory
+      securityContext:
+        fsGroup: 65534
+      nodeSelector:
+        kubernetes.io/os: linux

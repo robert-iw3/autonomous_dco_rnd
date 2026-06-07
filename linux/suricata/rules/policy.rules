@@ -1,0 +1,17 @@
+# ==============================================================================
+# policy.rules -- TIER 3 (action: alert)  [SID 2200000-2200999 reserved]
+#
+# Low-risk / informational / policy-visibility. ALERT only by default; only
+# becomes 'drop' under the 'paranoid' policy. Use these for situational
+# awareness and tuning, not enforcement.
+# ==============================================================================
+
+# Cleartext protocols in use (policy: should be encrypted).
+alert tcp $HOME_NET any -> $EXTERNAL_NET 23 (msg:"POLICY cleartext Telnet outbound"; flow:to_server; sid:2200001; rev:1;)
+alert ftp $HOME_NET any -> $EXTERNAL_NET any (msg:"POLICY cleartext FTP outbound"; flow:to_server; sid:2200002; rev:1;)
+
+# Outbound to anonymizers / Tor-like patterns (visibility).
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"POLICY TLS to self-signed cert (visibility)"; tls.cert_issuer; content:"self-signed"; nocase; sid:2200010; rev:1;)
+
+# Large outbound transfer (possible data movement; tune threshold per env).
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"POLICY large outbound flow (visibility)"; flow:to_server,established; stream_size:server,>,5000000; sid:2200020; rev:1;)

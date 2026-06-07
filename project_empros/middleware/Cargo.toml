@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = [
+    "src/lib_etl",
+    "src/lib_middleware",
+    "src/core_ingress",
+    "src/worker_nexus",
+    "src/worker_splunk",
+    "src/worker_elastic",
+    # worker_sql excluded: tiberius (SQL Server driver) requires a separate
+    # TLS configuration and is only deployed when sql_enabled=true in middleware.toml.
+    # Build it separately if needed: cargo build -p worker_sql
+    # "src/worker_sql",
+]
+
+# ── Middleware-local workspace dependencies ───────────────────────────────────
+# Internal crate paths
+[workspace.dependencies]
+lib_etl        = { path = "src/lib_etl" }
+lib_middleware = { path = "src/lib_middleware" }
+
+# Runtime
+tokio      = { version = "1.52", features = ["full", "signal"] }
+futures    = "0.3"
+async-nats = "0.48"
+bytes      = "1.10"
+
+# HTTP clients
+reqwest  = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+axum     = "0.8"
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+tower    = { version = "0.5", features = ["limit", "timeout"] }
+tower-http = { version = "0.6", features = ["limit"] }
+
+# Serialization
+serde        = { version = "1.0", features = ["derive"] }
+serde_json   = "1.0"
+serde_yaml   = "0.9"
+toml         = "0.8"
+
+# Parquet / Arrow (same security pins as main workspace)
+arrow   = "58.3"
+parquet = "58.3"
+
+# Cryptography
+hmac = "0.12"
+sha2 = "0.10"
+hex  = "0.4"
+
+# SQL Server
+tiberius   = { version = "0.12", features = ["tds73", "rustls"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+
+# Observability
+tracing              = "0.1"
+tracing-subscriber   = { version = "0.3", features = ["env-filter"] }
+metrics              = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# Utilities
+base64      = "0.22"
+notify      = "6.1"
+gethostname = "0.5"

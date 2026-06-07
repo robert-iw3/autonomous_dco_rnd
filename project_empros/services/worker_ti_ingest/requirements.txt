@@ -1,0 +1,35 @@
+# worker_ti_ingest -- Python service dependencies
+# All packages must be pre-downloaded to the air-gap PyPI mirror before deployment.
+
+# -- API framework -------------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+pydantic==2.10.4
+
+# -- Vector search -------------------------------------------------------------
+turbovec==0.1.1          # TurboVec IdMapIndex -- SIMD ANN with 16× compression
+numpy==2.1.3
+
+# -- Embeddings + reranking ----------------------------------------------------
+sentence-transformers==3.3.1   # BGE-M3 embed + CrossEncoder reranker
+# torch is a transitive dep of sentence-transformers; pin matches training container
+torch==2.5.1
+
+# -- BM25 keyword search -------------------------------------------------------
+rank-bm25==0.2.2
+
+# -- Qdrant persistence --------------------------------------------------------
+qdrant-client==1.12.1
+
+# -- NATS status events --------------------------------------------------------
+nats-py==2.9.0
+
+# -- Document parsing ----------------------------------------------------------
+PyMuPDF==1.25.1           # Fast PDF text extraction (primary)
+# docling==2.x            # Layout-aware PDF (heavy; optional -- uncomment if needed)
+pyyaml==6.0.2             # Sigma YAML rules
+stix2==3.0.1              # STIX 2.x bundle parsing
+
+# -- HTTP client (for future OpenCTI sync) -------------------------------------
+httpx==0.28.1

@@ -1,0 +1,733 @@
+Found 0 potentially malicious indicators scanning accelerate
+Found 3 potentially malicious indicators in bitsandbytes
+
+dll-hijacking: found 3 source code matches
+  * This package manipulates a trusted application into loading a malicious DLL at bitsandbytes/cextension.py:52
+        _lib: ct.CDLL
+  * This package manipulates a trusted application into loading a malicious DLL at bitsandbytes/cextension.py:55
+        def __init__(self, lib: ct.CDLL):
+  * This package manipulates a trusted application into loading a malicious DLL at bitsandbytes/cextension.py:80
+        def __init__(self, lib: ct.CDLL):
+Found 3 potentially malicious indicators in datasets
+
+api-obfuscation: found 3 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at datasets/features/features.py:153
+        return pa.__dict__[datasets_dtype]()
+  * This package uses obfuscated API calls that may evade static analysis detection at datasets/features/features.py:156
+        return pa.__dict__[datasets_dtype + "_"]()
+  * This package uses obfuscated API calls that may evade static analysis detection at datasets/table.py:1049
+        table = getattr(table, name)(*args, **kwargs)
+Found 3 potentially malicious indicators in duckdb
+
+api-obfuscation: found 3 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at duckdb/experimental/spark/sql/column.py:25
+        njc = getattr(self.expr, name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at duckdb/experimental/spark/sql/column.py:40
+        expr = getattr(self.expr, name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at duckdb/experimental/spark/sql/column.py:58
+        njc = getattr(self.expr, name)(jc)
+Found 0 potentially malicious indicators scanning fakeredis
+Found 0 potentially malicious indicators scanning hvac
+Found 0 potentially malicious indicators scanning langchain-anthropic
+Found 0 potentially malicious indicators scanning langchain-openai
+Found 0 potentially malicious indicators scanning langgraph
+Found 0 potentially malicious indicators scanning nats-py
+Found 59 potentially malicious indicators in pandas
+
+code-execution: found 13 source code matches
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:102
+        with subprocess.Popen(
+                ["pbcopy", "w"], stdin=subprocess.PIPE, close_fds=True
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:108
+        with subprocess.Popen(
+                ["pbpaste", "r"], stdout=subprocess.PIPE, close_fds=True
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:174
+        with subprocess.Popen(
+                ["xclip", "-selection", selection], stdin=subprocess.PIPE, close_fds=True
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:183
+        with subprocess.Popen(
+                ["xclip", "-selection", selection, "-o"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                close_fds=True,
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:205
+        with subprocess.Popen(
+                ["xsel", selection_flag, "-i"], stdin=subprocess.PIPE, close_fds=True
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:214
+        with subprocess.Popen(
+                ["xsel", selection_flag, "-o"], stdout=subprocess.PIPE, close_fds=True
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:233
+        subprocess.check_call(args, close_fds=True)
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:235
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, close_fds=True)
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:242
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, close_fds=True)
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:252
+        with subprocess.Popen(
+                [
+                    "qdbus",
+                    "org.kde.klipper",
+                    "/klipper",
+                    "setClipboardContents",
+                    text.encode(ENCODING),
+                ],
+                s...  ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:266
+        with subprocess.Popen(
+                ["qdbus", "org.kde.klipper", "/klipper", "getClipboardContents"],
+                stdout=subprocess.PIPE,
+                close_fds=True,
+            ) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:508
+        with subprocess.Popen(["clip.exe"], stdin=subprocess.PIPE, close_fds=True) as p:
+  * This package is executing OS commands in the setup.py file at pandas/io/clipboard/__init__.py:512
+        with subprocess.Popen(
+                ["powershell.exe", "-command", "Get-Clipboard"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                close_fds=True,
+            ) as p:
+
+clipboard-access: found 1 source code matches
+  * This package accesses the clipboard, which can indicate it's trying to steal sensitive data or overwrite cryptocurrency addresses at pandas/core/generic.py:3231
+        clipboards.to_clipboard(self, excel=excel, sep=sep, **kwargs)
+
+dll-hijacking: found 1 source code matches
+  * This package manipulates a trusted application into loading a malicious DLL at pandas/io/clipboard/__init__.py:357
+        msvcrt = ctypes.CDLL("msvcrt")
+
+api-obfuscation: found 44 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/_testing/_io.py:129
+        getattr(f, method)(*args)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/apply.py:457
+        new_res = getattr(colg, op_name)(a, *args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/apply.py:473
+        new_res = getattr(colg, op_name)(func, *args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/apply.py:560
+        results = [getattr(colg, op_name)(how, **kwargs) for _, how in func.items()]
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/apply.py:592
+        results.append(getattr(series, op_name)(how, **kwargs))
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/apply.py:597
+        results.append(getattr(series, op_name)(how, **kwargs))
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arraylike.py:398
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arraylike.py:402
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arraylike.py:445
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arraylike.py:494
+        return getattr(ufunc, method)(*new_inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arraylike.py:532
+        result = getattr(self, method_name)(skipna=False, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/arrow/array.py:1324
+        value = getattr(pc, method)(data, skip_nulls=skipna)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/datetimelike.py:2092
+        return getattr(ufunc, method)(self._ndarray, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/masked.py:788
+        result = getattr(ufunc, method)(*inputs2, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/masked.py:1532
+        result = getattr(self, name)(skipna=skipna, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/numpy_.py:240
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/sparse/array.py:1457
+        result = getattr(arr, name)(**kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/sparse/array.py:1654
+        sp_min_max = getattr(valid_vals, kind)()
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/sparse/array.py:1747
+        sp_values = getattr(ufunc, method)(self.sp_values, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/sparse/array.py:1748
+        fill_value = getattr(ufunc, method)(self.fill_value, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/sparse/array.py:1768
+        result = getattr(ufunc, method)(*new_inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/arrays/string_.py:964
+        result = getattr(self, name)(skipna=skipna, axis=axis, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/generic.py:3729
+        getattr(styler, kw_name)(**kw)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/generic.py:3732
+        getattr(styler, kw_name)(**sub_kw)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/generic.py:456
+        return getattr(self, func)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/generic.py:890
+        wrapper = lambda x: getattr(x, func)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/generic.py:2798
+        fast_path = lambda group: getattr(group, func)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/generic.py:2800
+        lambda x: getattr(x, func)(*args, **kwargs), axis=0
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/groupby.py:431
+        return getattr(self.plot, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/groupby.py:1833
+        return getattr(self, func)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/groupby.py:1868
+        result = getattr(self, func)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/groupby/groupby.py:5835
+        filled = getattr(self, op)(limit=0)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/indexes/accessors.py:202
+        result = getattr(self._parent.array, f"_dt_{name}")(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/indexes/base.py:958
+        result = getattr(ufunc, method)(*new_inputs, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/internals/managers.py:445
+        applied = getattr(b, f)(**kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/methods/selectn.py:263
+        values = getattr(series, method)(
+                    cur_n, keep=self.keep if is_last_column else "all"
+                )
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/nanops.py:1115
+        result = getattr(values, meth)(axis)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/resample.py:2006
+        return getattr(x, f)(**kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/reshape/pivot.py:521
+        grand_margin[k] = getattr(v, aggfunc)(**kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/reshape/pivot.py:524
+        grand_margin[k] = getattr(v, aggfunc[k])(**kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/strings/object_array.py:289
+        f = lambda x: getattr(x, method)(sub, start)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/core/strings/object_array.py:291
+        f = lambda x: getattr(x, method)(sub, start, end)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/io/formats/style.py:4319
+        value = getattr(data, op)(skipna=True)
+  * This package uses obfuscated API calls that may evade static analysis detection at pandas/io/formats/style.py:4321
+        value = getattr(value, op)(skipna=True)
+Found 5 potentially malicious indicators in peft
+
+api-obfuscation: found 5 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at peft/tuners/adaption_prompt/layer.py:106
+        _, key, value = getattr(self.model, c_attn_layer)(self.adaption_prompt).split(embed_dim, dim=2)
+  * This package uses obfuscated API calls that may evade static analysis detection at peft/tuners/adaption_prompt/layer.py:176
+        _, key, value = getattr(self.model, k_proj_layer)(self.adaption_prompt).split(embed_dim, dim=2)
+  * This package uses obfuscated API calls that may evade static analysis detection at peft/tuners/adaption_prompt/layer.py:178
+        key = getattr(self.model, k_proj_layer)(self.adaption_prompt)
+  * This package uses obfuscated API calls that may evade static analysis detection at peft/tuners/adaption_prompt/layer.py:179
+        value = getattr(self.model, v_proj_layer)(self.adaption_prompt)
+  * This package uses obfuscated API calls that may evade static analysis detection at peft/tuners/adaption_prompt/layer.py:216
+        adapter_output = getattr(self.model, o_proj_layer)(adapter_output)
+Found 0 potentially malicious indicators scanning prometheus-client
+Found 2 potentially malicious indicators in pyarrow
+
+code-execution: found 2 source code matches
+  * This package is executing OS commands in the setup.py file at pyarrow/__init__.py:322
+        return subprocess.call([_get_pkg_config_executable(),
+                                    '--exists', pkgname]) == 0
+  * This package is executing OS commands in the setup.py file at pyarrow/__init__.py:331
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+Error trying to connect to socket: closing socket - [Errno -2] Name does not resolve
+Found 2 potentially malicious indicators in pydantic
+
+api-obfuscation: found 2 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at pydantic/_internal/_decorators.py:190
+        self.wrapped = getattr(self.wrapped, name)(func)
+  * This package uses obfuscated API calls that may evade static analysis detection at pydantic/v1/utils.py:667
+        if getattr(p, method)():
+Found 2 potentially malicious indicators in pytest
+
+api-obfuscation: found 1 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at _pytest/_py/path.py:627
+        hash = getattr(mod, hashtype)()
+
+obfuscation: found 1 source code matches
+  * This package is using a common obfuscation method often used by malware at _pytest/config/__init__.py:2175
+        cat = getattr(m, klass)
+Found 0 potentially malicious indicators scanning qdrant-client
+Found 0 potentially malicious indicators scanning redis
+Found 0 potentially malicious indicators scanning requests
+Found 0 potentially malicious indicators scanning s3fs
+Found 3 potentially malicious indicators in sentence-transformers
+
+api-obfuscation: found 3 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at sentence_transformers/backend/optimize.py:88
+        optimization_config = getattr(AutoOptimizationConfig, optimization_config)()
+  * This package uses obfuscated API calls that may evade static analysis detection at sentence_transformers/backend/quantize.py:88
+        quantization_config = getattr(AutoQuantizationConfig, quantization_config)(is_static=False)
+  * This package uses obfuscated API calls that may evade static analysis detection at sentence_transformers/base/modules/router.py:526
+        dims.append(getattr(module, name)())
+Found 1 potentially malicious indicators in tabulate
+
+single_python_file: This package has 1 or fewer Python source files
+Found 0 potentially malicious indicators scanning tomli
+Found 149 potentially malicious indicators in torch
+
+api-obfuscation: found 94 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/__init__.py:994
+        return getattr(a, f"__sym_{name}__")()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/__init__.py:995
+        return getattr(math, name)(a)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/backends/distributed.py:368
+        return getattr(self, n.op)(n.target, new_args, kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/external_utils.py:177
+        return getattr(bw_state, hook_name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/guards.py:1702
+        out = getattr(
+                    base_guard_manager,
+                    f"tensor_property_{source.prop.name.lower()}_manager",
+                )(
+                    idx=source.idx,
+                    source=source_name,
+                    example...        )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/polyfills/operator.py:111
+        return getattr(obj, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/builtin.py:1592
+        tx, getattr(float, name)(args[0].as_python_constant())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/constant.py:266
+        return ConstantVariable.create(getattr(self.value, name)())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/dicts.py:1124
+        return getattr(self.dv_dict.items, self.kv)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/functions.py:446
+        val = getattr(self, f"get_{name[2:-2]}")()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/misc.py:2190
+        result = getattr(self.value, name)(*cargs, **ckwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/misc.py:2394
+        return getattr(r, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/misc.py:2398
+        getattr(self.random, name)(
+                    *[x.as_python_constant() for x in args],
+                    **{k: v.as_python_constant() for k, v in kwargs.items()},
+                )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/tensor.py:1020
+        fake_r = getattr(fake, name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/tensor.py:1026
+        fake_r = getattr(fake, name)(dim)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_dynamo/variables/torch.py:3499
+        return VariableTracker.build(tx, getattr(self.value, name)())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_export/pass_base.py:309
+        res_data = getattr(self.interpreter, kind)(target, args_data, kwargs_data)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_export/serde/serialize.py:2127
+        getattr(self, f"handle_{node.op}")(node)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_higher_order_ops/torchbind.py:98
+        return getattr(obj.wrapped_obj, method)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/analyze_preserves_zero_mask.py:57
+        return getattr(OpDecompositions, name)(*args, **kwargs).value
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/analyze_preserves_zero_mask.py:59
+        dtype = getattr(self.dtype_prop, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/analyze_preserves_zero_mask.py:114
+        out_dtype = getattr(self.dtype_prop, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/common.py:2650
+        value = getattr(self.parent_handler, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/common.py:2777
+        return getattr(self.vr_analysis, name)(*arg_bounds)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:594
+        return getattr(self._inner, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/triton.py:2102
+        return getattr(OpDecompositions, _fn_name)(x).value
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/triton.py:4935
+        output_dtype = getattr(
+                        dtype_handler,
+                        name,
+                    )(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/triton.py:4940
+        output_shape = getattr(
+                        shape_handler,
+                        name,
+                    )(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/codegen/triton.py:4947
+        getattr(overrides, name)(*args, **kwargs),
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/index_propagation.py:278
+        return self.wrap(getattr(self._inner, name)(*new_args, **new_kwargs))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/index_propagation.py:291
+        new_expr = getattr(SymPyOps, name)(*new_args, **new_kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/inductor_prims.py:90
+        lambda size, seed, mode, *, align_dtype=None: getattr(torch, mode)(
+            size, device=seed.device, dtype=torch.float32
+        ),
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ir.py:275
+        return getattr(ops, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/loop_body.py:618
+        return getattr(self._inner, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/lowering.py:2792
+        return getattr(ops, mode)(
+                    seed_loader([]),
+                    ops.index_expr(random_pos(index), torch.int32),
+                )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1036
+        self._write, getattr(self.parent_handler, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1062
+        return getattr(self._inner, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1067
+        val = getattr(self._inner, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1095
+        self._update_count, getattr(self.parent_handler, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1195
+        key = getattr(self.mock, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/ops_handler.py:1200
+        val = getattr(self._inner, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/runtime/caching/context.py:252
+        form: getattr(_RuntimeContext, form)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/runtime/caching/context.py:271
+        form: getattr(_CompileContext, form)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/select_algorithm.py:690
+        getattr(self, f)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/utils.py:663
+        result = getattr(obj, method)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/_inductor/virtualized.py:337
+        return OpsWrapper._wrap(getattr(_ops, name)(*new_args, **new_kwargs))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/ao/ns/fx/n_shadows_utils.py:90
+        result = getattr(self_obj, node.target)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/distributed/checkpoint/state_dict.py:215
+        if removed_fqn := getattr(curr_obj, dsd_fqn_modifiers)().get(
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/distributed/checkpoint/state_dict.py:248
+        and name in getattr(module, dsd_fqn_modifiers)().values()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:114
+        return getattr(self._store, store_op)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/distributed/fsdp/_state_dict_utils.py:926
+        getattr(state, hook_registration_fn_name)(hook, **hook_registration_fn_kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/distributed/fsdp/_state_dict_utils.py:930
+        getattr(handle._fully_sharded_module, hook_registration_fn_name)(
+                    hook, **hook_registration_fn_kwargs
+                )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:770
+        return getattr(self, f"_sym_{name}")()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1155
+        return getattr(torch.utils._sympy.functions, f"OpaqueUnaryFn_{name}")(a)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1799
+        getattr(a.node, method)(
+                            [to_node(a.node, b) for b in sizes],
+                            [to_node(a.node, b) for b in strides],
+                        )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1941
+        return wrap_node(getattr(self.node, method_attr)())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1957
+        ret = wrap_node(getattr(self.node, method_attr)(other_node))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1973
+        ret = wrap_node(getattr(other_node, method_attr)(self.node))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:1990
+        out = getattr(int, attr)(*args)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:2021
+        ret = wrap_node(getattr(pred.node, method_attr)(then_node, else_node))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/sym_node.py:2036
+        return wrap_node(getattr(self.node, method)(ndigits))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/experimental/symbolic_shapes.py:1189
+        return getattr(o, self.name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/interpreter.py:294
+        return getattr(self, n.op)(n.target, args, kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/fx/interpreter.py:402
+        return getattr(self_obj, target)(*args_tail, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/nn/attention/__init__.py:89
+        if getattr(torch._C, f"_get_{name}_sdp_enabled")():
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/nn/attention/__init__.py:102
+        getattr(torch._C, f"_set_sdp_use_{name}")(enabled)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/onnx/_internal/fx/passes/type_promotion.py:1380
+        node = getattr(graph, op_type)(target, args, kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/onnx/_internal/torchscript_exporter/jit_utils.py:338
+        return getattr(node, f"{kind}_")(name, value)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/onnx/_internal/torchscript_exporter/symbolic_helper.py:223
+        return getattr(node, sel)(key)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/onnx/_internal/torchscript_exporter/symbolic_helper.py:556
+        return getattr(self, ty)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/random.py:136
+        if not getattr(custom_device_mod, _bad_fork_name)():
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/random.py:137
+        getattr(custom_device_mod, _seed_all_name)(seed)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/autocast_test_lists.py:415
+        output = getattr(module, op)(*args, **add_kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/autocast_test_lists.py:462
+        control = getattr(module, op)(
+                            *cast(args, run_as_type), **add_kwargs
+                        )
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_distributed.py:971
+        getattr(self, test_name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_distributed.py:1472
+        getattr(self, test_name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_nn.py:3137
+        constructor=lambda *args, name=name: getattr(nn, name)(reduction=reduction),
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_nn.py:3204
+        constructor=lambda *args, name=name: getattr(nn, name)(reduction=reduction),
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_utils.py:1480
+        return getattr(self._value, name)(*args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/common_utils.py:1482
+        return getattr(operator, name)(self._value, *args, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/distributed/_tensor/common_dtensor.py:1158
+        getattr(self, test_name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/distributed/_tensor/common_dtensor.py:1217
+        getattr(self, test_name)()
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/testing/_internal/jit_utils.py:373
+        result = getattr(torch._C, '_jit_pass_' + name)(graph)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/functions.py:1409
+        return sympy.Float(getattr(math, name)(float(a)))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/functions.py:1413
+        return getattr(sympy, name)(a)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/functions.py:1421
+        return getattr(sympy, name)(a)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/functions.py:1468
+        return getattr(operator, real_op_name)(a, b)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/functions.py:1476
+        return sympy.Integer(getattr(operator, real_op_name)(int(a), int(b)))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/_sympy/interp.py:150
+        return getattr(analysis, handler_name)(*args, index_dtype)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/backend_registration.py:206
+        return self._apply(lambda t: getattr(t, custom_backend_name)(device))
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/backend_registration.py:342
+        custom_backend_storage: torch.UntypedStorage = getattr(
+                self._untyped_storage, custom_backend_name
+            )(device, non_blocking, **kwargs)
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/tensorboard/_pytorch_graph.py:74
+        list_of_node = list(getattr(node_cpp, m)())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/tensorboard/_pytorch_graph.py:88
+        setattr(self, m, getattr(node_cpp, m)())
+  * This package uses obfuscated API calls that may evade static analysis detection at torch/utils/tensorboard/_pytorch_graph.py:378
+        return getattr(node, sel)(key)
+
+exfiltrate-sensitive-data: found 3 source code matches
+  * This package is exfiltrating sensitive data to a remote server at torch/distributed/elastic/rendezvous/utils.py:149
+        addr_list = socket.getaddrinfo(
+            this_host, None, proto=socket.IPPROTO_TCP, flags=socket.AI_CANONNAME
+        )
+  * This package is exfiltrating sensitive data to a remote server at torch/hub.py:249
+        response = json.loads(_read_url(Request(url, headers=headers)))
+  * This package is exfiltrating sensitive data to a remote server at torch/hub.py:253
+        response = json.loads(_read_url(Request(url, headers=headers)))
+
+obfuscation: found 7 source code matches
+  * This package is using a common obfuscation method often used by malware at torch/_dynamo/convert_frame.py:1132
+        used_globals[ref] = getattr(_builtins, ref)
+  * This package is using a common obfuscation method often used by malware at torch/_jit_internal.py:328
+        return getattr(builtins, key)
+  * This package is using a common obfuscation method often used by malware at torch/_jit_internal.py:406
+        return getattr(builtins, key)
+  * This package is using a common obfuscation method often used by malware at torch/_jit_internal.py:607
+        return getattr(builtins, key, None)
+  * This package is using a common obfuscation method often used by malware at torch/fx/_symbolic_trace.py:1259
+        orig_fn = getattr(builtins, name)
+  * This package is using a common obfuscation method often used by malware at torch/fx/node.py:176
+        if getattr(builtins, func.__name__, None) is func:
+  * This package is using a common obfuscation method often used by malware at torch/jit/annotations.py:109
+        return getattr(builtins, name, None)
+
+dll-hijacking: found 45 source code matches
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:244
+        ctypes.CDLL("vcruntime140.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:245
+        ctypes.CDLL("msvcp140.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:247
+        ctypes.CDLL("vcruntime140_1.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:326
+        ctypes.CDLL(lib_path)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:379
+        ctypes.CDLL(global_deps_lib_path, mode=ctypes.RTLD_GLOBAL)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/__init__.py:402
+        ctypes.CDLL(global_deps_lib_path, mode=ctypes.RTLD_GLOBAL)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/_inductor/autotune_process.py:1059
+        self.DLL: CDLL | ModuleType | None = None
+  * This package manipulates a trusted application into loading a malicious DLL at torch/_ops.py:1509
+        ctypes.CDLL(path)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:265
+        msg_lib_notfound = (
+            f"Unable to find the {{0}} library file lib{{1}}.so in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib \
+    or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or \
+    {expanduser('~')}/.local/...t."
+        )
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:268
+        {expanduser('~')}/.local/lib/ so the LD_PRELOAD environment variable will not be set."
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:292
+        for item in os.getenv("LD_PRELOAD", "").split(":"):
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:303
+        ld_preloads = [f"{matches[0]}", os.getenv("LD_PRELOAD", "")]
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:305
+        os.environ["LD_PRELOAD"] = os.pathsep.join(
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:305
+        os.environ["LD_PRELOAD"] = os.pathsep.join(
+                            # pyrefly: ignore [unbound-name]
+                            [p.strip(os.pathsep) for p in ld_preloads if p]
+                        )
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:376
+        logger.warning(
+                    """Neither TCMalloc nor JeMalloc is found in $CONDA_PREFIX/lib or $VIRTUAL_ENV/lib
+                                or /.local/lib/ or /usr/local/lib/ or /usr/local/lib64/ or /usr/lib or /usr/lib64 or
+    ...        )
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:917
+        if "LD_PRELOAD" in os.environ:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:919
+        tmp_ldpreload = os.environ["LD_PRELOAD"]
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:925
+        logger.warning("%s doesn't exist. Removing it from LD_PRELOAD.", item)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:927
+        os.environ["LD_PRELOAD"] = ":".join(lst_valid)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/backends/xeon/run_cpu.py:929
+        os.environ["LD_PRELOAD"] = ""
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:86
+        self.original_CDLL = ctypes.CDLL  # type: ignore[misc,assignment]
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:94
+        ) -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:104
+        ctypes.CDLL = self.hooked_CDLL  # type: ignore[misc,assignment]
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:107
+        ctypes.CDLL = self.original_CDLL  # type: ignore[misc]
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:912
+        nvml_h = CDLL("libnvidia-ml.so.1")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/__init__.py:966
+        nvml_h = CDLL("libnvidia-ml.so.1")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:22
+        def _get_hip_runtime_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:30
+        lib = ctypes.CDLL(str(rocm_sdk.find_libraries("amdhip64")[0]))
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:33
+        lib = ctypes.CDLL(f"amdhip64_{torch.version.hip[0]}.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:35
+        lib = ctypes.CDLL("libamdhip64.so")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:45
+        def _get_cuda_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:47
+        return ctypes.CDLL("nvcuda.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:49
+        return ctypes.CDLL("libcuda.so.1")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:53
+        def _get_gpu_runtime_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:102
+        def _get_hiprtc_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:107
+        lib = ctypes.CDLL(str(rocm_sdk.find_libraries("hiprtc")[0]))
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:113
+        lib = ctypes.CDLL(f"hiprtc{version_str}.dll")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:115
+        lib = ctypes.CDLL("libhiprtc.so")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:131
+        def _get_nvrtc_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:144
+        return ctypes.CDLL(lib_name)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/_utils.py:150
+        def _get_gpu_rtc_library() -> ctypes.CDLL:
+  * This package manipulates a trusted application into loading a malicious DLL at torch/cuda/memory.py:1231
+        allocator = ctypes.CDLL(path_to_so_file)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/distributed/elastic/multiprocessing/redirects.py:40
+        lib = ctypes.CDLL(lib_name)
+  * This package manipulates a trusted application into loading a malicious DLL at torch/distributed/elastic/multiprocessing/redirects.py:50
+        return ctypes.CDLL("libc.so.6")
+  * This package manipulates a trusted application into loading a malicious DLL at torch/xpu/memory.py:513
+        allocator_lib = ctypes.CDLL(path_to_lib_file)
+Found 10 potentially malicious indicators in transformers
+
+api-obfuscation: found 7 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/generation/continuous_batching/requests.py:64
+        allocated_memory = total_memory - getattr(torch.mps, "recommended_max_memory")()
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/modeling_layers.py:123
+        transformer_outputs: BaseModelOutputWithPast = getattr(self, self.base_model_prefix)(
+                input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_valu...        )
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/modeling_layers.py:203
+        outputs: BaseModelOutputWithPast = getattr(self, self.base_model_prefix)(
+                input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+            ...        )
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/modeling_layers.py:266
+        outputs: BaseModelOutputWithPast = getattr(self, self.base_model_prefix)(
+                input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+            ...        )
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/models/canine/modeling_canine.py:142
+        shard_embeddings = getattr(self, name)(hash_bucket_ids)
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/models/tapas/modeling_tapas.py:137
+        embeddings += getattr(self, name)(token_type_ids[:, :, i])
+  * This package uses obfuscated API calls that may evade static analysis detection at transformers/trainer_callback.py:545
+        result = getattr(callback, event)(
+                    args,
+                    state,
+                    control,
+                    model=self.model,
+                    processing_class=self.processing_class,
+                    optimizer=self.op...        )
+
+dll-hijacking: found 1 source code matches
+  * This package manipulates a trusted application into loading a malicious DLL at transformers/utils/import_utils.py:233
+        cudart = ctypes.CDLL("libcudart.so")
+
+exfiltrate-sensitive-data: found 2 source code matches
+  * This package is exfiltrating sensitive data to a remote server at transformers/integrations/integration_utils.py:2561
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+  * This package is exfiltrating sensitive data to a remote server at transformers/integrations/integration_utils.py:2562
+        with urllib.request.urlopen(req, timeout=5, context=self._get_ssl_context()) as resp:
+Found 1 potentially malicious indicators in trl
+
+api-obfuscation: found 1 source code matches
+  * This package uses obfuscated API calls that may evade static analysis detection at trl/experimental/bema_for_ref_model/callback.py:40
+        result = getattr(callback, event)(
+                    args,
+                    state,
+                    control,
+                    model=self.model,
+                    ref_model=self.ref_model,  # <- Added ref_model to the callback call
+        ...        )
+Found 22 potentially malicious indicators in vllm
+
+bundled_binary: Binary file/s detected in package:
+861c2380c4beadc76c385fe6514574acb848d4d6f63ccb7520f6f670cc4960a3: _flashmla_C.abi3.so (elf)
+d25ba62aef247c9321eba570e00021ab0871dc9a4dad29edf65bbf4d477aadb4: _moe_C.abi3.so (elf)
+ea024e7f010c5773680e1bc7ae9da7a850387df5747d3241d29617f65c2fddc9: _C.abi3.so (elf)
+14af262f68732d90b17b08ee2c7b08bdf9b3e2d0e3ce3b14f1bd96ffbcff816c: cumem_allocator.abi3.so (elf)
+e59e0d3aec078d85a3270f6df25eb449cf8f112863ba4680058d06870e212163: _C_stable_libtorch.abi3.so (elf)
+f1741bcd0f6f2a25e471ea4fa7d2932471cb238b5b741845aba2526cd13e1c44: _flashmla_extension_C.abi3.so (elf)
+e803ed4174d7874d01a898fae6af79d023d72e619f7767f7353fc7f19f5a0209: _C.cpython-314-aarch64-linux-gnu.so (elf)
+e3ca5508dfda2699e93842081777d14de361ad3ddc38f856e2cdcef85b6b47fe: _C.cpython-311-aarch64-linux-gnu.so (elf)
+179c3796b9b3a9b016fe8eceb51531668fea7be280b060d32832caa17ca9cf32: _C.cpython-310-aarch64-linux-gnu.so (elf)
+4ea32dac80a857d5fd382cb76a210d8bfe4b86c1147124011c2d7e97f5577cf9: _C.cpython-312-aarch64-linux-gnu.so (elf)
+166dd309b550ab531ca2a1c804c488e0ccb29fd635441a5f49f7b779ee108624: _C.cpython-313-aarch64-linux-gnu.so (elf)
+43878125d07b756a91b7c6e134f6d8d44b46cc82428c04e6282bff86b22b1d18: _vllm_fa3_C.abi3.so (elf)
+c5d2ad2fb8248e894facd7ae8d6b82a99c1946c3933177349439ed4b73df983e: _vllm_fa2_C.abi3.so (elf)
+
+exfiltrate-sensitive-data: found 1 source code matches
+  * This package is exfiltrating sensitive data to a remote server at vllm/utils/flashinfer.py:283
+        response = requests.get(FLASHINFER_CUBINS_REPOSITORY, timeout=5)
+
+dll-hijacking: found 15 source code matches
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/distributed/device_communicators/cuda_wrapper.py:121
+        lib = ctypes.CDLL(so_file)
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/distributed/device_communicators/pynccl_wrapper.py:329
+        lib = ctypes.CDLL(so_file)
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/platforms/cpu.py:214
+        ld_preload_str = os.getenv("LD_PRELOAD", "")
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/platforms/cpu.py:252
+        os.environ["LD_PRELOAD"] = ld_preload_str
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/platforms/cpu.py:276
+        os.environ["LD_PRELOAD"] = ld_preload_str
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/third_party/triton_kernels/roofline.py:109
+        lib = ctypes.CDLL(libname)
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/utils/numa_utils.py:36
+        libnuma = ctypes.CDLL(libnuma_so)
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/utils/ompmultiprocessing.py:37
+        ld_preload_str = os.getenv("LD_PRELOAD", "")
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/simple_kv_offload/cuda_mem_ops.py:75
+        lib = ctypes.CDLL("libamdhip64.so", mode=ctypes.RTLD_GLOBAL)
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/worker/cpu_worker.py:103
+        ld_preload_list = os.environ.get("LD_PRELOAD", "")
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/worker/cpu_worker.py:105
+        logger.warning(
+                        "%s is not found in LD_PRELOAD. "
+                        "For best performance, please follow the section "
+                        "`set LD_PRELOAD` in "
+                        "https://docs.vllm.a...        )
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/worker/cpu_worker.py:106
+        "%s is not found in LD_PRELOAD. "
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/worker/cpu_worker.py:106
+        "%s is not found in LD_PRELOAD. "
+                        "For best performance, please follow the section "
+                        "`set LD_PRELOAD` in "
+                        "https://docs.vllm.ai/en/latest/getting_started/inst...raries.",
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/v1/worker/cpu_worker.py:108
+        "`set LD_PRELOAD` in "
+  * This package manipulates a trusted application into loading a malicious DLL at vllm/vllm_flash_attn/cute/cache_utils.py:28
+        ctypes.CDLL(_lib_path, mode=ctypes.RTLD_GLOBAL)
+
+screenshot: found 3 source code matches
+  * This package is taking screenshots, which can be used to steal sensitive information displayed on screen at vllm/assets/video.py:52
+        ok = cap.grab()  # next img
+  * This package is taking screenshots, which can be used to steal sensitive information displayed on screen at vllm/multimodal/video.py:218
+        ok = cap.grab()
+  * This package is taking screenshots, which can be used to steal sensitive information displayed on screen at vllm/multimodal/video.py:289
+        ok = cap.grab()
+
+code-execution: found 1 source code matches
+  * This package is executing OS commands in the setup.py file at vllm/third_party/deep_gemm/__init__.py:111
+        nvcc = subprocess.check_output(['which', 'nvcc'], stderr=devnull).decode().rstrip('\r\n')
+
+obfuscation: found 1 source code matches
+  * This package is using a common obfuscation method often used by malware at vllm/env_override.py:591
+        runtime_env.used_globals[ref] = getattr(_builtins, ref)

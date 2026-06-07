@@ -1,0 +1,25 @@
+# Downloaded artifacts -- never committed; populated by prep scripts
+images/
+custom-images/
+wheels/
+collections/
+providers/
+scan/reports/
+scan/anchore_scan_*.log
+manifests/sha256sums.txt
+manifests/deployment_manifest.json
+
+# Packaged bundles
+nexus_bundle_*.tar.gz
+nexus_bundle_*.tar.gz.sha256
+
+# Terraform cache
+providers/.terraform/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Logs
+*.log

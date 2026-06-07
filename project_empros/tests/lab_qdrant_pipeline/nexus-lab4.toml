@@ -1,0 +1,182 @@
+# ==============================================================================
+# Lab 4: Qdrant Vector Worker Pipeline -- test configuration
+# ==============================================================================
+
+[global]
+nats_url = "nats://nats:4222"
+telemetry_stream = "Tier5_Telemetry"
+telemetry_subject = "nexus.*.telemetry"
+dlq_subject_prefix = "nexus.dlq"
+
+[qdrant]
+grpc_url = "http://qdrant:6334"
+http_url = "http://qdrant:6333"
+collection_name = "ueba_vectors"
+batch_size = 10
+
+[qdrant.named_vectors]
+c2_math         = 8
+sentinel_math   = 5
+windows_math    = 6
+deepsensor_math = 4
+trellix_math    = 4
+cloud_flow      = 5
+network_tap     = 8
+
+[schema_mappings.linux_c2]
+identifier_column  = "outbound_ratio"
+vector_name        = "c2_math"
+primary_key_column = "id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+context_columns = [
+    "process_name", "pid", "uid", "dst_ip", "dst_port",
+    "packet_size_min", "packet_size_max", "dns_query", "event_type"
+]
+
+[schema_mappings.windows_c2]
+identifier_column  = "Image"
+vector_name        = "c2_math"
+primary_key_column = "event_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "host"
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+context_columns = ["Image", "CommandLine", "DestIp", "Port"]
+
+[schema_mappings.linux_sentinel]
+identifier_column  = "shannon_entropy"
+vector_name        = "sentinel_math"
+primary_key_column = "event_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "shannon_entropy", "execution_velocity", "tuple_rarity",
+    "path_depth", "anomaly_score"
+]
+context_columns = [
+    "level", "mitre_tactic", "mitre_technique", "pid", "ppid", "uid",
+    "comm", "command_line", "parent_comm", "user_name", "message",
+    "anomaly_score",
+]
+
+[schema_mappings.sysmon_sensor]
+identifier_column  = "sysmon_event_id"
+vector_name        = "windows_math"
+primary_key_column = "sysmon_event_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "command_entropy", "parent_child_score", "integrity_score", "anomaly_score",
+    "grant_access_score", "driver_trust_score",
+]
+context_columns = [
+    "Image", "CommandLine", "ParentImage", "User", "IntegrityLevel",
+    "ProcessId", "GrantedAccess", "TargetImage", "anomaly_score",
+]
+
+[schema_mappings.windows_deepsensor]
+identifier_column  = "max_velocity"
+vector_name        = "deepsensor_math"
+primary_key_column = "event_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "host"
+vector_columns     = ["score", "avg_entropy", "max_velocity", "event_count"]
+context_columns    = [
+    "category", "event_type", "pid", "parent_pid", "path",
+    "parent_image", "command_line", "event_user", "destination_ip", "severity"
+]
+
+[schema_mappings.trellix_ens]
+identifier_column  = "detection_name"
+vector_name        = "trellix_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["severity_score", "threat_score", "action_score", "anomaly_score"]
+context_columns    = [
+    "host", "process", "pid", "user", "file_path", "detection_name",
+    "threat_type", "action", "severity", "message"
+]
+
+[schema_mappings.cloud_flow]
+identifier_column  = "event_type"
+vector_name        = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns    = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "event_type", "description"
+]
+
+[schema_mappings.network_tap]
+identifier_column  = "session_id"
+vector_name        = "network_tap"
+primary_key_column = "session_id"
+timestamp_column   = "timestamp_start"
+sensor_id_column   = "sensor_name"
+vector_columns = [
+    "byte_ratio", "avg_inter_arrival", "variance_inter_arrival",
+    "ratio_small_packets", "ratio_large_packets", "payload_entropy",
+    "session_duration_ms", "packets_src"
+]
+context_columns = [
+    "src_ip", "dst_ip", "dst_port", "protocol_name",
+    "tls_ja3", "cert_cn", "cert_self_signed",
+    "dst_geo_country", "is_internal_dst", "port_class"
+]
+
+[schema_mappings.macos_sensor]
+identifier_column  = "plist_path"
+vector_name        = "windows_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "command_entropy", "parent_child_score", "integrity_score", "anomaly_score",
+    "grant_access_score", "driver_trust_score",
+]
+context_columns    = ["process_name", "file_path", "plist_path", "code_signature"]
+
+[schema_mappings.gcp_audit]
+identifier_column  = "event_type"
+vector_name        = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns    = ["process_name", "dst_ip", "event_type", "description"]
+
+[schema_mappings.gcp_scc]
+identifier_column  = "event_type"
+vector_name        = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns    = ["process_name", "dst_ip", "event_type", "description"]
+
+[schema_mappings.gcp_vpc_flow]
+identifier_column  = "event_type"
+vector_name        = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns    = ["process_name", "dst_ip", "event_type", "description"]
+
+[schema_mappings.vmware_syslog]
+identifier_column  = "event_type"
+vector_name        = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns    = ["process_name", "dst_ip", "event_type", "description"]

@@ -1,0 +1,60 @@
+alert tcp any any -> any any (msg:"Laundry Bear Infrastructure Detection - Suspicious Domains and IPs"; \
+flow:established,to_server; content:"micsrosoftonline.com"; nocase; http_host; content!"microsoftonline.com"; \
+sid:4444001; rev:1; classtype:trojan-activity;)
+
+alert tcp any any -> any any (msg:"Laundry Bear Infrastructure Detection - Suspicious Domains"; \
+flow:established,to_server; content:"|2e|eu"; nocase; http_host; pcre:"/ebsumrnit\.eu$/i"; \
+sid:4444002; rev:1; classtype:trojan-activity;)
+
+alert tcp any any -> any any (msg:"Laundry Bear Infrastructure Detection - Suspicious Domains"; \
+flow:established,to_server; content:"enticator-secure.com"; nocase; http_host; sid:4444003; rev:1; \
+classtype:trojan-activity;)
+
+alert tcp any any -> any any (msg:"Laundry Bear Infrastructure Detection - Suspicious Domains"; \
+flow:established,to_server; content:"walshhgroup.com"; nocase; http_host; sid:4444004; rev:1; \
+classtype:trojan-activity;)
+
+alert tcp any any -> any any (msg:"Laundry Bear Infrastructure Detection - Suspicious Domains"; \
+flow:established,to_server; content:"maidservant.shop"; nocase; http_host; sid:4444005; rev:1; \
+classtype:trojan-activity;)
+
+alert ip any any -> 104.36.83.170 any (msg:"Laundry Bear Infrastructure Detection - Suspicious IP"; \
+flow:established; sid:4444006; rev:1; classtype:trojan-activity;)
+
+alert ip any any -> 34.204.123.157 any (msg:"Laundry Bear Infrastructure Detection - Suspicious IP"; \
+flow:established; sid:4444007; rev:1; classtype:trojan-activity;)
+
+alert ip any any -> 54.144.139.77 any (msg:"Laundry Bear Infrastructure Detection - Suspicious IP"; \
+flow:established; sid:4444008; rev:1; classtype:trojan-activity;)
+
+alert tcp any any -> any 25 (msg:"Laundry Bear Suspicious Email Domain"; \
+flow:established,to_server; content:"micsrosoftonline.com"; nocase; smtp; \
+sid:4444009; rev:1; classtype:trojan-activity;)
+
+alert dns any any -> any any (msg:"Laundry Bear DNS Query Detection"; \
+dns_query; content:"micsrosoftonline.com"; nocase; sid:4444010; rev:1; \
+classtype:trojan-activity;)
+
+alert http any any -> any any (msg:"Laundry Bear AitM Phishing - Evilginx Redirect to outlook.live.com"; \
+flow:established,from_server; file_data; content:"<html><head><meta name='referrer' \
+content='no-referrer'><script>top.location.href='https://outlook.live.com';</script></head><body></body></html>"; \
+fast_pattern; sid:4444011; rev:1; \
+classtype:trojan-activity; metadata:threat_actor Laundry_Bear, attack_type AitM_Phishing, framework Evilginx;)
+
+alert http any any -> any any (msg:"Laundry Bear AitM Phishing - Evilginx Redirect to login.live.com"; \
+flow:established,from_server; file_data; content:"<html><head><meta name='referrer' \
+content='no-referrer'><script>top.location.href='https://login.live.com';</script></head><body></body></html>"; \
+fast_pattern; sid:4444012; rev:1; \
+classtype:trojan-activity; metadata:threat_actor Laundry_Bear, attack_type AitM_Phishing, framework Evilginx;)
+
+alert http any any -> any any (msg:"Laundry Bear AitM Phishing - Evilginx Redirect Pattern"; \
+flow:established,from_server; file_data; pcre:"/top\.location\.href='https:\/\/(outlook|login)\.live\.com'/"; \
+sid:4444013; rev:1; \
+classtype:trojan-activity; metadata:threat_actor Laundry_Bear, attack_type AitM_Phishing, framework Evilginx;)
+
+alert http any any -> any any (msg:"Laundry Bear AitM Phishing - Evilginx Redirect with Suspicious Domain"; \
+flow:established,from_server; file_data; content:"<html><head><meta name='referrer' \
+content='no-referrer'><script>top.location.href='https://outlook.live.com';</script></head><body></body></html>"; \
+http_host; content:"micsrosoftonline.com"; nocase; content!"microsoftonline.com"; sid:4444014; rev:1; \
+classtype:trojan-activity; \
+metadata:threat_actor Laundry_Bear, attack_type AitM_Phishing, framework Evilginx;)

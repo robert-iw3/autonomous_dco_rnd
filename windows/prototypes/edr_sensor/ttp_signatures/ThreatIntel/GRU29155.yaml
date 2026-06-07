@@ -1,0 +1,108 @@
+# =============================================================================
+# GRU Unit 29155 (Sandworm / Voodoo Bear)
+# =============================================================================
+
+- ttp_signature:
+    name: "GRU WhisperGate Wiper"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "WhisperGate wiper malware"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "WhisperGate"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "GRU Cyclops Blink / AcidRain Wiper"
+    severity: "Critical"
+    meta:
+      tactic: "Impact (TA0040)"
+      technique: "Data Encrypted for Impact (T1486)"
+      procedure: "Cyclops Blink or AcidRain wiper"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "cyclops"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe"
+
+- ttp_signature:
+    name: "GRU Certutil + Encoded Payload"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "GRU using certutil with encoded payload"
+    match:
+      actor: "certutil.exe"
+      type: "PROCESS_START"
+      target: "-decode"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "certutil.exe -decode"
+
+- ttp_signature:
+    name: "GRU Scheduled Task Persistence"
+    severity: "High"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Scheduled Task/Job (T1053)"
+      procedure: "Creating scheduled tasks for persistence"
+    match:
+      actor: "schtasks.exe"
+      type: "PROCESS_START"
+      target: "/create"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "schtasks.exe /create"
+
+- ttp_signature:
+    name: "GRU WhisperGate Encoded Sleep"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "WhisperGate stage 2 encoded sleep command"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "UwB0AGEAcgB0AC0AUwBsAGUAZQBwACAALQBzACAAMQAwAA=="
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "GRU Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "GRU using multiple LOLBins in sequence"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "GRU PowerShell Encoded Command Execution"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "GRU using encoded PowerShell for execution"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"

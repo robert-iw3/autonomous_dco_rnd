@@ -1,0 +1,134 @@
+rules_files:
+  - /etc/falco/falco_rules.yaml
+  - /etc/falco/falco_rules.local.yaml
+  - /etc/falco/rules.d
+
+load_plugins: [container]
+
+plugins:
+  - name: container
+    library_path: libcontainer.so
+  - name: k8saudit
+    library_path: libk8saudit.so
+    init_config:
+    open_params: "http://:9765/k8s-audit"
+  - name: cloudtrail
+    library_path: libcloudtrail.so
+  - name: json
+    library_path: libjson.so
+
+watch_config_files: true
+
+time_format_iso_8601: false
+
+priority: debug
+
+json_output: true
+json_include_output_property: true
+json_include_tags_property: true
+
+buffered_outputs: false
+
+outputs_rate: 0
+outputs_max_burst: 1000
+
+rule_matching: first
+
+outputs_queue:
+  capacity: 0
+
+output_timeout: 2000
+
+stdout_output:
+  enabled: true
+
+syslog_output:
+  enabled: true
+
+file_output:
+  enabled: true
+  keep_alive: true
+  filename: /logs/falco-events.log
+
+http_output:
+  enabled: true
+  url: "http://sidekick:2801/"
+  user_agent: "falcosecurity/falco"
+  insecure: false
+  ca_cert: ""
+  ca_bundle: ""
+  ca_path: "/etc/ssl/certs"
+  mtls: false
+  client_cert: "/etc/ssl/certs/client.crt"
+  client_key: "/etc/ssl/certs/client.key"
+  echo: false
+
+program_output:
+  enabled: false
+  keep_alive: false
+  program: "jq '{text: .output}' | curl -d @- -X POST https://hooks.slack.com/services/XXX"
+
+grpc_output:
+  enabled: false
+
+grpc:
+  enabled: false
+  bind_address: "unix:///run/falco/falco.sock"
+  threadiness: 0
+
+webserver:
+  enabled: true
+  threadiness: 0
+  listen_port: 8765
+  k8s_healthz_endpoint: /healthz
+  ssl_enabled: false
+  ssl_certificate: /etc/falco/falco.pem
+
+log_stderr: true
+log_syslog: true
+log_level: info
+
+libs_logger:
+  enabled: false
+  severity: debug
+
+syscall_event_timeouts:
+  max_consecutives: 1000
+
+syscall_event_drops:
+  threshold: .1
+  actions:
+    - log
+    - alert
+  rate: .03333
+  max_burst: 1
+  simulate_drops: false
+
+metrics:
+  enabled: false
+  interval: 1h
+  output_rule: true
+  resource_utilization_enabled: true
+  kernel_event_counters_enabled: true
+  libbpf_stats_enabled: true
+  convert_memory_to_mb: true
+  include_empty_values: false
+
+syscall_buf_size_preset: 4
+
+syscall_drop_failed_exit: false
+
+base_syscalls:
+  custom_set: []
+  repair: false
+
+engine:
+  kind: modern_ebpf
+
+modern_ebpf:
+  cpus_for_each_buffer: 2
+
+metadata_download:
+  max_mb: 100
+  chunk_wait_us: 1000
+  watch_freq_sec: 1

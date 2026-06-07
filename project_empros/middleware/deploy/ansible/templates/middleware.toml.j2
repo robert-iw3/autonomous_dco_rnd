@@ -1,0 +1,71 @@
+[global]
+nats_url = "{{ middleware_nats_url | default(groups['nats'] | map('regex_replace', '^(.*)$', 'nats://\\1:4222') | join(',')) }}"
+stream_name = "MiddlewareStream"
+telemetry_subject = "middleware.telemetry"
+dlq_subject_prefix = "middleware.dlq"
+
+[ingress]
+bind_addr = "0.0.0.0:{{ middleware_ingress_port | default('8443') }}"
+auth_token = "{{ vault_middleware_auth_token }}"
+max_payload_bytes = {{ middleware_max_payload | default('10485760') }}
+tls_enabled = {{ middleware_tls_enabled | default('true') | lower }}
+tls_cert_path = "/config/certs/server.pem"
+tls_key_path = "/config/certs/server-key.pem"
+integrity_secret = "{{ vault_middleware_integrity_secret }}"
+integrity_ban_threshold = {{ middleware_ban_threshold | default('5') }}
+
+[destinations]
+nexus_enabled = {{ nexus_enabled | default(true) | lower }}
+splunk_enabled = {{ splunk_enabled | default(false) | lower }}
+elastic_enabled = {{ elastic_enabled | default(false) | lower }}
+sql_enabled = {{ sql_enabled | default(false) | lower }}
+
+[nexus]
+gateway_url = "{{ nexus_gateway_url | default('') }}"
+auth_token = "{{ nexus_auth_token | default('') }}"
+integrity_secret = "{{ nexus_integrity_secret | default(middleware_integrity_secret) }}"
+verify_tls = {{ nexus_verify_tls | default('true') | lower }}
+max_backoff_sec = 60
+
+[splunk]
+hec_url = "{{ splunk_hec_url | default('') }}"
+hec_token = "{{ splunk_hec_token | default('') }}"
+index_endpoint = "{{ splunk_index_endpoint | default('nexus_endpoint') }}"
+index_cloud = "{{ splunk_index_cloud | default('nexus_cloud') }}"
+index_network = "{{ splunk_index_network | default('nexus_network') }}"
+index_alerts = "{{ splunk_index_alerts | default('nexus_alerts') }}"
+index_default = "{{ splunk_index_default | default('nexus_endpoint') }}"
+alert_score_threshold = {{ splunk_alert_threshold | default('70') }}
+target_sourcetype = "nexus:generic"
+batch_size = {{ splunk_batch_size | default('500') }}
+timeout_seconds = 15
+verify_tls = {{ splunk_verify_tls | default('false') | lower }}
+
+[elastic]
+host = "{{ elastic_host | default('') }}"
+index_endpoint = "{{ elastic_index_endpoint | default('nexus-endpoint') }}"
+index_cloud = "{{ elastic_index_cloud | default('nexus-cloud') }}"
+index_network = "{{ elastic_index_network | default('nexus-network') }}"
+index_default = "{{ elastic_index_default | default('nexus-telemetry') }}"
+auth = "{{ elastic_auth | default('') }}"
+pipeline = "{{ elastic_pipeline | default('nexus-telemetry-pipeline') }}"
+batch_size = {{ elastic_batch_size | default('1000') }}
+timeout_seconds = 15
+verify_tls = {{ elastic_verify_tls | default('false') | lower }}
+
+[sql]
+host = "{{ sql_host | default('') }}"
+port = {{ sql_port | default('1433') }}
+database = "{{ sql_database | default('Sensor_Telemetry') }}"
+use_sspi = {{ sql_use_sspi | default('false') | lower }}
+user = "{{ sql_user | default('') }}"
+pass = "{{ sql_pass | default('') }}"
+encryption = "{{ sql_encryption | default('Required') }}"
+trust_server_cert = {{ sql_trust_cert | default('true') | lower }}
+sproc = "{{ sql_sproc | default('EXEC dbo.sp_IngestSensorTelemetry @json = @p1') }}"
+batch_size = {{ sql_batch_size | default('2000') }}
+test_webhook_url = "{{ sql_test_webhook | default('') }}"
+
+[schemas]
+cim_mappings_file = "/config/cim_mappings.yaml"
+ecs_mappings_file = "/config/ecs_mappings.yaml"

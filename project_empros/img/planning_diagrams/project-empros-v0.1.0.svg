@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1050" width="100%" height="100%">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b0bec5" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#80d8ff" />
+    </marker>
+  </defs>
+
+  <style>
+    /* Base Box Styling with bright contrast strokes */
+    .box { rx: 6px; ry: 6px; stroke-width: 1.5; }
+    .sensor { fill: #263238; stroke: #546e7a; }
+    .proxy { fill: #e65100; stroke: #ffb300; }
+    .ingress { fill: #004d40; stroke: #1de9b6; }
+    .nats { fill: #311b92; stroke: #b388ff; }
+    .worker-hot { fill: #00695c; stroke: #80cbc4; }
+    .worker-cold { fill: #37474f; stroke: #90a4ae; }
+    .qdrant { fill: #0d47a1; stroke: #82b1ff; }
+    .s3 { fill: #006064; stroke: #84ffff; }
+    .redis { fill: #b71c1c; stroke: #ff8a80; }
+    .hunter { fill: #bf360c; stroke: #ffab91; }
+    .external { fill: #212121; stroke: #9e9e9e; }
+
+    /* Typography */
+    .text-title { fill: #ffffff; font-family: sans-serif; font-size: 15px; font-weight: bold; text-anchor: middle; }
+    .text-sub { fill: #cfd8dc; font-family: sans-serif; font-size: 12px; text-anchor: middle; }
+
+    /* Dark Mode Annotation Boxes (Neon Green) */
+    .annotation-box { fill: rgba(105, 240, 174, 0.05); stroke: #69f0ae; stroke-width: 1.5; stroke-dasharray: 4,4; rx: 4px; ry: 4px; }
+    .annotation-text { fill: #69f0ae; font-family: monospace; font-size: 12px; font-weight: 600; }
+
+    /* Blue Annotations */
+    .annotation-text-blue { fill: #80d8ff; font-family: monospace; font-size: 13px; font-weight: bold; }
+
+    /* Connecting Lines */
+    .line { stroke: #b0bec5; stroke-width: 2; fill: none; }
+    .line-blue { stroke: #80d8ff; stroke-width: 2; stroke-dasharray: 4,4; fill: none; }
+
+    /* Main Header */
+    .header { font-family: sans-serif; font-size: 24px; font-weight: bold; fill: #ffffff; text-anchor: middle; }
+  </style>
+
+  <text x="550" y="40" class="header">Sentinel Nexus: Distributed Data &amp; Security Flow</text>
+
+  <rect x="50" y="80" width="180" height="60" class="box sensor" />
+  <text x="140" y="115" class="text-title">Endpoint Fleet</text>
+
+  <rect x="280" y="80" width="220" height="60" class="box proxy" />
+  <text x="390" y="105" class="text-title">HAProxy Edge</text>
+  <text x="390" y="125" class="text-sub">L4 Load Balancer</text>
+
+  <rect x="280" y="145" width="220" height="55" class="annotation-box" />
+  <text x="290" y="165" class="annotation-text">✓ KTLS 1.3 Termination</text>
+  <text x="290" y="185" class="annotation-text">✓ Max Conn Caps (DDoS Shield)</text>
+
+  <rect x="600" y="80" width="260" height="60" class="box ingress" />
+  <text x="730" y="105" class="text-title">Core Ingress Fleet</text>
+  <text x="730" y="125" class="text-sub">Axum Zero-Trust Gateway</text>
+
+  <rect x="600" y="145" width="260" height="70" class="annotation-box" />
+  <text x="610" y="165" class="annotation-text">✓ Cryptographic JWT Validation</text>
+  <text x="610" y="185" class="annotation-text">✓ Strict Struct Schema Parsing</text>
+  <text x="610" y="205" class="annotation-text">✓ Math Bounds Enforcement</text>
+
+  <rect x="600" y="260" width="260" height="60" class="box nats" />
+  <text x="730" y="285" class="text-title">NATS JetStream Cluster</text>
+  <text x="730" y="305" class="text-sub">Persistent Message Bus</text>
+
+  <rect x="600" y="325" width="260" height="70" class="annotation-box" />
+  <text x="610" y="345" class="annotation-text">✓ Ed25519 NKey Authentication</text>
+  <text x="610" y="365" class="annotation-text">✓ LUKS Encrypted NVMe Storage</text>
+  <text x="610" y="385" class="annotation-text">✓ Deterministic Topic Sharding</text>
+
+  <rect x="350" y="440" width="240" height="50" class="box worker-hot" />
+  <text x="470" y="460" class="text-title">Worker: Qdrant</text>
+  <text x="470" y="478" class="text-sub">High-Speed Upsert</text>
+
+  <rect x="350" y="495" width="240" height="40" class="annotation-box" />
+  <text x="360" y="510" class="annotation-text">✓ UUIDv5 Hash Idempotency</text>
+  <text x="360" y="528" class="annotation-text">✓ gRPC Circuit Breaker</text>
+
+  <rect x="750" y="440" width="240" height="50" class="box worker-cold" />
+  <text x="870" y="460" class="text-title">Worker: S3 Archive</text>
+  <text x="870" y="478" class="text-sub">Data Lake Spooling</text>
+
+  <rect x="750" y="495" width="240" height="40" class="annotation-box" />
+  <text x="760" y="510" class="annotation-text">✓ NDJSON Serialization</text>
+  <text x="760" y="528" class="annotation-text">✓ In-Memory GZIP Buffer</text>
+
+  <rect x="350" y="580" width="240" height="60" class="box qdrant" />
+  <text x="470" y="605" class="text-title">Qdrant DB (Hot Storage)</text>
+  <text x="470" y="625" class="text-sub">Vector Similarity Index</text>
+
+  <rect x="350" y="645" width="240" height="40" class="annotation-box" />
+  <text x="360" y="660" class="annotation-text">✓ 14-Day Vector TTL (Eviction)</text>
+  <text x="360" y="678" class="annotation-text">✓ on_disk HNSW Graph</text>
+
+  <rect x="750" y="580" width="240" height="60" class="box s3" />
+  <text x="870" y="605" class="text-title">Object Storage (Cold)</text>
+  <text x="870" y="625" class="text-sub">Historical Data Lake</text>
+
+  <rect x="750" y="645" width="240" height="40" class="annotation-box" />
+  <text x="760" y="660" class="annotation-text">✓ WORM Compliance Lock</text>
+  <text x="760" y="678" class="annotation-text">✓ AES-256 Encryption</text>
+
+  <rect x="350" y="750" width="240" height="60" class="box hunter" />
+  <text x="470" y="775" class="text-title">LLM Hunter Fleet</text>
+  <text x="470" y="795" class="text-sub">Autonomous Correlation Daemon</text>
+
+  <rect x="350" y="815" width="240" height="40" class="annotation-box" />
+  <text x="360" y="830" class="annotation-text">✓ Pre-LLM Event Aggregation</text>
+  <text x="360" y="848" class="annotation-text">✓ API Rate-Limit Protection</text>
+
+  <rect x="80" y="750" width="200" height="60" class="box redis" />
+  <text x="180" y="775" class="text-title">Redis Cluster</text>
+  <text x="180" y="795" class="text-sub">Distributed State</text>
+
+  <rect x="80" y="815" width="200" height="40" class="annotation-box" />
+  <text x="90" y="830" class="annotation-text">✓ SETNX Distributed Mutex</text>
+  <text x="90" y="848" class="annotation-text">✓ 7-Day Key TTL</text>
+
+  <rect x="350" y="900" width="240" height="60" class="box external" />
+  <text x="470" y="935" class="text-title">LLM Provider (API)</text>
+
+  <rect x="650" y="900" width="200" height="60" class="box external" />
+  <text x="750" y="935" class="text-title">SOAR / Webhook</text>
+
+  <path d="M 230 110 L 280 110" class="line" marker-end="url(#arrow)" />
+  <path d="M 500 110 L 600 110" class="line" marker-end="url(#arrow)" />
+  <path d="M 730 215 L 730 260" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 600 290 L 470 440" class="line" marker-end="url(#arrow)" />
+  <path d="M 860 395 L 870 440" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 470 535 L 470 580" class="line" marker-end="url(#arrow)" />
+  <path d="M 870 535 L 870 580" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 470 685 L 470 750" class="line" marker-end="url(#arrow)" />
+
+  <path d="M 350 780 L 280 780" class="line-blue" marker-end="url(#arrow-blue)" />
+  <text x="295" y="770" class="annotation-text-blue">SETNX</text>
+
+  <path d="M 470 855 L 470 900" class="line" marker-end="url(#arrow)" />
+  <path d="M 590 780 L 750 900" class="line" marker-end="url(#arrow)" />
+
+</svg>

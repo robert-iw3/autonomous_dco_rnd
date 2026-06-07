@@ -1,0 +1,26 @@
+[package]
+name = "nexus-aws-vpc-connector"
+version = "0.1.0"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+aws-config = { version = "1.1", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.12"
+aws-sdk-sqs = "1.12"
+aws-sdk-dynamodb = "1.12"
+parquet = { version = "53", features = ["async"] }
+arrow = "53"
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+dashmap = "5.5"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5"

@@ -1,0 +1,26 @@
+=============================================
+  Rust Security Audit - Thu May 21 08:07:27 CDT 2026
+=============================================
+
+---------------------------------------------
+  ..
+---------------------------------------------
+    Updating crates.io index
+     Locking 353 packages to latest Rust 1.95.0 compatible versions
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding libbpf-cargo v0.24.0 (available: v0.24.8)
+      Adding libbpf-rs v0.24.0 (available: v0.24.8)
+      Adding matchit v0.8.4 (available: v0.8.6)
+      Adding mimalloc v0.1.43 (available: v0.1.51)
+      Adding reqwest v0.13.1 (available: v0.13.3)
+      Adding rusqlite v0.32.1 (available: v0.39.0)
+      Adding toml v0.8.23 (available: v1.1.2+spec-1.1.0)
+      Adding yara v0.28.0 (available: v0.32.0)
+    Fetching advisory database from `https://github.com/RustSec/advisory-db.git`
+      Loaded 1096 security advisories (from /usr/local/cargo/advisory-db)
+    Updating crates.io index
+    Scanning Cargo.lock for vulnerabilities (354 crate dependencies)
+
+=============================================
+  Audit Complete
+=============================================

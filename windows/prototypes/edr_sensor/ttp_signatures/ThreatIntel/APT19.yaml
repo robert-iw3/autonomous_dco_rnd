@@ -1,0 +1,93 @@
+# =============================================================================
+# APT19 (Codoso Team)
+# =============================================================================
+
+- ttp_signature:
+    name: "APT19 Spearphishing with Malicious Documents"
+    severity: "Critical"
+    meta:
+      tactic: "Initial Access (TA0001)"
+      technique: "Spearphishing Attachment (T1566.001)"
+      procedure: "APT19 delivering initial access via malicious Office documents"
+    match:
+      actor: "winword.exe"
+      type: "FILE_EVENT"
+      target:
+        - "*.vbs"
+        - "*.ps1"
+        - "*.exe"
+        - "*.dll"
+        - "*.js"
+    filter:
+      exclude_path:
+        - "C:\\Users\\*\\AppData\\Local\\Microsoft\\Office\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "APT19 PowerShell Encoded Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "APT19 using encoded PowerShell for execution"
+    match:
+      actor: "powershell.exe"
+      type: "PROCESS_START"
+      target: "-enc"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+      exclude_actor_cmd: "powershell.exe -enc"
+
+- ttp_signature:
+    name: "APT19 Living-off-the-Land Chain"
+    severity: "High"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Signed Binary Proxy Execution (T1218)"
+      procedure: "APT19 abusing multiple LOLBins"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "rundll32.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "rundll32.exe"
+
+- ttp_signature:
+    name: "APT19 Registry Run Key Persistence"
+    severity: "Critical"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Boot or Logon Autostart Execution: Registry Run Keys (T1547.001)"
+      procedure: "APT19 maintaining persistence via Run key using reg.exe or custom binaries"
+    match:
+      actor: "**"
+      type: "REGISTRY_EVENT"
+      target: "*\\Microsoft\\Windows\\CurrentVersion\\Run*"
+    filter:
+      exclude_actor:
+        - "svchost.exe"
+        - "MoUsoCoreWorker.exe"
+        - "SearchIndexer.exe"
+      exclude_target_value:
+        - "*LastRunVersion*"
+        - "*FeatureTimestampOfLatestRun*"
+        - "*Microsoft\\Teams\\*"
+        - "*OneDrive.exe*"
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "APT19 WMI Lateral Movement"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "APT19 using WMI for lateral movement"
+    match:
+      actor: "wmic.exe"
+      type: "PROCESS_START"
+      target: "/node:"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+      exclude_actor_cmd: "wmic.exe /node:"

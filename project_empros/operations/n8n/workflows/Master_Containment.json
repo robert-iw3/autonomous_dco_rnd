@@ -1,0 +1,470 @@
+{
+  "name": "Master_Containment",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "master-containment",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "path": "rlhf-feedback",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "rlhf-webhook",
+      "name": "Receive WebUI Feedback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nats-server:8222/publish/nexus.training.rlhf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\": \"{{ $json.body.incident_id }}\",\n  \"swarm_verdict\": \"{{ $json.body.swarm_verdict }}\",\n  \"operator_action\": \"{{ $json.body.operator_action }}\",\n  \"timestamp\": \"{{ $now }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "publish-rlhf",
+      "name": "Publish to NATS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        220,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Initialize execution tracking\nconst steps = $input.first().json.body.execution_steps || [];\nconst incidentId = $input.first().json.body.incident_id || 'UNKNOWN';\nconst sourceType = $input.first().json.body.source_type || '';\n\nreturn [{\n  json: {\n    incident_id: incidentId,\n    source_type: sourceType,\n    total_steps: steps.length,\n    completed: 0,\n    failed: 0,\n    errors: [],\n    steps: steps\n  }\n}];"
+      },
+      "id": "init-tracker",
+      "name": "Initialize Tracker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "steps",
+        "options": {
+          "destinationFieldName": "current_step"
+        }
+      },
+      "id": "split-steps",
+      "name": "Iterate Steps",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.current_step.method }}",
+        "url": "={{ $json.current_step.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": "={{ Object.entries($json.current_step.headers || {}).map(([name, value]) => ({name, value})) }}"
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.current_step.body) }}",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "id": "execute-api",
+      "name": "Execute API Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        660,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Track successful execution\nconst tracker = $('Initialize Tracker').first().json;\ntracker.completed += 1;\n\nreturn [{\n  json: {\n    ...tracker,\n    last_step: $json.current_step?.step_name || 'unknown',\n    last_status: 'success',\n    last_response: $json\n  }\n}];"
+      },
+      "id": "track-success",
+      "name": "Track Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Track failed execution and trigger SSH playbook fallback if EDR API is unreachable.\n// A connection error (no status code) or 5xx indicates the EDR agent is absent/down \u2014\n// in that case we dispatch to the Fallback_Containment workflow instead.\nconst tracker = $('Initialize Tracker').first().json;\ntracker.failed += 1;\n\nconst errMsg    = $json.error?.message || 'Unknown error';\nconst statusCode = $json.statusCode || null;\nconst step       = $json.current_step || {};\n\ntracker.errors.push({\n  step:        step.step_name || 'unknown',\n  error:       errMsg,\n  status_code: statusCode,\n  timestamp:   new Date().toISOString()\n});\n\n// EDR unreachable: no status code (connection refused/timeout) or 5xx server error.\n// Do NOT fall back for 4xx (auth/validation errors \u2014 EDR IS reachable but rejected the action).\nconst shouldFallback = !statusCode || statusCode >= 500;\n\nreturn [{\n  json: {\n    ...tracker,\n    last_step:       step.step_name || 'unknown',\n    last_status:     'failed',\n    should_fallback: shouldFallback,\n    fallback_target: step.body?.target_ip || step.body?.target || ''\n  }\n}];"
+      },
+      "id": "track-failure",
+      "name": "Track Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.should_fallback }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-fallback",
+      "name": "EDR Unreachable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n:5678/webhook/fallback-containment",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\":  \"{{ $json.incident_id }}\",\n  \"target\":       \"{{ $json.fallback_target }}\",\n  \"targets\":      [\"{{ $json.fallback_target }}\"],\n  \"action\":       \"isolate_host\",\n  \"action_type\":  \"isolate_host\",\n  \"source_type\":  \"{{ $json.source_type }}\",\n  \"reason\":       \"EDR API unreachable \u2014 falling back to SSH playbooks\"\n}",
+        "options": {
+          "timeout": 620000
+        }
+      },
+      "id": "invoke-fallback",
+      "name": "Invoke SSH Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1320,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all results and determine final status\nconst items = $input.all();\nlet totalCompleted = 0;\nlet totalFailed    = 0;\nlet allErrors      = [];\nlet incidentId     = '';\nlet totalSteps     = 0;\n\nfor (const item of items) {\n  totalCompleted = Math.max(totalCompleted, item.json.completed || 0);\n  totalFailed    = Math.max(totalFailed,    item.json.failed    || 0);\n  if (item.json.errors)      allErrors.push(...item.json.errors);\n  if (item.json.incident_id) incidentId = item.json.incident_id;\n  if (item.json.total_steps) totalSteps = item.json.total_steps;\n}\n\nconst status = totalFailed === 0 ? 'CONTAINED' :\n               totalCompleted === 0 ? 'FAILED' : 'PARTIAL_FAILURE';\n\nreturn [{\n  json: {\n    incident_id: incidentId,\n    status:      status,\n    total_steps: totalSteps,\n    completed:   totalCompleted,\n    failed:      totalFailed,\n    errors:      allErrors,\n    timestamp:   new Date().toISOString()\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://orchestrator:8000/api/v1/callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"status\": \"{{ $json.status }}\",\n  \"completed\": {{ $json.completed }},\n  \"failed\": {{ $json.failed }},\n  \"total_steps\": {{ $json.total_steps }},\n  \"errors\": {{ JSON.stringify($json.errors) }},\n  \"timestamp\": \"{{ $json.timestamp }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "signal-orchestrator",
+      "name": "Signal Orchestrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route cloud source_types to Cloud_Containment workflow instead of\n// the step-executor (which targets on-prem EDR/firewall/SSH).\nconst AWS_TYPES   = ['aws_guardduty','aws_cloudtrail','aws_vpc'];\nconst AZURE_TYPES = ['azure_entraid','azure_activity','azure_nsg'];\nconst GCP_TYPES   = ['gcp_audit','gcp_scc','gcp_vpc_flow'];\n\nconst payload = $input.first().json;\nconst st = (payload.source_type || '').toLowerCase();\nconst isCloud = AWS_TYPES.includes(st) || AZURE_TYPES.includes(st) || GCP_TYPES.includes(st);\n\nreturn [{ json: { ...payload, _is_cloud: isCloud, _cloud_source_type: st } }];"
+      },
+      "id": "check-cloud-source",
+      "name": "Cloud Source Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._is_cloud }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "cloud"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "route-cloud-or-onprem",
+      "name": "Cloud or On-Prem?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        440,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n:5678/webhook/cloud-containment",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"incident_id\":  \"{{ $json.incident_id }}\",\n  \"source_type\":  \"{{ $json._cloud_source_type }}\",\n  \"target_ip\":    \"{{ $json.target_ip || $json.target }}\",\n  \"action\":       \"{{ $json.action || 'isolate' }}\",\n  \"reason\":       \"{{ $json.reason || 'Master_Containment cloud dispatch' }}\",\n  \"raw\":          {{ JSON.stringify($json) }}\n}",
+        "options": {
+          "timeout": 130000
+        }
+      },
+      "id": "dispatch-to-cloud",
+      "name": "Dispatch to Cloud Containment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        660,
+        -400
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Initialize Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive WebUI Feedback": {
+      "main": [
+        [
+          {
+            "node": "Publish to NATS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Tracker": {
+      "main": [
+        [
+          {
+            "node": "Cloud Source Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Iterate Steps": {
+      "main": [
+        [
+          {
+            "node": "Execute API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute API Call": {
+      "main": [
+        [
+          {
+            "node": "Track Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Track Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Success": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Failure": {
+      "main": [
+        [
+          {
+            "node": "EDR Unreachable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EDR Unreachable?": {
+      "main": [
+        [
+          {
+            "node": "Invoke SSH Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoke SSH Fallback": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Signal Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloud Source Check": {
+      "main": [
+        [
+          {
+            "node": "Cloud or On-Prem?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloud or On-Prem?": {
+      "cloud": [
+        [
+          {
+            "node": "Dispatch to Cloud Containment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "extra": [
+        [
+          {
+            "node": "Iterate Steps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch to Cloud Containment": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}

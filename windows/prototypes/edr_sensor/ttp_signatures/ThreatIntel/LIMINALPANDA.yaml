@@ -1,0 +1,91 @@
+# =============================================================================
+# LIMINAL PANDA (UNC4986 / Gingham Typhoon)
+# =============================================================================
+
+- ttp_signature:
+    name: "Liminal Panda TinyShell Backdoor Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Non-Application Layer Protocol (T1095)"
+      procedure: "Execution of TinyShell, a lightweight C-based backdoor used for persistent remote access"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "tinyshell"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Liminal Panda LPS-Tunnel Port Forwarding"
+    severity: "Critical"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Protocol Tunneling (T1572)"
+      procedure: "Using the custom LPS-Tunnel tool to map internal telecom database ports to external C2 nodes"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "lps-tunnel"
+    filter:
+      exclude_path: "C:\\Windows\\*"
+
+- ttp_signature:
+    name: "Liminal Panda LSASS Dump via Comsvcs.dll"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping: LSASS Memory (T1003.001)"
+      procedure: "Abusing the native comsvcs.dll to dump LSASS memory without dropping custom binaries"
+    match:
+      actor: "rundll32.exe"
+      type: "PROCESS_START"
+      target: "comsvcs.dll, MiniDump"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+        - "C:\\Windows\\SysWOW64\\*"
+
+- ttp_signature:
+    name: "Liminal Panda FRP (Fast Reverse Proxy) Pivot"
+    severity: "High"
+    meta:
+      tactic: "Command and Control (TA0011)"
+      technique: "Proxy (T1090)"
+      procedure: "Deployment of FRP to establish a multi-stage reverse proxy from internal servers to the internet"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "frpc.exe -c"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+        - "C:\\Program Files\\*"
+
+- ttp_signature:
+    name: "Liminal Panda NBTScan Network Discovery"
+    severity: "High"
+    meta:
+      tactic: "Discovery (TA0007)"
+      technique: "Network Service Discovery (T1046)"
+      procedure: "Using NBTScan to identify Windows systems and NetBIOS shares within the telecom OAM network"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "nbtscan.exe"
+    filter:
+      exclude_path: "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "Liminal Panda Pypykatz Credential Harvesting"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping (T1003)"
+      procedure: "Using Python-based Pypykatz to parse LSASS dumps or extract credentials from the registry"
+    match:
+      actor: "python.exe"
+      type: "PROCESS_START"
+      target: "pypykatz"
+    filter:
+      exclude_path: "C:\\Windows\\*"

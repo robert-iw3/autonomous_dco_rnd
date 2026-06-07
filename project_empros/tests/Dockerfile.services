@@ -1,0 +1,47 @@
+# SECTION: services
+# Tests:   test_worker_contracts, lab_worker_rules/, lab_infra_contracts/,
+#          lab_operations_contracts/, lab_orchestration/
+# Deps:    pytest only -- all tests do pure source-code reads (no imports of
+#          compiled deps); subprocess used to validate cargo check syntax
+#   docker build -f project_empros/tests/Dockerfile.services -t nexus-test-services .
+FROM docker.io/alpine:3.23
+
+RUN apk add --no-cache python3 py3-pip
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN pip3 install --no-cache-dir "pytest>=7.4.0" "PyYAML>=6.0"
+
+# All source trees the contract tests read (no Python imports -- file reads only)
+COPY project_empros/services/           /repo/project_empros/services/
+COPY project_empros/infrastructure/     /repo/project_empros/infrastructure/
+COPY project_empros/orchestration/      /repo/project_empros/orchestration/
+COPY project_empros/operations/         /repo/project_empros/operations/
+COPY project_empros/middleware/         /repo/project_empros/middleware/
+COPY project_empros/libs/               /repo/project_empros/libs/
+COPY project_empros/analytics/llm_hunter/ /repo/project_empros/analytics/llm_hunter/
+COPY project_empros/mlops/scripts/      /repo/project_empros/mlops/scripts/
+COPY project_empros/mlops/data/staging/             /repo/project_empros/mlops/data/staging/
+COPY project_empros/tests/test_worker_contracts.py      /repo/project_empros/tests/
+COPY project_empros/tests/test_s3_query_alignment.py    /repo/project_empros/tests/
+COPY project_empros/tests/docker-compose.yml            /repo/project_empros/tests/
+COPY project_empros/tests/lab_worker_rules/             /repo/project_empros/tests/lab_worker_rules/
+COPY project_empros/tests/lab_infra_contracts/          /repo/project_empros/tests/lab_infra_contracts/
+COPY project_empros/tests/lab_operations_contracts/     /repo/project_empros/tests/lab_operations_contracts/
+COPY project_empros/tests/lab_orchestration/            /repo/project_empros/tests/lab_orchestration/
+COPY project_empros/tests/lab_nats_ingress/nats-test.conf /repo/project_empros/tests/lab_nats_ingress/
+COPY project_empros/tests/deploy/                       /repo/project_empros/tests/deploy/
+COPY project_empros/tests/pytest.ini                    /repo/project_empros/tests/
+
+ENV PYTHONPATH=/repo/project_empros
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/test_worker_contracts.py", \
+     "tests/lab_worker_rules/", \
+     "tests/lab_infra_contracts/", \
+     "tests/lab_operations_contracts/", \
+     "tests/lab_orchestration/", \
+     "-v", "--tb=short", "--junit-xml=/reports/services.xml"]

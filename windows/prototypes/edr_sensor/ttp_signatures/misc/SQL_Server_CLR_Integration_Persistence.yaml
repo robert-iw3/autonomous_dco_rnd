@@ -1,0 +1,11 @@
+- ttp_signature:
+    name: "SQL Server CLR Integration Persistence"
+    severity: "Medium"
+    meta:
+      tactic: "Persistence (TA0003)"
+      technique: "Server Software Component: SQL Stored Procedures (T1505.001)"
+      procedure: "sqlservr.exe enabling CLR integration in registry"
+    match:
+      actor: "sqlservr.exe"
+      type: "REGISTRY_EVENT"
+      target: "CLR enabled"

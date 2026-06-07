@@ -1,0 +1,66 @@
+[global]
+# Defines core sensor identity and operational behavior
+sensor_name = "c2-sensor-alpha"
+mode = "full" # Options: "collector" (passive/log), "standard" (ML analysis), "full" (ML + Active Defense)
+db_path = "/app/data/baseline.db" # Primary SQLite storage location
+auth_db_path = "/app/data/auth.db" # Local credential storage for API
+log_level = "info" # System verbosity: debug, info, warn, error
+
+[ebpf]
+# Configures the kernel-level observation engine
+bpf_object_path = "/app/ebpf/probes/c2_probe.bpf.o" # Compiled eBPF bytecode
+target_interface = "wlo1" # NIC for traffic capture
+ring_buffer_max_entries = 65536 # Size of kernel-to-user memory ring buffer
+capture_loopback = false # Ignores local traffic to reduce noise
+
+[api_dashboard]
+# Controls the local HTTPS management interface
+bind_address = "0.0.0.0"
+port = 8443
+tls_cert_path = "/app/certs/cert.pem"
+tls_key_path = "/app/certs/key.pem"
+static_ui_path = "/app/ui/static"
+# DEPRECATED: jwt_secret and default_admin_password are tracked for cleanup, use env vars.
+# On first boot, start_core will provide random generated credentials for login
+jwt_secret = "CHANGE_ME_IN_PRODUCTION"
+default_admin_password = "admin"
+
+[mitigation]
+# Logic for automated threat response
+enabled = false # Toggles automated blocking
+dry_run = true # If enabled, logs block actions without executing them
+containment_threshold = 90 # ML score requirement to trigger automatic mitigation
+
+[nexus]
+# Telemetry ingestion and forwarding settings
+enabled = false # Toggles nexus pipeline
+nats_url = "nats://nexus-server:4222" # NATS broker endpoint
+stream_name = "C2_TELEMETRY" # Targeted NATS JetStream
+subject_prefix = "nexus.telemetry" # Hierarchical subject structure
+gateway_url = "https://nexus-edge.local:443/api/v1/sensor/telemetry" # REST fallback API
+auth_token = "c2-sensor-alpha-secret-token" # Shared secret for nexus authentication
+spool_dir = "/app/data/spool" # Local parquet storage before transmission
+max_backoff_sec = 60.0 # Exponential backoff limit for failed transmission
+publish_delay_sec = 0.2 # Throttling to prevent network saturation
+
+# Spool disk limits: prevents local data storage from consuming all host disk space
+max_spool_bytes = 524288000   # 500 MB limit
+max_spool_files = 2000 # File count limit
+
+# DEPRECATED: JetStream stream retention (tracked for cleanup)
+#stream_max_bytes = 1073741824 # 1 GB
+#stream_max_age_sec = 604800   # 7 days
+
+# DEPRECATED: Authentication methods (tracked for cleanup)
+#auth_token = "your-nats-auth-token"
+#nkey_seed_path = "/app/certs/sensor.nk"
+#creds_path = "/app/certs/sensor.creds"
+
+[nexus.tls]
+# TLS configuration for outbound telemetry
+enabled = false
+ca_path = "/app/certs/nexus-ca.pem" # Root CA for nexus gateway validation
+# DEPRECATED: TLS fields (tracked for cleanup)
+#ca_path = "/app/certs/nats-ca.pem"
+#cert_path = "/app/certs/sensor-cert.pem"
+#key_path = "/app/certs/sensor-key.pem"

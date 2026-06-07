@@ -1,0 +1,10 @@
+# Exclude large runtime data and build artifacts from Docker build context.
+# Sensor tests read source files (Cargo.toml, *.rs) -- not runtime data or images.
+linux/c2_sensor/data/
+linux/c2_sensor/img/
+linux/*/target/
+project_empros/mlops/models/
+project_empros/mlops/data/training/
+*.pyc
+__pycache__/
+.git/

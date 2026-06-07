@@ -1,0 +1,98 @@
+# =============================================================================
+# UNC5221 (Ivanti Exploitation Actor / Post-Exploitation Windows Pivot)
+# =============================================================================
+
+- ttp_signature:
+    name: "UNC5221 Impacket WMIExec Lateral Movement"
+    severity: "Critical"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Windows Management Instrumentation (T1047)"
+      procedure: "UNC5221 pivoting from Ivanti appliance to Windows via Impacket wmiexec.py"
+    match:
+      actor: "WmiPrvSE.exe"
+      type: "PROCESS_START"
+      target: "cmd.exe /Q /c"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "UNC5221 Impacket SMBExec Service Execution"
+    severity: "Critical"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Service Execution (T1569.002)"
+      procedure: "UNC5221 executing commands over SMB via dynamically created services (smbexec.py)"
+    match:
+      actor: "services.exe"
+      type: "PROCESS_START"
+      target: "cmd.exe /c echo"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "UNC5221 Sliver C2 Process Hollowing (WerFault)"
+    severity: "Critical"
+    meta:
+      tactic: "Defense Evasion (TA0005)"
+      technique: "Process Injection: Process Hollowing (T1055.012)"
+      procedure: "UNC5221 staging Sliver C2 payload by hollowing native WerFault.exe"
+    match:
+      actor: "**"
+      type: "PROCESS_START"
+      target: "WerFault.exe"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+      exclude_actor_cmd:
+        - "svchost.exe"
+        - "explorer.exe"
+
+- ttp_signature:
+    name: "UNC5221 NetExec / CrackMapExec PowerShell Pivot"
+    severity: "High"
+    meta:
+      tactic: "Execution (TA0002)"
+      technique: "Command and Scripting Interpreter: PowerShell (T1059.001)"
+      procedure: "UNC5221 using NetExec to spray credentials and execute encoded PowerShell"
+    match:
+      actor: "cmd.exe"
+      type: "PROCESS_START"
+      target: "/c powershell -nop -w hidden -noni -ep bypass -e"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "UNC5221 Remote RDP Activation"
+    severity: "High"
+    meta:
+      tactic: "Lateral Movement (TA0008)"
+      technique: "Remote Services: Remote Desktop Protocol (T1021.001)"
+      procedure: "UNC5221 using remote registry or WMI to forcefully enable RDP on target servers"
+    match:
+      actor: "reg.exe"
+      type: "PROCESS_START"
+      target: "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 0"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\System32\\*"
+
+- ttp_signature:
+    name: "UNC5221 Active Directory DCSync Prep (LSA Protection Bypass)"
+    severity: "Critical"
+    meta:
+      tactic: "Credential Access (TA0006)"
+      technique: "OS Credential Dumping: LSA Secrets (T1003.004)"
+      procedure: "UNC5221 disabling RunAsPPL (LSA Protection) prior to dumping LSASS or performing DCSync"
+    match:
+      actor: "reg.exe"
+      type: "REGISTRY_EVENT"
+      target: "RunAsPPL"
+    filter:
+      exclude_path:
+        - "C:\\Windows\\*"
+      exclude_target_value:
+        - "1"

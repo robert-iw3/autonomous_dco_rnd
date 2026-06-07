@@ -1,0 +1,21 @@
+[package]
+name = "transmission"
+version = "0.0.1"
+edition = "2024"
+authors = ["Robert Weber"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+rust-ini = "0.21"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["rustls-tls"], default-features = false }
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+arrow = "50.0"
+parquet = { version = "50.0", features = ["arrow", "zstd"] }
+tikv-jemallocator = "0.5"
+chrono = { version = "0.4", features = ["serde"] }
+# Shared nexus HMAC integrity stamper (canonical order verified against core_ingress)
+nexus_integrity = { path = "../../windows_xdr_dev/nexus_integrity" }
+hex = "0.4"

@@ -1,0 +1,141 @@
+---
+# Trellix ENS SQL pipeline -- Docker Compose
+#
+# Services:
+#   staging-2022  -- SQL Server 2022 staging DB (profile: mssql2022)
+#   staging-2025  -- SQL Server 2025 staging DB (profile: mssql2025)
+#   transmit      -- Python: SQL → UEBA → Parquet → Nexus
+#
+# Usage:
+#   SQL 2022 + transmit:  docker compose --profile mssql2022 up -d
+#   SQL 2025 + transmit:  docker compose --profile mssql2025 up -d
+#
+# Required env vars (set in .env or environment):
+#   SA_PASSWORD              -- SQL Server SA password (min 8 chars, complexity)
+#   EPO_PRODUCTION_HOST      -- FQDN/IP of production ePO SQL Server
+#   EPO_READONLY_USER        -- Read-only SQL login on production ePO
+#   EPO_READONLY_PASSWORD    -- Password for EPO_READONLY_USER
+#   NEXUS_INGEST_URL         -- Nexus ingress endpoint
+#   NEXUS_HMAC_SECRET        -- HMAC-SHA256 signing key (from Ansible Vault)
+
+version: "3.9"
+
+networks:
+  ens_pipeline:
+    driver: bridge
+    internal: true      # no external egress from this network
+
+volumes:
+  mssql2022_data:
+  mssql2025_data:
+
+services:
+
+  # -- SQL Server 2022 staging ---------------------------------
+  staging-2022:
+    build:
+      context: .
+      dockerfile: Dockerfile.mssql2022
+    image: trellix-staging-mssql2022:latest
+    profiles: ["mssql2022"]
+    container_name: trellix_staging_2022
+    restart: unless-stopped
+    environment:
+      SA_PASSWORD:               "${SA_PASSWORD}"
+      ACCEPT_EULA:               "Y"
+      MSSQL_PID:                 "Developer"
+      MSSQL_MEMORY_LIMIT_MB:     "2048"
+      EPO_PRODUCTION_HOST:       "${EPO_PRODUCTION_HOST:-}"
+      EPO_READONLY_USER:         "${EPO_READONLY_USER:-}"
+      EPO_READONLY_PASSWORD:     "${EPO_READONLY_PASSWORD:-}"
+    volumes:
+      - mssql2022_data:/var/opt/mssql/data
+    ports:
+      - "1433:1433"
+    networks:
+      - ens_pipeline
+    healthcheck:
+      test: >
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$SA_PASSWORD" -C
+        -Q "SELECT name FROM sys.databases WHERE name='ConsolidatedEventsENS'"
+        | grep -q ConsolidatedEventsENS
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # -- SQL Server 2025 staging ---------------------------------
+  staging-2025:
+    build:
+      context: .
+      dockerfile: Dockerfile.mssql2025
+    image: trellix-staging-mssql2025:latest
+    profiles: ["mssql2025"]
+    container_name: trellix_staging_2025
+    restart: unless-stopped
+    environment:
+      SA_PASSWORD:               "${SA_PASSWORD}"
+      ACCEPT_EULA:               "Y"
+      MSSQL_PID:                 "Developer"
+      MSSQL_MEMORY_LIMIT_MB:     "2048"
+      EPO_PRODUCTION_HOST:       "${EPO_PRODUCTION_HOST:-}"
+      EPO_READONLY_USER:         "${EPO_READONLY_USER:-}"
+      EPO_READONLY_PASSWORD:     "${EPO_READONLY_PASSWORD:-}"
+    volumes:
+      - mssql2025_data:/var/opt/mssql/data
+    ports:
+      - "1433:1433"
+    networks:
+      - ens_pipeline
+    healthcheck:
+      test: >
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$SA_PASSWORD" -C
+        -Q "SELECT name FROM sys.databases WHERE name='ConsolidatedEventsENS'"
+        | grep -q ConsolidatedEventsENS
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # -- Transmission container ----------------------------------
+  # Reads from whichever staging container is up (MSSQL_HOST),
+  # applies UEBA/ML, converts to Parquet, HMAC-signs, sends to Nexus.
+  transmit:
+    build:
+      context: ./transmit
+      dockerfile: Dockerfile
+    image: trellix-transmit:latest
+    profiles: ["mssql2022", "mssql2025"]
+    container_name: trellix_transmit
+    restart: unless-stopped
+    depends_on:
+      staging-2022:
+        condition: service_healthy
+        required: false
+      staging-2025:
+        condition: service_healthy
+        required: false
+    environment:
+      MSSQL_HOST:                "${MSSQL_HOST:-staging-2022}"
+      MSSQL_PORT:                "1433"
+      MSSQL_DB:                  "ConsolidatedEventsENS"
+      MSSQL_USER:                "SA"
+      MSSQL_PASSWORD:            "${SA_PASSWORD}"
+      NEXUS_INGEST_URL:          "${NEXUS_INGEST_URL}"
+      NEXUS_HMAC_SECRET:         "${NEXUS_HMAC_SECRET}"
+      TRANSMIT_BATCH_SIZE:       "${TRANSMIT_BATCH_SIZE:-1000}"
+      TRANSMIT_INTERVAL_SECS:    "${TRANSMIT_INTERVAL_SECS:-60}"
+      UEBA_REFIT_INTERVAL:       "${UEBA_REFIT_INTERVAL:-500}"
+      # Air-gap: no external model downloads
+      TRANSFORMERS_OFFLINE:      "1"
+      HF_DATASETS_OFFLINE:       "1"
+    volumes:
+      - ./transmit/ueba_state:/app/ueba_state   # SQLite WAL persistence
+    networks:
+      - ens_pipeline
+    healthcheck:
+      test: ["CMD", "python", "-c", "import reader; print('ok')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

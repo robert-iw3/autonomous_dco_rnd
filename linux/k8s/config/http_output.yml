@@ -1,0 +1,23 @@
+# Falco output configuration
+# The transmitter tails the file_output log for Parquet conversion.
+# Sidekick receives via HTTP for the web UI dashboard.
+
+json_output: true
+json_include_output_property: true
+json_include_tags_property: true
+
+http_output:
+  enabled: true
+  url: "http://sidekick:2801/"
+
+file_output:
+  enabled: true
+  keep_alive: true
+  filename: /logs/falco-events.log
+
+webserver:
+  enabled: true
+  threadiness: 0
+  listen_port: 8765
+  k8s_healthz_endpoint: /healthz
+  ssl_enabled: false

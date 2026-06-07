@@ -1,0 +1,11 @@
+# Eval MiniLab dependencies -- deliberately lightweight (no PyTorch/transformers)
+# Runs on any Python 3.10+ without a GPU install
+requests>=2.31.0
+rich>=13.0.0
+pytest>=7.4.0
+python-dotenv>=1.0.0
+
+# Data pipeline simulation (DuckDB → Parquet, Qdrant vector store)
+duckdb>=0.10.0
+qdrant-client>=1.9.0
+pyarrow>=15.0.0

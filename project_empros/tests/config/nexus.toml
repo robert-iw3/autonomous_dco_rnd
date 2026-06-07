@@ -1,0 +1,386 @@
+# ==============================================================================
+# Sentinel Nexus Configuration Map
+# ==============================================================================
+
+[global]
+nats_url = "nats://nats:4222"
+telemetry_stream = "Tier5_Telemetry"
+telemetry_subject = "nexus.*.telemetry"
+dlq_subject_prefix = "nexus.dlq"
+
+sensor_stream = "Sensor_Telemetry"
+sensor_subject = "nexus.sensor.telemetry"
+
+[ingress]
+bind_addr = "0.0.0.0:8080"
+tls_enabled = false
+tls_cert = "certs/server.pem"
+tls_key = "certs/server-key.pem"
+
+[qdrant]
+grpc_url = "http://qdrant:6334"
+http_url = "http://qdrant:6333"
+collection_name = "ueba_vectors"
+batch_size = 500
+
+[qdrant.named_vectors]
+c2_math         = 8
+sentinel_math   = 5
+windows_math    = 6   # sysmon_sensor 6D (expanded: +grant_access_score, +driver_trust_score)
+deepsensor_math = 4   # windows_deepsensor 4D
+trellix_math    = 6   # trellix_ens 6D: +entropy_score +frequency_score
+cloud_flow      = 5
+network_tap     = 8
+
+[hunter]
+active_provider = "internal_sovereign"
+# Ordered fallback chain, consulted only if the active provider is unreachable.
+# SOVEREIGN BY DEFAULT: list only internal providers here. Add a frontier name
+# (e.g. "primary_anthropic") ONLY if you deliberately accept external egress of
+# expert prompts for resilience -- DLP does not scrub full prompts.
+failover_providers = ["internal_ollama"]
+similarity_threshold = 0.85
+hunt_interval_seconds = 300
+
+# ==============================================================================
+# Archive & Cold Storage (Dual-Provider S3)
+# ==============================================================================
+# Set 'provider' to "minio", "minio_onprem", or "aws" to select the active backend.
+# All providers expose the same S3-compatible API so DuckDB httpfs, the object_store
+# crate, and boto3 all work without code changes.
+
+[archive]
+provider = "minio_onprem"
+bucket_name = "nexus-cold-storage"
+
+[archive.partitioning]
+# Hive-style partitioning: telemetry/{type}/dt={YYYY-MM-DD}/hour={HH}/{uuid}.parquet
+# Enables DuckDB automatic partition discovery and predicate pushdown on dt/hour.
+path_style = "hive"
+# Future compaction: merge small files when this row count is reached per partition
+network_tap_compaction_rows = 100000
+
+[archive.minio]
+# Shared MinIO service (e.g., existing infrastructure)
+endpoint = "http://minio-service.sentinel-nexus.svc.cluster.local:9000"
+
+[archive.minio_onprem]
+# Dedicated on-prem MinIO deployed by the minio_node Ansible role
+endpoint = "https://minio.internal.local:9000"
+access_key_env_var = "MINIO_ACCESS_KEY"
+secret_key_env_var = "MINIO_SECRET_KEY"
+
+[archive.aws]
+region = "us-east-1"
+# AWS credentials via IAM instance profile (no keys needed)
+
+# ==============================================================================
+# Model A: Network Baseline Engine (LSTM-Autoencoder)
+# ==============================================================================
+# The baseline detector runs as a standalone service (serve_baseline.py) that
+# consumes network_tap flows from NATS and fires anomaly events when the
+# reconstruction error exceeds the calibrated threshold.
+
+[baseline]
+# Sliding window parameters
+window_size = 64          # Flows per window (must match training)
+stride = 16               # Inference every N new flows per IP pair
+max_tracked_pairs = 50000 # Memory cap: pairs x window_size x 8 floats x 4 bytes
+
+# Model architecture (must match train_lstm_ae.py)
+hidden_dim = 64
+latent_dim = 32
+
+# Calibrated by train_lstm_ae.py (μ + 3σ on eval set reconstruction error)
+# Updated automatically by the training pipeline. Manual override available.
+reconstruction_threshold = 0.05
+
+# Path to saved model weights (safetensors only -- no pickle)
+model_path = "/opt/sentinel-nexus/mlops/models/baseline"
+
+# NATS subjects
+input_subject = "nexus.network_tap.telemetry"
+alert_subject = "nexus.alerts.baseline"
+
+[sensors]
+accepted_ids = ["c2-sensor-alpha", "c2-sensor-beta", "c2-sensor-gamma"]
+max_batch_size = 5000
+retention_hours = 168
+
+[sentinel]
+accepted_ids = ["linux-sentinel-prod", "linux-sentinel-dmz"]
+sentinel_stream = "Sentinel_Telemetry"
+sentinel_subject = "nexus.sentinel.telemetry"
+max_payload_mb = 10
+
+# ==============================================================================
+# Dynamic Parquet Schema Mappings
+# ==============================================================================
+
+[schema_mappings.linux_c2]
+identifier_column = "outbound_ratio"
+vector_name = "c2_math"
+primary_key_column = "id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+
+context_columns = [
+    "process_name", "pid", "uid", "process_hash", "event_type",
+    "dst_ip", "dst_port", "packet_size_min", "packet_size_max",
+    "dns_query", "dns_flags", "mitre_tactic", "ml_result",
+    "reasons", "suppressed", "hostname"
+]
+
+[schema_mappings.windows_c2]
+identifier_column = "Image"
+vector_name = "c2_math"
+primary_key_column = "event_id"
+timestamp_column = "timestamp"
+sensor_id_column = "host"
+
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+
+context_columns = [
+    "Image", "CommandLine", "PID", "TID",
+    "DestIp", "Port", "Query", "ThreatIntel"
+]
+
+[schema_mappings.linux_sentinel]
+identifier_column = "shannon_entropy"
+vector_name = "sentinel_math"
+primary_key_column = "event_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"   # fixed: must be the reporting HOST, not a network destination
+
+vector_columns = [
+    "shannon_entropy", "execution_velocity", "tuple_rarity",
+    "path_depth", "anomaly_score"
+]
+
+context_columns = [
+    "level", "mitre_tactic", "mitre_technique", "pid", "ppid", "uid",
+    "container_name", "comm", "command_line", "parent_comm", "user_name",
+    "target_file", "dest_ip", "dest_port", "message"
+]
+
+[schema_mappings.windows_deepsensor]
+identifier_column = "max_velocity"
+vector_name = "deepsensor_math"
+primary_key_column = "event_id"
+timestamp_column = "timestamp"
+sensor_id_column = "host"   # fixed: EdrRow.host is the Windows hostname
+
+vector_columns = ["score", "avg_entropy", "max_velocity", "event_count"]
+
+context_columns = [
+    "category", "event_type", "pid", "parent_pid", "tid", "path",
+    "parent_image", "command_line", "event_user", "destination_ip", "port",
+    "signature_name", "tactic", "technique", "severity"
+]
+
+[schema_mappings.cloud_flow]
+identifier_column = "event_type"
+vector_name = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+
+vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+
+context_columns = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
+    "process_hash", "reasons", "event_type", "description"
+]
+
+[schema_mappings.network_tap]
+identifier_column = "session_id"
+vector_name = "network_tap"
+primary_key_column = "session_id"
+timestamp_column = "timestamp_start"
+sensor_id_column = "sensor_name"
+
+vector_columns = [
+    "byte_ratio", "avg_inter_arrival", "variance_inter_arrival",
+    "ratio_small_packets", "ratio_large_packets", "payload_entropy",
+    "session_duration_ms", "packets_src"
+]
+
+context_columns = [
+    "src_ip", "dst_ip", "dst_port", "protocol_name",
+    "dns_query", "http_uri", "http_useragent",
+    "tls_ja3", "tls_ja3s", "cert_cn", "cert_self_signed",
+    "dst_geo_country", "dst_asn_org", "hostname",
+    "is_internal_dst", "port_class"
+]
+
+# ── Missing schema mappings (synced from services/config/nexus.toml) ─────────
+
+[schema_mappings.sysmon_sensor]
+identifier_column  = "sysmon_event_id"
+vector_name        = "windows_math"
+primary_key_column = "sysmon_event_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "command_entropy", "parent_child_score", "integrity_score", "anomaly_score",
+    "grant_access_score", "driver_trust_score",
+]
+context_columns = [
+    "Image", "CommandLine", "ParentImage", "ParentCommandLine",
+    "User", "IntegrityLevel", "ProcessId", "ParentProcessId",
+    "DestinationIp", "DestinationPort", "Protocol",
+    "TargetImage", "GrantedAccess",
+    "TargetObject", "Details", "EventType_reg",
+    "ImageLoaded", "Signed", "SignatureStatus",
+    "PipeName", "QueryName", "QueryResults",
+    "TargetFilename", "TamperingType", "Hashes",
+]
+
+[schema_mappings.trellix_ens]
+identifier_column  = "detection_name"
+vector_name        = "trellix_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "severity_score", "threat_score", "action_score", "anomaly_score",
+    "entropy_score", "frequency_score"
+]
+context_columns = [
+    "host", "process", "pid", "user", "file_path", "file_name",
+    "threat_source_url", "detection_name", "threat_type", "action", "severity",
+    "threat_category", "event_id", "source_component", "analyzer_detection_method"
+]
+
+[schema_mappings.macos_sensor]
+identifier_column  = "plist_path"
+vector_name        = "windows_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "command_entropy", "parent_child_score", "integrity_score", "anomaly_score",
+    "grant_access_score", "driver_trust_score",
+]
+context_columns = ["process_name", "file_path", "plist_path", "code_signature", "quarantine_flag", "publisher"]
+
+# ── GCP / VMware Connectors (UnifiedFlowRecord → cloud_flow vector) ──────────
+# All emit the same 33-column UnifiedFlowRecord schema. Each gets its own
+# sensor_type for per-source NATS routing and Hive partition granularity,
+# but they share the cloud_flow named vector (size 5).
+
+[schema_mappings.gcp_audit]
+identifier_column = "event_type"
+vector_name = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
+    "process_hash", "reasons", "event_type", "description",
+]
+
+[schema_mappings.gcp_scc]
+identifier_column = "event_type"
+vector_name = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
+    "process_hash", "reasons", "event_type", "description",
+]
+
+[schema_mappings.gcp_vpc_flow]
+identifier_column = "event_type"
+vector_name = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
+    "process_hash", "reasons", "event_type", "description",
+]
+
+[schema_mappings.vmware_syslog]
+identifier_column = "event_type"
+vector_name = "cloud_flow"
+primary_key_column = "sensor_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
+context_columns = [
+    "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
+    "process_hash", "reasons", "event_type", "description",
+]
+
+# ==============================================================================
+# Threat-Intelligence Gateway (tools/ti_lookup.py)
+# ==============================================================================
+# A provider runs only if it is listed in `enabled_providers` AND its API key
+# env var is present (set in hunter.env from Ansible Vault -- secrets never live
+# in this file). External providers are skipped automatically for internal /
+# private IPs; only the internal 'misp' feed (egress=False) may resolve internal
+# assets. Results are cached in Redis (24h) and rate-limited per free-tier budget.
+
+[threat_intel]
+enabled_providers = ["misp", "virustotal", "abuseipdb", "otx", "xforce", "greynoise"]
+
+# Env vars consumed (wired in hunter.env.j2):
+#   VT_API_KEY           VirusTotal          ip/domain/hash   (4/min · 500/day)
+#   ABUSEIPDB_API_KEY    AbuseIPDB           ip               (1000/day)
+#   OTX_API_KEY          AlienVault OTX      ip/domain/hash
+#   XFORCE_API_KEY       IBM X-Force         ip/domain/hash   (needs both key + password)
+#   XFORCE_API_PASSWORD  IBM X-Force password
+#   GREYNOISE_API_KEY    GreyNoise Community ip
+# Tunables: NEXUS_TI_CACHE_TTL, NEXUS_TI_HTTP_TIMEOUT,
+#           NEXUS_ABUSEIPDB_THRESHOLD, NEXUS_XFORCE_THRESHOLD
+
+[threat_intel.misp]
+# Internal sovereign IOC feed. Endpoint is non-secret config; the key is an env
+# reference following the same convention as the LLM provider blocks below.
+endpoint = "https://misp.internal.local"
+api_key_env_var = "MISP_API_KEY"
+verify_tls = true   # set false, or a CA-bundle path, for a self-signed internal cert
+
+# ==============================================================================
+# LLM Provider Definitions
+# ==============================================================================
+[llm.internal_sovereign]
+api_type = "rest_openai_compatible"
+api_key_env_var = ""
+endpoint = "http://nexus-vllm:8000/v1"
+model = "nexus-spatial-endpoint"  # matches MODEL_C_DISPLAY in mlops/model_config.toml
+
+[llm.primary_openai]
+api_type = "openai"
+api_key_env_var = "OPENAI_API_KEY"
+model = "gpt-4o"
+
+[llm.primary_anthropic]
+api_type = "anthropic"
+api_key_env_var = "ANTHROPIC_API_KEY"
+model = "claude-opus-4-6"
+
+[llm.internal_ollama]
+api_type = "rest_openai_compatible"
+api_key_env_var = ""
+endpoint = "http://ollama:11434/v1/chat/completions"
+model = "${NEXUS_OLLAMA_MODEL:-llama3.3}"  # override via NEXUS_OLLAMA_MODEL env var
+
+[llm.azure_corporate]
+api_type = "rest_openai_compatible"
+api_key_env_var = "AZURE_OPENAI_KEY"
+endpoint = "https://corp-ai.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview"
+model = "gpt-4o"

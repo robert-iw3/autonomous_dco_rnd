@@ -1,0 +1,17 @@
+# ==============================================================================
+# allowlist.rules -- TIER 0 (action: pass)  [SID 1000000-1000999 reserved]
+#
+# 'pass' is evaluated FIRST in action-order, so matches here are permitted and
+# will NOT be dropped even if a Tier-1 drop rule also matches. Use sparingly.
+# All examples are commented; uncomment + edit for your environment. Address
+# vars ($HOME_NET etc.) and datasets keep these environment-agnostic.
+# ==============================================================================
+
+# Authorized vulnerability scanner: exempt from Tier-2 scan->drop escalation.
+#pass ip [SCANNER_IP/32] any -> $HOME_NET any (msg:"LOCAL allowlist authorized scanner"; sid:1000001; rev:1;)
+
+# Health-check / liveness probe source that would otherwise look like recon.
+#pass tcp $HOME_NET any -> $HOME_NET [80,443] (msg:"LOCAL allowlist healthcheck"; flow:established; sid:1000002; rev:1;)
+
+# Known-good automation that triggers a noisy policy rule.
+#pass tcp [AUTOMATION_CIDR] any -> $K8S_API $KUBE_API_PORTS (msg:"LOCAL allowlist CI to API"; flow:established; sid:1000003; rev:1;)

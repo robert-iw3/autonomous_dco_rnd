@@ -1,0 +1,111 @@
+%YAML 1.1
+---
+
+# Suricata configuration for Docker API-targeting malware detection
+# Integrates docker_malware.rules and docker_malware_hashes.txt
+
+# Basic Suricata configuration
+default-log-dir: /var/log/suricata/
+default-rule-path: /etc/suricata/rules/
+
+# Define address groups
+vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"  # Adjust to your internal network
+    EXTERNAL_NET: "!$HOME_NET"
+
+# Rule files to load
+rule-files:
+  - docker_api.rules  # Load the Docker malware rules
+
+# File store and hash checking
+file-store:
+  enabled: yes
+  dir: /var/log/suricata/files
+  filestore: yes
+filemd5: /etc/suricata/data/docker_malware_hashes.txt  # Path to hash list file
+
+# Enable DNS and HTTP protocol inspection
+app-layer:
+  protocols:
+    dns:
+      enabled: yes
+      detection-ports:
+        dp: 53
+    http:
+      enabled: yes
+      libhtp:
+        default-config:
+          personality: IDS
+          request-body-limit: 0
+          response-body-limit: 0
+
+# Output configuration for alerts and logs
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert:
+            payload: yes
+            packet: yes
+            metadata: yes
+        - dns:
+            query: yes
+            answer: yes
+        - http:
+            extended: yes
+        - file:
+            enabled: yes
+
+# Packet capture settings
+af-packet:
+  - interface: eth0  # Adjust to your network interface
+    threads: auto
+    defrag: yes
+    cluster-type: cluster_flow
+    cluster-id: 99
+    buffer-size: 32768
+
+# Logging settings
+logging:
+  default-log-level: info
+  outputs:
+    - console:
+        enabled: yes
+    - file:
+        enabled: yes
+        filename: /var/log/suricata/suricata.log
+
+# Host OS settings (adjust as needed)
+host-os-policy:
+  linux: 0.0.0.0/0
+
+# Enable detection mode
+detect-engine:
+  - profile: medium
+  - custom-values:
+      toclient-groups: 200
+      toserver-groups: 200
+  - sgh-mpm-context: auto
+  - inspection-recursion-limit: 0
+
+# Threading configuration
+threading:
+  set-cpu-affinity: no
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ "0" ]
+    - worker-cpu-set:
+        cpu: [ "0-3" ]  # Adjust based on CPU cores
+  detect-thread-ratio: 1.0
+
+# Notes:
+# - Place docker_malware.rules and docker_malware_hashes.txt in /etc/suricata/rules/ and /etc/suricata/data/, respectively.
+# - Adjust HOME_NET to match your internal network CIDR blocks.
+# - Update af-packet interface (e.g., eth0) to your network interface.
+# - EVE JSON output includes alerts, DNS queries, HTTP traffic, and file events for correlation and historical analysis.
+# - Test with tcpreplay or curl to simulate traffic to Tor domains, webhook.site, or port 2375.
+# - For HTTPS inspection, enable TLS in app-layer if SSL decryption is available.
+# - Consider adding threshold rules (e.g., threshold: type both, track by_src, count 1, seconds 300) to reduce noise.
