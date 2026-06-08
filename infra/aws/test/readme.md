@@ -11,7 +11,7 @@ suite (that validates Nexus, not the sensors).
 `config.rs` are byte-identical across all three crates -- one shared workbench
 covers all three rather than three near-duplicate ones.
 
-## Two tiers
+## 3 tiers
 
 `nexus-aws-{vpc,cloudtrail,guardduty}-connector` are pure Rust binary crates --
 there is no embedded Python interpreter, so pytest cannot drive `transmit_bytes()`,
@@ -42,6 +42,16 @@ mirrors the pattern established in `linux/sentinel/test/` and `infra/network_tap
   there is no `cargo test` step -- `cargo check` is the layer that actually
   exercises the real, fixed source Tier 0 can only mirror.
 
+- **Tier2** is the IaC layer — and rather than a generic `terraform validate` pass,
+  its centerpiece (`test_iac_runtime_contract.py`) applies logic-mirror philosophy
+  to the **IaC↔application seam**: it cross-checks that the deploy IAM policy grants
+  *exactly* the AWS actions the connector consumes at runtime, that the S3 notification
+  `filter_suffix` matches the connector's Parquet `CONTENT_TYPE` (imported straight from
+  the tier0 mirror, so the two halves can't drift), that the DynamoDB `hash_key` matches
+  how the connector keys metadata, and that the StackSet FlowLog actually emits `vpc-id`
+  Parquet to S3. A missing `sqs:DeleteMessage` or an `s3:GetObject` on the wrong ARN
+  passes tier0+tier1 and 403s in prod — this is the gap that closes it.
+
 ## Running
 
 ```bash
@@ -49,4 +59,5 @@ mirrors the pattern established in `linux/sentinel/test/` and `infra/network_tap
 ./test/run.sh --all        # Tier 0 + Tier 1
 ./test/run.sh --tier 0
 ./test/run.sh --tier 1     # requires docker or podman
+./test/run.sh --tier 2     # IaC validation
 ```

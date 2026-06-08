@@ -4,20 +4,36 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-# --- KMS ---------------------------------------------------------------------
-
 resource "aws_kms_key" "nexus_key" {
   description             = "KMS key for Nexus CloudTrail Logs encryption"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+
+  # CKV2_AWS_64: explicit key policy (was missing). Root retains IAM-based
+  # delegation; CloudTrail service is allowed to use the key for log delivery.
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Effect    = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action    = ["kms:GenerateDataKey*", "kms:Decrypt"]
+        Resource  = "*"
+      }
+    ]
+  })
 }
 
 resource "aws_kms_alias" "nexus_key_alias" {
   name          = "alias/${var.project_name}-key"
   target_key_id = aws_kms_key.nexus_key.key_id
 }
-
-# --- S3 ----------------------------------------------------------------------
 
 resource "aws_s3_bucket" "cloudtrail_logs" {
   bucket        = "${var.project_name}-${var.environment}-storage"
@@ -54,6 +70,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail_lifecycle" {
   rule {
     id     = "archive-and-expire"
     status = "Enabled"
+    filter {}
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -61,10 +78,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail_lifecycle" {
     expiration {
       days = 90
     }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
 }
-
-# --- SQS ---------------------------------------------------------------------
 
 resource "aws_sqs_queue" "cloudtrail_dlq" {
   name                      = "${var.project_name}-${var.environment}-dlq"
@@ -109,8 +127,6 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   }
 }
 
-# --- DynamoDB ----------------------------------------------------------------
-
 resource "aws_dynamodb_table" "identity_metadata" {
   name         = "nexus_cloud_identity_metadata"
   billing_mode = "PAY_PER_REQUEST"
@@ -119,6 +135,11 @@ resource "aws_dynamodb_table" "identity_metadata" {
   attribute {
     name = "iam_arn"
     type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.nexus_key.arn
   }
 
   point_in_time_recovery {
@@ -130,8 +151,6 @@ resource "aws_dynamodb_table" "identity_metadata" {
     Project     = "Nexus"
   }
 }
-
-# --- IAM ---------------------------------------------------------------------
 
 resource "aws_iam_policy" "connector_execution_policy" {
   name        = "${var.project_name}-${var.environment}-execution-policy"

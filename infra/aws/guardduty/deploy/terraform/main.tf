@@ -99,12 +99,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "guardduty_lifecycle" {
   rule {
     id     = "archive-and-expire"
     status = "Enabled"
+    filter {}
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
     }
     expiration {
       days = 90
+    }
+    # CKV_AWS_300: bound incomplete multipart uploads.
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
     }
   }
 }
@@ -186,6 +191,12 @@ resource "aws_dynamodb_table" "infrastructure_metadata" {
     type = "S"
   }
 
+  # CKV_AWS_119: encrypt with the CMK.
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.nexus_key.arn
+  }
+
   point_in_time_recovery {
     enabled = true
   }
@@ -199,6 +210,12 @@ resource "aws_dynamodb_table" "identity_metadata" {
   attribute {
     name = "iam_arn"
     type = "S"
+  }
+
+  # CKV_AWS_119: encrypt with the CMK.
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.nexus_key.arn
   }
 
   point_in_time_recovery {
