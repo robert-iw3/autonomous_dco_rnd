@@ -34,7 +34,7 @@
 
   "nexus": {
     "format":           "parquet",
-    "content_type":     "application/octet-stream",
+    "content_type":     "application/vnd.apache.parquet",
     "hmac_algorithm":   "sha256",
     "timeout_seconds":  30,
     "stream_name_ens":       "trellix_ens",

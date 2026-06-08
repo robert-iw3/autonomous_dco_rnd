@@ -303,8 +303,8 @@ pub async fn transmit_loop(
                     let mut sver_b          = StringBuilder::with_capacity(row_count, row_count * 2);
 
                     macro_rules! append_opt_str {
-                        ($builder:expr, $col:expr) => {
-                            match row.try_get::<Option<String>, _>($col) {
+                        ($row:expr, $builder:expr, $col:expr) => {
+                            match $row.try_get::<Option<String>, _>($col) {
                                 Ok(Some(v)) if !v.is_empty() => $builder.append_value(v),
                                 _ => $builder.append_null(),
                             }
@@ -395,23 +395,23 @@ pub async fn transmit_loop(
                             _ => tcp_fin_b.append_null(),
                         }
 
-                        append_opt_str!(dns_q_b,   "dns_query");
-                        append_opt_str!(dns_s_b,   "dns_status");
-                        append_opt_str!(http_m_b,  "http_method");
-                        append_opt_str!(http_u_b,  "http_uri");
-                        append_opt_str!(http_ua_b, "http_useragent");
+                        append_opt_str!(row, dns_q_b,   "dns_query");
+                        append_opt_str!(row, dns_s_b,   "dns_status");
+                        append_opt_str!(row, http_m_b,  "http_method");
+                        append_opt_str!(row, http_u_b,  "http_uri");
+                        append_opt_str!(row, http_ua_b, "http_useragent");
 
                         match row.try_get::<Option<i32>, _>("http_status_code") {
                             Ok(Some(v)) if v > 0 => http_sc_b.append_value(v as u16),
                             _ => http_sc_b.append_null(),
                         }
 
-                        append_opt_str!(ja3_b,  "tls_ja3");
-                        append_opt_str!(ja3s_b, "tls_ja3s");
-                        append_opt_str!(tlsv_b, "tls_version");
-                        append_opt_str!(tlsc_b, "tls_cipher");
-                        append_opt_str!(ccn_b,  "cert_cn");
-                        append_opt_str!(cicn_b, "cert_issuer_cn");
+                        append_opt_str!(row, ja3_b,  "tls_ja3");
+                        append_opt_str!(row, ja3s_b, "tls_ja3s");
+                        append_opt_str!(row, tlsv_b, "tls_version");
+                        append_opt_str!(row, tlsc_b, "tls_cipher");
+                        append_opt_str!(row, ccn_b,  "cert_cn");
+                        append_opt_str!(row, cicn_b, "cert_issuer_cn");
 
                         match row.try_get::<Option<i32>, _>("cert_self_signed") {
                             Ok(Some(v)) => css_b.append_value(v != 0),
@@ -422,10 +422,10 @@ pub async fn transmit_loop(
                             _ => cvd_b.append_null(),
                         }
 
-                        append_opt_str!(host_b, "hostname");
-                        append_opt_str!(sgeo_b, "src_geo_country");
-                        append_opt_str!(dgeo_b, "dst_geo_country");
-                        append_opt_str!(dasn_b, "dst_asn_org");
+                        append_opt_str!(row, host_b, "hostname");
+                        append_opt_str!(row, sgeo_b, "src_geo_country");
+                        append_opt_str!(row, dgeo_b, "dst_geo_country");
+                        append_opt_str!(row, dasn_b, "dst_asn_org");
 
                         sname_b.append_value(&cfg.global.sensor_name);
                         stype_b.append_value(&cfg.global.sensor_type);

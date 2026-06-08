@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use failsafe::{backoff, failure_policy, CircuitBreaker, Config as FailsafeConfig, StateMachine};
+use failsafe::{backoff, failure_policy, futures::CircuitBreaker, Config as FailsafeConfig, StateMachine};
 use lib_siem_core::{start_durable_worker, SiemAdapter, WorkerConfig};
-use metrics::{counter, increment_counter};
+use metrics::counter;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::{fs, time::Duration};
-use tracing::{error, info, info_span, warn, Instrument, Level};
+use tracing::{error, info, info_span, Instrument, Level};
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -17,8 +17,8 @@ use tikv_jemallocator::Jemalloc;
 static GLOBAL: Jemalloc = Jemalloc;
 
 type RedisCircuitBreaker = StateMachine<
-    failsafe::failure_policy::ConsecutiveFailures<failsafe::failure_policy::CountedFailures>,
-    failsafe::backoff::Exponential,
+    failsafe::failure_policy::ConsecutiveFailures<failsafe::backoff::Exponential>,
+    (),
 >;
 
 #[derive(Deserialize)]
@@ -75,8 +75,10 @@ impl SiemAdapter for RulesAdapter {
             .expect("CRITICAL: Failed to open Redis client");
 
         let circuit_breaker = FailsafeConfig::new()
-            .failure_policy(failure_policy::ConsecutiveFailures::new(3))
-            .backoff(backoff::Exponential::new(Duration::from_secs(2), Duration::from_secs(60)))
+            .failure_policy(failure_policy::consecutive_failures(
+                3,
+                backoff::exponential(Duration::from_secs(2), Duration::from_secs(60)),
+            ))
             .build();
 
         info!("Dual-Layer Deterministic Rules Engine initialized | Redis: {}", conf.redis.url);
@@ -174,6 +176,8 @@ impl SiemAdapter for RulesAdapter {
                         }
                     } else if has_col("session_id") && has_col("tls_ja3") {
                         "network_tap"
+                    } else if has_col("rule") && has_col("evt_type") {
+                        "falco_runtime"
                     } else {
                         continue;
                     };
@@ -181,7 +185,8 @@ impl SiemAdapter for RulesAdapter {
                     let edge_signature = {
                         let s1 = get_str("signature_name");
                         let s2 = get_str("message");
-                        if !s1.is_empty() { s1 } else { s2 }
+                        let s3 = get_str("rule");
+                        if !s1.is_empty() { s1 } else if !s2.is_empty() { s2 } else { s3 }
                     };
 
                     let edge_tactic = {
@@ -228,10 +233,10 @@ impl SiemAdapter for RulesAdapter {
                         sensor_id,
                         source_type: source_type.to_string(),
                         pid: { let p = get_u32("pid"); if p != 0 { p } else { get_u32("PID") } },
-                        uid: get_u32("uid"),
-                        process_name: { let c = get_str("comm"); if !c.is_empty() { c } else { get_str("Image") } },
-                        command_line: { let c = get_str("command_line"); if !c.is_empty() { c } else { get_str("CommandLine") } },
-                        dest_ip: { let d = get_str("dst_ip"); if !d.is_empty() { d } else { get_str("destination_ip") } },
+                        uid: { let u = get_u32("uid"); if u != 0 { u } else { get_u32("user_uid") } },
+                        process_name: { let c = get_str("comm"); if !c.is_empty() { c } else { let i = get_str("Image"); if !i.is_empty() { i } else { get_str("proc_name") } } },
+                        command_line: { let c = get_str("command_line"); if !c.is_empty() { c } else { let cl = get_str("CommandLine"); if !cl.is_empty() { cl } else { get_str("proc_cmdline") } } },
+                        dest_ip: { let d = get_str("dst_ip"); if !d.is_empty() { d } else { let di = get_str("destination_ip"); if !di.is_empty() { di } else { get_str("fd_dip") } } },
                         dns_query: { let q = get_str("dns_query"); if !q.is_empty() { q } else { get_str("Query") } },
                         edge_tactic: if edge_tactic.is_empty() { None } else { Some(edge_tactic) },
                         edge_technique: if edge_technique.is_empty() { None } else { Some(edge_technique) },
@@ -323,9 +328,10 @@ impl SiemAdapter for RulesAdapter {
                 .map_err(|e| format!("Redis connection failed: {}", e))?;
 
             let alert_queue_key = self.alert_queue_key.clone();
+            let alert_count = matched_alerts.len();
 
             let dispatch_result = self.circuit_breaker
-                .call_async(async move {
+                .call(async move {
                     for alert in &matched_alerts {
                         let _: () = con.lpush(&alert_queue_key, alert).await
                             .map_err(|e| format!("Redis LPUSH failed: {}", e))?;
@@ -337,16 +343,16 @@ impl SiemAdapter for RulesAdapter {
 
             match dispatch_result {
                 Ok(_) => {
-                    info!("Fired {} deterministic alerts to Redis (Edge + Centralized).", matched_alerts.len());
-                    counter!("nexus_rules_alerts_fired_total", matched_alerts.len() as u64);
+                    info!("Fired {} deterministic alerts to Redis (Edge + Centralized).", alert_count);
+                    counter!("nexus_rules_alerts_fired_total").increment(alert_count as u64);
                 }
                 Err(failsafe::Error::Inner(e)) => {
-                    increment_counter!("nexus_rules_redis_faults_total");
+                    counter!("nexus_rules_redis_faults_total").increment(1);
                     error!("Redis pipeline fault, retaining events: {}", e);
                     return Err(e);
                 }
                 Err(failsafe::Error::Rejected) => {
-                    increment_counter!("nexus_rules_redis_rejected_total");
+                    counter!("nexus_rules_redis_rejected_total").increment(1);
                     error!("Redis circuit breaker OPEN. Suspending ingestion block.");
                     return Err("Circuit breaker rejected execution.".to_string());
                 }

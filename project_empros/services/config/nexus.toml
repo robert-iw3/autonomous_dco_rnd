@@ -31,6 +31,7 @@ deepsensor_math = 4  # windows_deepsensor EdrRow -- score, avg_entropy, max_velo
 trellix_math   = 6   # trellix_ens 6D -- severity_score, threat_score, action_score, anomaly_score, entropy_score, frequency_score
 cloud_flow     = 5
 network_tap    = 8
+falco_math     = 4   # falco_runtime -- priority_score, container_scope_score, network_activity_score, privileged_score
 embedding_384  = 384 # retained for any golden dataset records still using the proxy
 
 [hunter]
@@ -381,6 +382,33 @@ context_columns = [
     "src_ip", "dest_ip", "src_port", "dest_port", "proto",
     "signature_id", "signature", "severity", "category",
     "alert_action", "flow_id", "mitre_tactic", "mitre_technique"
+]
+
+[schema_mappings.falco_runtime]
+# Falco (k8s) runtime security telemetry -- container/syscall rule violations.
+# identifier_column: "rule" is non-nullable in falco_schema() and collision-free
+# against every other registered mapping's identifier/vector/context columns.
+# vector_name: falco_math (4D) -- derived feature scores computed in-sensor by
+# falco_transmitter (Falco emits pure raw telemetry with no native numeric
+# ML features, unlike sentinel's shannon_entropy or trellix's severity_score).
+identifier_column  = "rule"
+vector_name        = "falco_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+
+vector_columns = [
+    "priority_score",          # [0] Falco priority (emergency..debug) mapped to [0,1]
+    "container_scope_score",   # [1] 1.0 if event occurred inside a container, else 0.0
+    "network_activity_score",  # [2] 1.0 if fd.sip/fd.dip present (network-related syscall)
+    "privileged_score",        # [3] 1.0 if user.uid == 0 (root/privileged context)
+]
+
+context_columns = [
+    "rule", "output", "priority", "hostname",
+    "container_id", "container_name", "container_image",
+    "proc_name", "proc_cmdline", "user_name",
+    "evt_type", "fd_name", "fd_sip", "fd_dip"
 ]
 
 # ==============================================================================

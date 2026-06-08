@@ -192,11 +192,12 @@ fn eve_schema() -> Arc<Schema> {
         Field::new("in_iface", DataType::Utf8, true),
         // Alert
         Field::new("alert_action", DataType::Utf8, true),
-        Field::new("alert_signature", DataType::Utf8, true),
-        Field::new("alert_sid", DataType::UInt32, true),
-        Field::new("alert_severity", DataType::UInt32, true),
-        Field::new("alert_category", DataType::Utf8, true),
-        Field::new("alert_mitre", DataType::Utf8, true),
+        Field::new("signature", DataType::Utf8, true),
+        Field::new("signature_id", DataType::UInt32, true),
+        Field::new("severity", DataType::UInt32, true),
+        Field::new("category", DataType::Utf8, true),
+        Field::new("mitre_tactic", DataType::Utf8, true),
+        Field::new("mitre_technique", DataType::Utf8, true),
         // Flow
         Field::new("flow_pkts_toserver", DataType::UInt64, true),
         Field::new("flow_pkts_toclient", DataType::UInt64, true),
@@ -246,7 +247,8 @@ fn events_to_parquet(events: &[EveEvent], sensor_id: &str) -> Result<Vec<u8>, St
     // Alert
     let mut aa_b = StringBuilder::new(); let mut asig_b = StringBuilder::new();
     let mut asid_b = UInt32Builder::with_capacity(cap); let mut asev_b = UInt32Builder::with_capacity(cap);
-    let mut acat_b = StringBuilder::new(); let mut amitre_b = StringBuilder::new();
+    let mut acat_b = StringBuilder::new();
+    let mut amt_b = StringBuilder::new(); let mut amte_b = StringBuilder::new();
     // Flow
     let mut fps_b = UInt64Builder::with_capacity(cap); let mut fpc_b = UInt64Builder::with_capacity(cap);
     let mut fbs_b = UInt64Builder::with_capacity(cap); let mut fbc_b = UInt64Builder::with_capacity(cap);
@@ -288,11 +290,13 @@ fn events_to_parquet(events: &[EveEvent], sensor_id: &str) -> Result<Vec<u8>, St
         opt_u32(&mut asid_b, a.and_then(|a| a.signature_id));
         opt_u32(&mut asev_b, a.and_then(|a| a.severity));
         opt_str(&mut acat_b, a.and_then(|a| a.category.as_deref()));
-        // Extract MITRE from alert metadata
-        let mitre = a.and_then(|a| a.metadata.as_ref())
-            .and_then(|m| m.get("mitre_technique_id"))
-            .map(|v| v.to_string().replace('"', ""));
-        opt_str(&mut amitre_b, mitre.as_deref());
+        // Extract MITRE ATT&CK tactic/technique from alert metadata (ET ruleset convention:
+        // metadata.mitre_tactic_id / mitre_tactic_name / mitre_technique_id / mitre_technique_name)
+        let metadata = a.and_then(|a| a.metadata.as_ref());
+        let tactic = mitre_field(metadata, "mitre_tactic_id", "mitre_tactic_name");
+        let technique = mitre_field(metadata, "mitre_technique_id", "mitre_technique_name");
+        opt_str(&mut amt_b, tactic.as_deref());
+        opt_str(&mut amte_b, technique.as_deref());
 
         // Flow
         let f = e.flow.as_ref();
@@ -342,7 +346,7 @@ fn events_to_parquet(events: &[EveEvent], sensor_id: &str) -> Result<Vec<u8>, St
         Arc::new(proto_b.finish()), Arc::new(cid_b.finish()), Arc::new(iface_b.finish()),
         Arc::new(aa_b.finish()), Arc::new(asig_b.finish()),
         Arc::new(asid_b.finish()), Arc::new(asev_b.finish()),
-        Arc::new(acat_b.finish()), Arc::new(amitre_b.finish()),
+        Arc::new(acat_b.finish()), Arc::new(amt_b.finish()), Arc::new(amte_b.finish()),
         Arc::new(fps_b.finish()), Arc::new(fpc_b.finish()),
         Arc::new(fbs_b.finish()), Arc::new(fbc_b.finish()), Arc::new(fst_b.finish()),
         Arc::new(dt_b.finish()), Arc::new(drr_b.finish()),
@@ -364,6 +368,24 @@ fn events_to_parquet(events: &[EveEvent], sensor_id: &str) -> Result<Vec<u8>, St
     writer.write(&batch).map_err(|e| format!("Parquet write failed: {e}"))?;
     writer.close().map_err(|e| format!("Parquet close failed: {e}"))?;
     Ok(buf)
+}
+
+/// Combines the `_id`/`_name` pair from EVE alert metadata (e.g.
+/// `mitre_tactic_id`/`mitre_tactic_name`) into a single "ID Name" string,
+/// falling back to whichever half is present. Returns `None` if neither key exists.
+fn mitre_field(metadata: Option<&HashMap<String, serde_json::Value>>, id_key: &str, name_key: &str) -> Option<String> {
+    let stringify = |v: &serde_json::Value| match v {
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string().replace('"', ""),
+    };
+    let id = metadata.and_then(|m| m.get(id_key)).map(stringify);
+    let name = metadata.and_then(|m| m.get(name_key)).map(stringify);
+    match (id, name) {
+        (Some(i), Some(n)) => Some(format!("{i} {n}")),
+        (Some(i), None) => Some(i),
+        (None, Some(n)) => Some(n),
+        (None, None) => None,
+    }
 }
 
 fn opt_str(b: &mut StringBuilder, v: Option<&str>) {
@@ -595,4 +617,239 @@ async fn main() {
         }
     }
     info!("Suricata Transmitter shutdown.");
+}
+// =============================================================================
+// Tests -- algorithmic validation of EVE schema mapping, Parquet serialization,
+// MITRE field extraction, and HMAC integrity stamping. Run via `cargo test`
+// (test/tier1 of the workbench).
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use bytes::Bytes;
+
+    fn sample_event(json: &str) -> EveEvent {
+        serde_json::from_str(json).expect("sample EVE event must parse")
+    }
+
+    // -------------------------------------------------------------------------
+    // eve_schema(): column names + order must match the central
+    // [schema_mappings.suricata_eve] contract in nexus.toml (identifier_column,
+    // sensor_id_column, vector_columns are pre-computed upstream and are NOT
+    // emitted by this transmitter; context_columns + metadata columns are).
+    // -------------------------------------------------------------------------
+    #[test]
+    fn schema_contains_contract_context_columns() {
+        let schema = eve_schema();
+        let names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+
+        // From nexus.toml [schema_mappings.suricata_eve].context_columns
+        let contract_context_columns = [
+            "src_ip", "dest_ip", "src_port", "dest_port", "proto",
+            "signature_id", "signature", "severity", "category",
+            "alert_action", "flow_id", "mitre_tactic", "mitre_technique",
+        ];
+        for col in contract_context_columns {
+            assert!(names.contains(&col), "contract context_column '{col}' missing from eve_schema()");
+        }
+
+        // sensor_id_column from the contract, plus the routing discriminator
+        assert!(names.contains(&"sensor_id"));
+        assert!(names.contains(&"sensor_type"));
+
+        // identifier_column / primary_key_column from the contract
+        assert!(names.contains(&"community_id"));
+    }
+
+    #[test]
+    fn schema_field_order_matches_record_batch_array_order() {
+        // events_to_parquet() builds its RecordBatch array vector in a fixed
+        // order that must line up positionally with eve_schema()'s field order.
+        let schema = eve_schema();
+        let expected_order = [
+            "timestamp", "flow_id", "event_type", "src_ip", "src_port",
+            "dest_ip", "dest_port", "proto", "community_id", "in_iface",
+            "alert_action", "signature", "signature_id", "severity", "category",
+            "mitre_tactic", "mitre_technique",
+            "flow_pkts_toserver", "flow_pkts_toclient", "flow_bytes_toserver",
+            "flow_bytes_toclient", "flow_state",
+            "dns_type", "dns_rrname", "dns_rcode", "dns_rrtype",
+            "http_hostname", "http_url", "http_method", "http_user_agent", "http_status",
+            "tls_version", "tls_subject", "tls_issuer", "tls_ja3_hash", "tls_ja3s_hash",
+            "file_filename", "file_size", "file_sha256",
+            "sensor_id", "sensor_type",
+        ];
+        let actual: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert_eq!(actual, expected_order.to_vec());
+    }
+
+    // -------------------------------------------------------------------------
+    // mitre_field(): combines `<prefix>_id`/`<prefix>_name` metadata pairs into
+    // the single "ID Name" string stored in the mitre_tactic/mitre_technique
+    // Parquet columns (matching the "TA0001 Initial Access" convention used by
+    // linux/sentinel's MitreTactic::Display).
+    // -------------------------------------------------------------------------
+    fn meta(pairs: &[(&str, &str)]) -> HashMap<String, serde_json::Value> {
+        pairs.iter().map(|(k, v)| (k.to_string(), serde_json::Value::String(v.to_string()))).collect()
+    }
+
+    #[test]
+    fn mitre_field_combines_id_and_name() {
+        let m = meta(&[("mitre_tactic_id", "TA0011"), ("mitre_tactic_name", "Command and Control")]);
+        assert_eq!(mitre_field(Some(&m), "mitre_tactic_id", "mitre_tactic_name").as_deref(),
+                   Some("TA0011 Command and Control"));
+    }
+
+    #[test]
+    fn mitre_field_falls_back_to_id_only() {
+        let m = meta(&[("mitre_technique_id", "T1071")]);
+        assert_eq!(mitre_field(Some(&m), "mitre_technique_id", "mitre_technique_name").as_deref(),
+                   Some("T1071"));
+    }
+
+    #[test]
+    fn mitre_field_falls_back_to_name_only() {
+        let m = meta(&[("mitre_technique_name", "Application Layer Protocol")]);
+        assert_eq!(mitre_field(Some(&m), "mitre_technique_id", "mitre_technique_name").as_deref(),
+                   Some("Application Layer Protocol"));
+    }
+
+    #[test]
+    fn mitre_field_none_when_absent() {
+        let m = meta(&[("attack_target", "Client_Endpoint")]);
+        assert_eq!(mitre_field(Some(&m), "mitre_tactic_id", "mitre_tactic_name"), None);
+        assert_eq!(mitre_field(None, "mitre_tactic_id", "mitre_tactic_name"), None);
+    }
+
+    // -------------------------------------------------------------------------
+    // events_to_parquet(): end-to-end -- synthetic EVE alert events serialize
+    // to real Parquet bytes that round-trip through the Arrow reader with the
+    // contract's MITRE columns populated.
+    // -------------------------------------------------------------------------
+    #[test]
+    fn events_to_parquet_round_trips_mitre_columns() {
+        let event = sample_event(r#"{
+            "timestamp": "2026-06-07T12:00:00.000000+0000",
+            "flow_id": 123456789,
+            "event_type": "alert",
+            "src_ip": "10.0.0.5",
+            "src_port": 443,
+            "dest_ip": "203.0.113.9",
+            "dest_port": 8443,
+            "proto": "TCP",
+            "community_id": "1:abcdef0123456789==",
+            "alert": {
+                "action": "allowed",
+                "signature": "ET MALWARE Suspicious C2 Beacon",
+                "signature_id": 2030001,
+                "rev": 1,
+                "severity": 1,
+                "category": "A Network Trojan was detected",
+                "metadata": {
+                    "mitre_tactic_id": "TA0011",
+                    "mitre_tactic_name": "Command and Control",
+                    "mitre_technique_id": "T1071",
+                    "mitre_technique_name": "Application Layer Protocol"
+                }
+            }
+        }"#);
+
+        let pq = events_to_parquet(&[event], "suricata-sensor-test").expect("serialization should succeed");
+        assert!(!pq.is_empty());
+
+        let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(pq))
+            .expect("parquet reader init")
+            .build()
+            .expect("parquet reader build");
+
+        let batches: Vec<_> = reader.collect::<Result<Vec<_>, _>>().expect("read batches");
+        assert_eq!(batches.len(), 1);
+        let batch = &batches[0];
+        assert_eq!(batch.num_rows(), 1);
+
+        let col = |name: &str| -> String {
+            let idx = batch.schema().index_of(name).unwrap_or_else(|_| panic!("column '{name}' missing from output"));
+            let arr = batch.column(idx).as_any().downcast_ref::<arrow::array::StringArray>()
+                .unwrap_or_else(|| panic!("column '{name}' is not Utf8"));
+            arr.value(0).to_string()
+        };
+
+        assert_eq!(col("event_type"), "alert");
+        assert_eq!(col("signature"), "ET MALWARE Suspicious C2 Beacon");
+        assert_eq!(col("category"), "A Network Trojan was detected");
+        assert_eq!(col("mitre_tactic"), "TA0011 Command and Control");
+        assert_eq!(col("mitre_technique"), "T1071 Application Layer Protocol");
+        assert_eq!(col("sensor_id"), "suricata-sensor-test");
+        assert_eq!(col("sensor_type"), "suricata_eve");
+    }
+
+    #[test]
+    fn events_to_parquet_nulls_mitre_columns_when_alert_untagged() {
+        let event = sample_event(r#"{
+            "timestamp": "2026-06-07T12:00:01.000000+0000",
+            "event_type": "flow",
+            "proto": "UDP",
+            "flow": {"pkts_toserver": 10, "pkts_toclient": 8, "bytes_toserver": 1200, "bytes_toclient": 900, "state": "established"}
+        }"#);
+
+        let pq = events_to_parquet(&[event], "suricata-sensor-test").expect("serialization should succeed");
+        let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(pq)).unwrap().build().unwrap();
+        let batches: Vec<_> = reader.collect::<Result<Vec<_>, _>>().unwrap();
+        let batch = &batches[0];
+
+        for name in ["mitre_tactic", "mitre_technique", "alert_action", "signature"] {
+            let idx = batch.schema().index_of(name).unwrap();
+            assert!(batch.column(idx).is_null(0), "expected '{name}' to be null for a non-alert event");
+        }
+        let flow_state_idx = batch.schema().index_of("flow_state").unwrap();
+        let flow_state = batch.column(flow_state_idx).as_any().downcast_ref::<arrow::array::StringArray>().unwrap();
+        assert_eq!(flow_state.value(0), "established");
+    }
+
+    // -------------------------------------------------------------------------
+    // Stamper::stamp(): HMAC formula must stay byte-identical to the central
+    // core_ingress contract: HMAC-SHA256(payload || seq.BE64 || sensor_id || ts.BE64)
+    // -------------------------------------------------------------------------
+    fn reference_hmac(secret: &[u8], payload: &[u8], sequence: u64, sensor_id: &str, ts: u64) -> String {
+        let mut mac = HmacSha256::new_from_slice(secret).unwrap();
+        mac.update(payload);
+        mac.update(&sequence.to_be_bytes());
+        mac.update(sensor_id.as_bytes());
+        mac.update(&ts.to_be_bytes());
+        hex::encode(mac.finalize().into_bytes())
+    }
+
+    #[test]
+    fn stamper_hmac_matches_independent_reference_and_increments_sequence() {
+        let mut stamper = Stamper {
+            sensor_id: "suricata-sensor-test".to_string(),
+            secret: b"unit-test-integrity-secret".to_vec(),
+            sequence: 0,
+        };
+
+        let payload = b"synthetic-parquet-bytes";
+        let (seq1, ts1, hmac1) = stamper.stamp(payload);
+        assert_eq!(seq1, 1);
+        assert_eq!(hmac1, reference_hmac(&stamper.secret, payload, seq1, &stamper.sensor_id, ts1));
+        assert_eq!(hmac1.len(), 64);
+        assert!(hmac1.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+
+        let (seq2, ts2, hmac2) = stamper.stamp(payload);
+        assert_eq!(seq2, 2);
+        assert_eq!(hmac2, reference_hmac(&stamper.secret, payload, seq2, &stamper.sensor_id, ts2));
+        assert_ne!(hmac1, hmac2, "sequence-dependent HMAC must change between batches");
+    }
+
+    #[test]
+    fn stamper_hmac_detects_payload_tampering() {
+        let mut stamper = Stamper {
+            sensor_id: "suricata-sensor-test".to_string(),
+            secret: b"unit-test-integrity-secret".to_vec(),
+            sequence: 0,
+        };
+        let (seq, ts, hmac) = stamper.stamp(b"original-bytes");
+        let tampered = reference_hmac(&stamper.secret, b"tampered-bytes!", seq, &stamper.sensor_id, ts);
+        assert_ne!(hmac, tampered);
+    }
 }

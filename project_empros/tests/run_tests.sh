@@ -378,7 +378,12 @@ else
             continue
         fi
         echo ""
-        run_section "$sec" "$dockerfile" && (( PASS_COUNT++ )) || { (( FAIL_COUNT++ )) || true; FAILED_SECTIONS+=("$sec"); }
+        if run_section "$sec" "$dockerfile"; then
+            (( PASS_COUNT++ )) || true
+        else
+            (( FAIL_COUNT++ )) || true
+            FAILED_SECTIONS+=("$sec")
+        fi
     done
 fi
 

@@ -116,7 +116,11 @@ class TestSuricataRustSource:
         assert "dns" in self._src()
 
     def test_alert_sid_field_present(self):
-        assert "alert_sid" in self._src()
+        # Renamed alert_sid -> signature_id (along with alert_signature/alert_severity/
+        # alert_category/alert_mitre -> signature/severity/category/mitre_tactic+
+        # mitre_technique) to align 1:1 with nexus.toml [schema_mappings.suricata_eve]
+        # context_columns -- see linux/suricata/test workbench findings.
+        assert "signature_id" in self._src()
 
     def test_signature_field_present(self):
         assert "signature" in self._src()

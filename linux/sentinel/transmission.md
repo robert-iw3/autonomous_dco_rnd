@@ -40,7 +40,7 @@ Set this in the `master.toml`:
 
 ```toml
 [siem]
-middleware_gateway_url = "https://nexus-edge.local:443/api/v1/sentinel/telemetry"
+middleware_gateway_url = "https://nexus-edge.local:443/api/v1/telemetry"
 batch_size = 100
 
 # The pre-shared key for HMAC generation

@@ -251,7 +251,10 @@ class TestDockerfiles:
         assert "internal" in (TRELLIX_SQL / "docker-compose.yml").read_text()
 
     def test_compose_hmac_env_var(self):
-        assert "NEXUS_HMAC_SECRET" in (TRELLIX_SQL / "docker-compose.yml").read_text()
+        # Canonical signing-secret env var is NEXUS_INTEGRITY_SECRET -- it's what
+        # reader.py uses for hmac.new(NEXUS_INTEGRITY_SECRET, ...) and what the
+        # compose file actually defines; "NEXUS_HMAC_SECRET" appears nowhere.
+        assert "NEXUS_INTEGRITY_SECRET" in (TRELLIX_SQL / "docker-compose.yml").read_text()
 
     def test_compose_no_external_egress_env(self):
         assert "TRANSFORMERS_OFFLINE" in (TRELLIX_SQL / "docker-compose.yml").read_text()

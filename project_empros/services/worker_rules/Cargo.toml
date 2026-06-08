@@ -8,6 +8,7 @@ authors = ["Robert Weber"]
 # Runtime
 tokio       = { workspace = true }
 async-trait = { workspace = true }
+async-nats  = { workspace = true }
 futures     = { workspace = true }
 
 # Serialization

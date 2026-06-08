@@ -10,7 +10,7 @@ use crate::transmitter::Transmitter;
 
 use async_compression::tokio::bufread::GzipDecoder;
 use aws_config::BehaviorVersion;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::time::{sleep, Duration};
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let Some(messages) = out.messages() else { continue };
+        let messages = out.messages();
 
         for msg in messages {
             let Some(body) = msg.body() else { continue };
@@ -116,7 +116,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                if let Some(rec) = transformer.transform_finding(&finding) {
+                // GuardDuty findings carry accountId/region inline (unlike VPC
+                // Flow / CloudTrail, which need a DynamoDB lookup to resolve
+                // `environment` from an external identity table) -- there is
+                // no metadata-cache plumbing in this connector, so
+                // transform_finding() always sees an empty map and falls back
+                // to environment="unknown" (transformer.rs's documented default).
+                let empty_metadata: HashMap<String, String> = HashMap::new();
+                if let Some(rec) = transformer.transform_finding(&finding, &empty_metadata) {
                     normalized.push(rec);
                     if let Some(k) = id {
                         seen.insert(k.clone());

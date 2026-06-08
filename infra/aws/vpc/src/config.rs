@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub sqs_queue_url: String,
     pub gateway_url: String,
+    pub auth_token: String,
     pub integrity_secret: String,
     pub sensor_id: String,
     pub sensor_type: String,
@@ -20,9 +21,10 @@ impl Config {
         Self {
             sqs_queue_url: env::var("SQS_QUEUE_URL").expect("SQS_QUEUE_URL must be set"),
             gateway_url: env::var("GATEWAY_URL").expect("GATEWAY_URL must be set"),
+            auth_token: env::var("AUTH_TOKEN").expect("AUTH_TOKEN must be set"),
             integrity_secret: env::var("INTEGRITY_SECRET").expect("INTEGRITY_SECRET must be set"),
             sensor_id: env::var("SENSOR_ID").unwrap_or_else(|_| "aws-vpc-connector-default".to_string()),
-            sensor_type: "aws-vpc-connector".to_string(),
+            sensor_type: "aws-vpc-flow-connector".to_string(),
             spool_dir: PathBuf::from(env::var("SPOOL_DIR").unwrap_or_else(|_| "/app/data/spool".to_string())),
             max_spool_bytes: env::var("MAX_SPOOL_BYTES")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(524_288_000),

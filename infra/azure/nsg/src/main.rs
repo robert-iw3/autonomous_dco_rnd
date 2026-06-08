@@ -1,14 +1,16 @@
 mod cache;
+mod checkpoint;
 mod config;
+mod eventhubs_credential;
 mod transformer;
 mod transmitter;
 
 use crate::cache::{MetadataCache, TemporalCache};
+use crate::checkpoint::PartitionCheckpoint;
 use crate::config::Config;
 use crate::transformer::Transformer;
 use crate::transmitter::Transmitter;
 
-use azure_identity::DefaultAzureCredential;
 use azure_storage_blobs::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -26,8 +28,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metadata_cache = Arc::new(MetadataCache::new());
     // ONE transmitter shared across all partitions (single sequence + spool).
     let transmitter = Arc::new(Transmitter::new(config.clone()));
+    let checkpoint = Arc::new(PartitionCheckpoint::new(&config.spool_dir));
 
-    let credential = Arc::new(DefaultAzureCredential::new()?);
+    let credential = azure_identity::create_default_credential()?;
     let blob_client = BlobServiceClient::new(&config.storage_account_url, credential.clone());
 
     let tc = Arc::clone(&temporal_cache);
@@ -42,33 +45,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Nexus Azure NSG Flow connector online.");
 
-    use azure_messaging_eventhubs::consumer::ConsumerClient;
-    let consumer = ConsumerClient::new(
-        config.eventhub_connection_str.clone(),
-        config.eventhub_name.clone(),
-        config.consumer_group.clone(),
-        Default::default(),
-    )?;
+    use azure_messaging_eventhubs::ConsumerClient;
+    let eventhubs_credential = crate::eventhubs_credential::EventHubsCredentialChain::new()?;
+    let consumer = Arc::new(
+        ConsumerClient::builder()
+            .with_consumer_group(config.consumer_group.clone())
+            .open(&config.eventhub_namespace, config.eventhub_name.clone(), eventhubs_credential)
+            .await?,
+    );
 
-    let partition_ids = consumer.get_partition_ids().await?;
+    let partition_ids = consumer.get_eventhub_properties().await?.partition_ids;
     let mut handles = Vec::new();
 
     for partition_id in partition_ids {
-        let consumer = consumer.clone();
+        let consumer = Arc::clone(&consumer);
         let config = config.clone();
         let blob_client = blob_client.clone();
         let transformer = Transformer::new((*temporal_cache).clone());
         let transmitter = Arc::clone(&transmitter);
         let metadata_cache = Arc::clone(&metadata_cache);
+        let checkpoint = Arc::clone(&checkpoint);
 
         handles.push(tokio::spawn(async move {
+            // Resume just past the last confirmed-transmitted offset, if one
+            // was persisted by a prior run -- otherwise fall back to the
+            // Event Hub's default (latest) position.
+            let receiver_options = checkpoint.load(&partition_id).map(|offset| {
+                use azure_messaging_eventhubs::{OpenReceiverOptions, StartLocation, StartPosition};
+                OpenReceiverOptions {
+                    start_position: Some(StartPosition {
+                        location: StartLocation::Offset(offset),
+                        inclusive: false,
+                    }),
+                    ..Default::default()
+                }
+            });
+
             loop {
-                match consumer.read_events_from_partition(&partition_id, Default::default()).await {
-                    Ok(mut stream) => {
+                match consumer.open_receiver_on_partition(partition_id.clone(), receiver_options.clone()).await {
+                    Ok(receiver) => {
                         use futures::StreamExt;
+                        let mut stream = receiver.stream_events();
                         while let Some(event_result) = stream.next().await {
                             if let Ok(event_data) = event_result {
-                                let body = event_data.body().unwrap_or_default();
+                                let offset = event_data.offset().clone();
+                                let body = event_data.event_data().body().unwrap_or_default();
                                 let body_str = String::from_utf8_lossy(&body);
 
                                 if let Some(blob_path) = extract_blob_path(&body_str) {
@@ -83,10 +104,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 fetch_nsg_metadata(&blob_path, &metadata_cache).await;
                                             let records =
                                                 transformer.transform_blob(&blob_json, &metadata);
-                                            if !records.is_empty()
-                                                && !transmitter.spool_and_transmit(records).await
-                                            {
-                                                tracing::error!("Transmit failed for {}", blob_path);
+                                            if !records.is_empty() {
+                                                if transmitter.spool_and_transmit(records).await {
+                                                    if let Some(offset) = &offset {
+                                                        checkpoint.save(&partition_id, offset);
+                                                    }
+                                                } else {
+                                                    tracing::error!("Transmit failed for {}", blob_path);
+                                                }
                                             }
                                         }
                                         Err(e) => {
@@ -98,7 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Partition {} read error: {}. Retrying.", partition_id, e);
+                        tracing::warn!("Partition {} receiver open error: {}. Retrying.", partition_id, e);
                         sleep(Duration::from_secs(5)).await;
                     }
                 }
@@ -122,7 +147,7 @@ async fn fetch_and_parse_blob(
     client: &BlobServiceClient,
     container: &str,
     blob_path: &str,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
     let container_client = client.container_client(container);
     let blob_client = container_client.blob_client(blob_path);
     let response = blob_client.get_content().await?;

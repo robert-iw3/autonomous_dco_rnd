@@ -81,7 +81,7 @@ parquet_directory = "/var/backups/linux-sentinel/parquet"
 [siem]
 # Upstream Forwarder Configuration
 #middleware_gateway_url = "https://siem-gateway.local/api/ingest" # Target SIEM endpoint
-middleware_gateway_url = "https://nexus-edge.local:443/api/v1/sentinel/telemetry" # Target HAProxy -> Axum Gateway
+middleware_gateway_url = "https://nexus-edge.local:443/api/v1/telemetry" # Target HAProxy -> Axum Gateway
 tls_ca_cert = "/opt/linux-sentinel/certs/nexus-ca.pem"
 auth_token = "${SENTINEL_AUTH_TOKEN}" # Environment variable resolved at runtime
 batch_size = 100 # Max number of events per payload sent via JetStream/HTTP micro-batching

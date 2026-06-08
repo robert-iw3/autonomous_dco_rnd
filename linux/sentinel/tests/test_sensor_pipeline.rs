@@ -173,30 +173,29 @@ fn test_alert_level_serialization() {
 // 3. Parquet schema (mocked -- parquet_transmitter builds the schema)
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// The full list of Arrow columns the parquet_transmitter builds.
-/// This must match what corpus_utils.py _LIN_FIELDS + vector fields expect.
 const EXPECTED_SENTINEL_PARQUET_COLUMNS: &[&str] = &[
-    // Identity
-    "endpoint_id", "event_id", "timestamp",
+    // Identity (sensor_id_column = "sensor_id" per the central contract --
+    // sourced from the local SecurityAlert.endpoint_id field but renamed on
+    // the wire to identify the REPORTING HOST for worker_qdrant routing)
+    "event_id", "sensor_id", "timestamp",
     // Alert
     "level", "mitre_tactic", "mitre_technique",
     // Process
-    "pid", "ppid", "uid", "cgroup_id",
-    "container_id", "container_name",
+    "pid", "ppid", "uid", "container_name",
     "comm", "command_line", "parent_comm", "user_name",
     // Network/file
-    "target_file", "dest_ip", "dest_port", "source_port",
+    "target_file", "dest_ip", "dest_port",
     // 5D sentinel_math vector
     "shannon_entropy", "execution_velocity", "tuple_rarity", "path_depth", "anomaly_score",
     // Metadata
-    "message", "in_memory_capture",
+    "message", "in_memory_capture", "ml_vector",
 ];
 
 #[test]
 fn test_expected_parquet_column_count() {
     /// sentinel_math context has these columns -- verify no accidental schema change
-    assert_eq!(EXPECTED_SENTINEL_PARQUET_COLUMNS.len(), 27,
-        "sentinel Parquet schema should have 27 columns");
+    assert_eq!(EXPECTED_SENTINEL_PARQUET_COLUMNS.len(), 25,
+        "sentinel Parquet schema should have 25 columns");
 }
 
 #[test]
@@ -280,7 +279,9 @@ fn test_sentinel_hmac_protocol_matches_nexus_integrity() {
 
 #[test]
 fn test_required_transmission_headers() {
-    /// Every sentinel batch must set these six headers (validated by core_ingress).
+    /// Every sentinel batch must set these seven headers, cross-checked against
+    /// the literals in parquet_transmitter.rs (default client headers set once
+    /// in ParquetTransmitter::new() + per-request headers set in the forward task).
     let required_headers = [
         "Authorization",
         "Content-Type",
@@ -289,12 +290,24 @@ fn test_required_transmission_headers() {
         "X-Batch-Sequence",
         "X-Batch-Timestamp",
         "X-Batch-HMAC",
-        "X-Partition-Date",
-        "X-Partition-Hour",
     ];
-    // Document the contract -- actual header setting is in parquet_transmitter.rs
-    assert_eq!(required_headers.len(), 9,
-        "Transmission protocol requires exactly 9 headers");
+    assert_eq!(required_headers.len(), 7,
+        "Transmission protocol requires exactly 7 sensor-set headers");
+
+    let src = include_str!("../src/siem/parquet_transmitter.rs");
+    // Authorization is set via .bearer_auth(&token), not a literal header name.
+    assert!(src.contains(".bearer_auth(&token)"), "Authorization must be set via bearer_auth");
+    assert!(src.contains(r#"HeaderValue::from_static("application/vnd.apache.parquet")"#));
+    assert!(src.contains(r#"headers.insert("X-Sensor-Type""#));
+    for hdr_const in ["HDR_SENSOR_ID", "HDR_BATCH_SEQUENCE", "HDR_BATCH_TIMESTAMP", "HDR_BATCH_HMAC"] {
+        assert!(src.contains(&format!(".header({hdr_const}, ")),
+            "per-request header constant '{hdr_const}' not set in transmit task");
+    }
+
+    // And confirm the partition headers are deliberately absent from the sensor
+    // (they belong to core_ingress's response-side enrichment, not the request).
+    assert!(!src.contains("X-Partition-Date") && !src.contains("X-Partition-Hour"),
+        "X-Partition-Date/Hour are gateway-injected -- the sensor must not set them");
 }
 
 #[test]
@@ -306,12 +319,39 @@ fn test_content_type_is_parquet() {
 }
 
 #[test]
-fn test_sensor_type_header_is_linux_sentinel() {
-    // Document: X-Sensor-Type header must be "linux_sentinel" for S3 routing
-    let sensor_type = "linux_sentinel";
-    let s3_path = format!("telemetry/{sensor_type}/dt=2026-06-02/hour=15/uuid.parquet");
-    assert!(s3_path.contains("linux_sentinel"),
-        "S3 path must use 'linux_sentinel' from X-Sensor-Type header");
+fn test_sensor_type_header_matches_sensor_profile_and_routing_consumers() {
+    /// The wire-level X-Sensor-Type string is "Linux-Sentinel" (PascalCase-with-hyphen),
+    /// which is DELIBERATELY distinct from the lowercase_snake_case
+    /// [schema_mappings.linux_sentinel] TOML table key used for duck-typed routing
+    /// in worker_qdrant/worker_rules. "Linux-Sentinel" is the value:
+    ///   - declared in middleware/config/sensor_profiles/linux_sentinel.toml (sensor_type = "Linux-Sentinel")
+    ///   - exact-matched by worker_splunk and worker_elastic's source_type dispatch
+    ///   - sent verbatim on every batch via parquet_transmitter.rs's default X-Sensor-Type header
+    ///   - used raw by worker_s3_archive to build "telemetry/{sensor_type}/dt=.../hour=.../uuid.parquet"
+    /// A mismatch here would silently misroute every Sentinel batch in Splunk/Elastic/S3.
+    const WIRE_SENSOR_TYPE: &str = "Linux-Sentinel";
+
+    let s3_path = format!("telemetry/{WIRE_SENSOR_TYPE}/dt=2026-06-02/hour=15/uuid.parquet");
+    assert!(s3_path.contains(WIRE_SENSOR_TYPE),
+        "S3 path must use the literal X-Sensor-Type header value '{WIRE_SENSOR_TYPE}'");
+
+    // Cross-check: the literal set on the reqwest client's default headers in
+    // parquet_transmitter.rs must be byte-identical to WIRE_SENSOR_TYPE.
+    let src = include_str!("../src/siem/parquet_transmitter.rs");
+    assert!(
+        src.contains(&format!(r#"HeaderValue::from_static("{WIRE_SENSOR_TYPE}")"#)),
+        "parquet_transmitter.rs's X-Sensor-Type default header literal is out of sync with '{WIRE_SENSOR_TYPE}'"
+    );
+
+    // Cross-check: the central sensor_profiles entry must declare the same string,
+    // since core_ingress and downstream consumers key off it for routing/auth.
+    let profile = include_str!(
+        "../../../project_empros/middleware/config/sensor_profiles/linux_sentinel.toml"
+    );
+    assert!(
+        profile.contains(&format!(r#"sensor_type = "{WIRE_SENSOR_TYPE}""#)),
+        "sensor_profiles/linux_sentinel.toml's declared sensor_type is out of sync with '{WIRE_SENSOR_TYPE}'"
+    );
 }
 
 

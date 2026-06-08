@@ -16,7 +16,7 @@ members = [
     # independently -- not listed here to avoid sub-workspace conflicts.
 
     # -- Integration tests --------------------------------------------------------
-    "tests",
+    "tests/integration",
 ]
 
 # ==============================================================================

@@ -42,7 +42,7 @@ max_spool_bytes   = 53687091200
 
 [nexus]
 # MUST be HTTPS -- enforced at startup.
-gateway_url  = "https://nexus-edge.local:443/api/v1/netflow/telemetry"
+gateway_url  = "https://nexus-edge.local:443/api/v1/telemetry"
 # Inject via secrets manager -- do NOT set placeholder values in production.
 auth_token       = "INJECT_FROM_SECRETS_MANAGER"
 integrity_secret = "INJECT_FROM_SECRETS_MANAGER"

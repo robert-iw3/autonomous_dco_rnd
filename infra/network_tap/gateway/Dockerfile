@@ -2,7 +2,7 @@ FROM docker.io/rust:1-bookworm AS builder
 
 RUN apt-get -qq update && \
     apt-get install -yq --no-install-recommends \
-    cmake pkg-config libssl-dev libsasl2-dev && \
+    cmake pkg-config libssl-dev libsasl2-dev libcurl4-openssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build

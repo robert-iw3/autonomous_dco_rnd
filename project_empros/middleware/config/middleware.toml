@@ -3,7 +3,7 @@
 # connects to NATS via the host-mapped port, NOT via the Docker DNS alias "nats".
 # Sensor services (worker_qdrant, worker_rules, orchestrator) use "nats://nats:4222"
 # (Docker service hostname) instead -- this divergence is intentional by design.
-# Override via NEXUS_NATS_URL env var for containerised middleware deployments.
+# Override via NEXUS_NATS_URL env var for containerized middleware deployments.
 nats_url = "nats://127.0.0.1:4222"
 # MiddlewareStream is separate from Sensor_Telemetry -- middleware subjects
 # use the "middleware.*" prefix, not "nexus.*", to enforce pipeline isolation.

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub sqs_queue_url: String,
     pub gateway_url: String,
+    pub auth_token: String,
     pub integrity_secret: String,
     pub sensor_id: String,
     pub sensor_type: String,
@@ -20,6 +21,7 @@ impl Config {
         Self {
             sqs_queue_url: env::var("SQS_QUEUE_URL").expect("SQS_QUEUE_URL must be set"),
             gateway_url: env::var("GATEWAY_URL").expect("GATEWAY_URL must be set"),
+            auth_token: env::var("AUTH_TOKEN").expect("AUTH_TOKEN must be set"),
             integrity_secret: env::var("INTEGRITY_SECRET").expect("INTEGRITY_SECRET must be set"),
             sensor_id: env::var("SENSOR_ID").unwrap_or_else(|_| "aws-guardduty-connector-default".to_string()),
             sensor_type: "aws-guardduty-connector".to_string(),

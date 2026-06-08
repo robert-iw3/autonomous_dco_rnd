@@ -15,6 +15,8 @@ import json
 import logging
 import os
 import signal
+import socket
+import struct
 import sys
 import time
 from pathlib import Path
@@ -43,6 +45,11 @@ logging.basicConfig(
 )
 log = logging.getLogger("reader")
 
+# -- Nexus sensor identity ------------------------------------------------------
+# X-Sensor-Type must match [schema_mappings.trellix_ens] in nexus.toml so the
+# central ingress and downstream workers route this telemetry correctly.
+SENSOR_TYPE = "trellix_ens"
+
 # -- Config from environment ---------------------------------------------------
 
 MSSQL_HOST      = os.environ["MSSQL_HOST"]
@@ -51,8 +58,10 @@ MSSQL_DB        = os.environ.get("MSSQL_DB", "ConsolidatedEventsENS")
 MSSQL_USER      = os.environ["MSSQL_USER"]
 MSSQL_PASSWORD  = os.environ["MSSQL_PASSWORD"]
 
-NEXUS_INGEST_URL    = os.environ["NEXUS_INGEST_URL"]
-NEXUS_HMAC_SECRET   = os.environ["NEXUS_HMAC_SECRET"].encode()
+NEXUS_INGEST_URL      = os.environ["NEXUS_INGEST_URL"]
+NEXUS_AUTH_TOKEN      = os.environ["NEXUS_AUTH_TOKEN"]
+NEXUS_INTEGRITY_SECRET = os.environ["NEXUS_INTEGRITY_SECRET"].encode()
+NEXUS_SENSOR_ID       = os.environ.get("NEXUS_SENSOR_ID") or socket.gethostname()
 
 BATCH_SIZE          = int(os.environ.get("TRANSMIT_BATCH_SIZE", 1000))
 INTERVAL_SECS       = int(os.environ.get("TRANSMIT_INTERVAL_SECS", 60))
@@ -71,6 +80,25 @@ def _handle_signal(sig: int, frame: Any) -> None:
 
 signal.signal(signal.SIGTERM, _handle_signal)
 signal.signal(signal.SIGINT, _handle_signal)
+
+
+# -- Batch sequence (persisted, monotonically increasing -- required by ingress
+#    replay/integrity protection in core_ingress::integrity::IntegrityVerifier) --
+
+class _BatchSequence:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        try:
+            self._current = int(path.read_text().strip())
+        except (OSError, ValueError):
+            self._current = 0
+
+    def next(self) -> int:
+        self._current += 1
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(str(self._current))
+        tmp.replace(self._path)
+        return self._current
 
 
 # -- SQL connection ------------------------------------------------------------
@@ -174,22 +202,35 @@ def _rows_to_parquet(rows: list[dict]) -> bytes:
     return buf.getvalue()
 
 
-# -- HMAC signing --------------------------------------------------------------
+# -- HMAC signing ---------------------------------------------------------------
+# Must match middleware/src/core_ingress/src/integrity.rs::compute_hmac exactly:
+#   mac.update(payload)
+#   mac.update(&seq.to_be_bytes())    // 8-byte big-endian u64
+#   mac.update(sensor_id.as_bytes())  // raw UTF-8 bytes
+#   mac.update(&ts.to_be_bytes())     // 8-byte big-endian u64
 
-def _hmac_sign(payload: bytes) -> str:
-    return hmac.new(NEXUS_HMAC_SECRET, payload, hashlib.sha256).hexdigest()
+def _compute_hmac(payload: bytes, sequence: int, timestamp: int) -> str:
+    mac = hmac.new(NEXUS_INTEGRITY_SECRET, digestmod=hashlib.sha256)
+    mac.update(payload)
+    mac.update(struct.pack(">Q", sequence))
+    mac.update(NEXUS_SENSOR_ID.encode("utf-8"))
+    mac.update(struct.pack(">Q", timestamp))
+    return mac.hexdigest()
 
 
 # -- Nexus POST ----------------------------------------------------------------
 
-def _send_to_nexus(payload: bytes, batch_id: str, stream: str) -> None:
-    sig = _hmac_sign(payload)
+def _send_to_nexus(payload: bytes, batch_id: str, stream: str, sequence: int) -> None:
+    ts = int(time.time())
+    hmac_hex = _compute_hmac(payload, sequence, ts)
     headers = {
-        "Content-Type":     "application/octet-stream",
-        "X-Nexus-BatchID":  batch_id,
-        "X-Nexus-Stream":   f"trellix_{stream}",
-        "X-Nexus-Format":   "parquet",
-        "X-HMAC-SHA256":    sig,
+        "Authorization":     f"Bearer {NEXUS_AUTH_TOKEN}",
+        "Content-Type":      "application/vnd.apache.parquet",
+        "X-Sensor-Type":     SENSOR_TYPE,
+        "X-Sensor-Id":       NEXUS_SENSOR_ID,
+        "X-Batch-Sequence":  str(sequence),
+        "X-Batch-Timestamp": str(ts),
+        "X-Batch-HMAC":      hmac_hex,
     }
     resp = requests.post(
         NEXUS_INGEST_URL,
@@ -198,8 +239,8 @@ def _send_to_nexus(payload: bytes, batch_id: str, stream: str) -> None:
         timeout=30,
     )
     resp.raise_for_status()
-    log.info("batch_id=%s stream=%s bytes=%d status=%d",
-             batch_id, stream, len(payload), resp.status_code)
+    log.info("batch_id=%s stream=%s seq=%d bytes=%d status=%d",
+             batch_id, stream, sequence, len(payload), resp.status_code)
 
 
 # -- Main loop -----------------------------------------------------------------
@@ -208,6 +249,7 @@ def _process_stream(
     con: pyodbc.Connection,
     engine: TrellixUEBAEngine,
     stream: str,
+    sequence: _BatchSequence,
 ) -> int:
     last_auto_id = _get_watermark(con, stream)
     rows = _fetch_batch(con, stream, last_auto_id)
@@ -261,7 +303,7 @@ def _process_stream(
         ))
 
     payload = _rows_to_parquet(out_rows)
-    _send_to_nexus(payload, batch_id, stream)
+    _send_to_nexus(payload, batch_id, stream, sequence.next())
 
     last_auto_id_new = rows[-1][0]  # AutoID is column 0
     _update_watermark(con, stream, last_auto_id_new, len(out_rows), batch_id)
@@ -278,6 +320,7 @@ def run() -> None:
         db_path=db_path,
         refit_interval=UEBA_REFIT_INTERVAL,
     )
+    sequence = _BatchSequence(Path(__file__).parent / "ueba_state" / ".transmit_sequence")
 
     while not _STOP:
         try:
@@ -285,7 +328,7 @@ def run() -> None:
             try:
                 total = 0
                 for stream in ("ens", "appcontrol"):
-                    total += _process_stream(con, engine, stream)
+                    total += _process_stream(con, engine, stream, sequence)
                 if total:
                     log.info("Cycle complete: %d rows transmitted.", total)
                 else:

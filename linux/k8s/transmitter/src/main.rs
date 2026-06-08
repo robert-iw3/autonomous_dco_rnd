@@ -9,10 +9,9 @@
 // directory. On reconnect, the spool is drained oldest-first before live data.
 // =============================================================================
 
-use arrow::array::{Int32Builder, StringBuilder, UInt16Builder};
+use arrow::array::{Float32Builder, Int32Builder, StringBuilder, UInt16Builder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use bytes::Bytes;
 use chrono::Utc;
 use hmac::{Hmac, Mac};
 use metrics::{counter, gauge};
@@ -23,7 +22,7 @@ use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use reqwest::Client;
 use serde::Deserialize;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -128,9 +127,94 @@ fn falco_schema() -> Arc<Schema> {
         Field::new("fd_dport", DataType::UInt16, true),
         Field::new("fd_l4proto", DataType::Utf8, true),
         Field::new("raw_fields", DataType::Utf8, true),
+
+        // -- Nexus integration columns -----------------------------------
+        // event_id: Falco emits no per-event identifier of its own (unlike
+        // sysmon's sysmon_event_id or sentinel's event_id). worker_rules's
+        // OS-agnostic extraction requires one (`event.event_id.is_empty()`
+        // drops the row), so we derive a stable one here: SHA-256 of the
+        // fields that make an alert occurrence unique, hex-encoded. Stable
+        // across spool/retransmission (content-derived, not random).
+        Field::new("event_id", DataType::Utf8, false),
+        // priority_score / container_scope_score / network_activity_score /
+        // privileged_score: falco_math (4D) feature vector for worker_qdrant
+        // vectorization + Agentic AI Swarm evaluation -- registered in
+        // nexus.toml [schema_mappings.falco_runtime]. All four are computed
+        // here pre-normalised to [0,1] (see compute_falco_math_features()).
+        Field::new("priority_score", DataType::Float32, false),
+        Field::new("container_scope_score", DataType::Float32, false),
+        Field::new("network_activity_score", DataType::Float32, false),
+        Field::new("privileged_score", DataType::Float32, false),
+
         Field::new("sensor_id", DataType::Utf8, false),
         Field::new("sensor_type", DataType::Utf8, false),
     ]))
+}
+
+/// Maps Falco's syslog-derived priority scale to a normalised [0,1] severity
+/// score (1.0 = most severe). Falco emits one of eight levels (Emergency
+/// down to Debug, matching syslog severity 0-7); unrecognised values map to
+/// the schema's own "Unknown" default at the midpoint.
+fn priority_score(priority: &str) -> f32 {
+    match priority.to_ascii_lowercase().as_str() {
+        "emergency"     => 7.0 / 7.0,
+        "alert"         => 6.0 / 7.0,
+        "critical"      => 5.0 / 7.0,
+        "error"         => 4.0 / 7.0,
+        "warning"       => 3.0 / 7.0,
+        "notice"        => 2.0 / 7.0,
+        "informational" => 1.0 / 7.0,
+        "debug"         => 0.0,
+        _               => 0.5,
+    }
+}
+
+/// Derives a stable, content-based event identifier: SHA-256 over the fields
+/// that make a single Falco alert occurrence unique (timestamp + hostname +
+/// rule + output), hex-encoded. Falco emits no per-event ID of its own, and
+/// re-derivation must be stable across spool/retransmission (so this can't
+/// be a random UUID generated at serialization time).
+fn derive_event_id(e: &FalcoEvent) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(e.time.as_deref().unwrap_or("").as_bytes());
+    hasher.update(b"\0");
+    hasher.update(e.hostname.as_deref().unwrap_or("").as_bytes());
+    hasher.update(b"\0");
+    hasher.update(e.rule.as_deref().unwrap_or("").as_bytes());
+    hasher.update(b"\0");
+    hasher.update(e.output.as_deref().unwrap_or("").as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+/// Computes the falco_math (4D) feature vector for a single event, all
+/// dimensions pre-normalised to [0,1] -- see Field doc comments in
+/// falco_schema() for what each dimension represents and why.
+fn compute_falco_math_features(e: &FalcoEvent) -> (f32, f32, f32, f32) {
+    let f = &e.output_fields;
+
+    let priority = priority_score(e.priority.as_deref().unwrap_or("Unknown"));
+
+    // Workload-plane (running inside a container) vs host/control-plane event.
+    let container_scope = if str_field(f, "container.id").map(|s| !s.is_empty()).unwrap_or(false) {
+        1.0
+    } else {
+        0.0
+    };
+
+    // Syscall touches a network file descriptor (has a remote endpoint).
+    let network_activity = if str_field(f, "fd.sip").is_some() || str_field(f, "fd.dip").is_some() {
+        1.0
+    } else {
+        0.0
+    };
+
+    // Process is running as root (uid 0) -- a common privilege-escalation signal.
+    let privileged = match f.get("user.uid").and_then(|v| v.as_i64()) {
+        Some(0) => 1.0,
+        _ => 0.0,
+    };
+
+    (priority, container_scope, network_activity, privileged)
 }
 
 // -- Parquet Serialization ----------------------------------------------------
@@ -164,6 +248,11 @@ fn events_to_parquet(events: &[FalcoEvent], sensor_id: &str) -> Result<Vec<u8>, 
     let mut fddport_b = UInt16Builder::with_capacity(cap);
     let mut fdproto_b = StringBuilder::new();
     let mut raw_b = StringBuilder::new();
+    let mut eid_b = StringBuilder::with_capacity(cap, cap * 64);
+    let mut pscore_b = Float32Builder::with_capacity(cap);
+    let mut cscore_b = Float32Builder::with_capacity(cap);
+    let mut nscore_b = Float32Builder::with_capacity(cap);
+    let mut uscore_b = Float32Builder::with_capacity(cap);
     let mut sid_b = StringBuilder::with_capacity(cap, cap * 20);
     let mut stype_b = StringBuilder::with_capacity(cap, cap * 14);
 
@@ -197,6 +286,14 @@ fn events_to_parquet(events: &[FalcoEvent], sensor_id: &str) -> Result<Vec<u8>, 
 
         // Preserve all output_fields as raw JSON for downstream enrichment
         raw_b.append_value(serde_json::to_string(f).unwrap_or_default());
+
+        eid_b.append_value(derive_event_id(e));
+        let (pscore, cscore, nscore, uscore) = compute_falco_math_features(e);
+        pscore_b.append_value(pscore);
+        cscore_b.append_value(cscore);
+        nscore_b.append_value(nscore);
+        uscore_b.append_value(uscore);
+
         sid_b.append_value(sensor_id);
         stype_b.append_value("falco_runtime");
     }
@@ -212,7 +309,11 @@ fn events_to_parquet(events: &[FalcoEvent], sensor_id: &str) -> Result<Vec<u8>, 
         Arc::new(etype_b.finish()),
         Arc::new(fdname_b.finish()), Arc::new(fdsip_b.finish()), Arc::new(fddip_b.finish()),
         Arc::new(fdsport_b.finish()), Arc::new(fddport_b.finish()), Arc::new(fdproto_b.finish()),
-        Arc::new(raw_b.finish()), Arc::new(sid_b.finish()), Arc::new(stype_b.finish()),
+        Arc::new(raw_b.finish()),
+        Arc::new(eid_b.finish()),
+        Arc::new(pscore_b.finish()), Arc::new(cscore_b.finish()),
+        Arc::new(nscore_b.finish()), Arc::new(uscore_b.finish()),
+        Arc::new(sid_b.finish()), Arc::new(stype_b.finish()),
     ]).map_err(|e| format!("RecordBatch build failed: {e}"))?;
 
     let props = WriterProperties::builder()

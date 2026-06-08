@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let Some(messages) = out.messages() else { continue };
+        let messages = out.messages();
 
         for msg in messages {
             let Some(body) = msg.body() else { continue };

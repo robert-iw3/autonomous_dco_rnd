@@ -698,9 +698,12 @@ class TestHMACAndNexusTransmission:
         self.db.close()
 
     def test_hmac_header_name_is_x_hmac_sha256(self):
-        """reader.py uses X-HMAC-SHA256 as the signing header name."""
+        """reader.py must use the canonical X-Batch-HMAC signing header name --
+        matches HDR_BATCH_HMAC in both core_ingress integrity.rs trees
+        (services/core_ingress and middleware/src/core_ingress); "X-HMAC-SHA256"
+        is not a header name used anywhere in the codebase."""
         src = (TRANSMIT / "reader.py").read_text()
-        assert "X-HMAC-SHA256" in src
+        assert "X-Batch-HMAC" in src
 
     def test_nexus_stream_header_prefixed_with_trellix(self):
         src = (TRANSMIT / "reader.py").read_text()

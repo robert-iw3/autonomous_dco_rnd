@@ -15,8 +15,10 @@
 #   EPO_PRODUCTION_HOST      -- FQDN/IP of production ePO SQL Server
 #   EPO_READONLY_USER        -- Read-only SQL login on production ePO
 #   EPO_READONLY_PASSWORD    -- Password for EPO_READONLY_USER
-#   NEXUS_INGEST_URL         -- Nexus ingress endpoint
-#   NEXUS_HMAC_SECRET        -- HMAC-SHA256 signing key (from Ansible Vault)
+#   NEXUS_INGEST_URL         -- Nexus core_ingress endpoint (POST /api/v1/telemetry)
+#   NEXUS_AUTH_TOKEN         -- Bearer token for Authorization header
+#   NEXUS_INTEGRITY_SECRET   -- HMAC-SHA256 batch-signing shared key (from Ansible Vault)
+#   NEXUS_SENSOR_ID          -- stable sensor identity (defaults to container hostname)
 
 version: "3.9"
 
@@ -122,7 +124,9 @@ services:
       MSSQL_USER:                "SA"
       MSSQL_PASSWORD:            "${SA_PASSWORD}"
       NEXUS_INGEST_URL:          "${NEXUS_INGEST_URL}"
-      NEXUS_HMAC_SECRET:         "${NEXUS_HMAC_SECRET}"
+      NEXUS_AUTH_TOKEN:          "${NEXUS_AUTH_TOKEN}"
+      NEXUS_INTEGRITY_SECRET:    "${NEXUS_INTEGRITY_SECRET}"
+      NEXUS_SENSOR_ID:           "${NEXUS_SENSOR_ID:-}"
       TRANSMIT_BATCH_SIZE:       "${TRANSMIT_BATCH_SIZE:-1000}"
       TRANSMIT_INTERVAL_SECS:    "${TRANSMIT_INTERVAL_SECS:-60}"
       UEBA_REFIT_INTERVAL:       "${UEBA_REFIT_INTERVAL:-500}"

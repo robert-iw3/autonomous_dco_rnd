@@ -346,11 +346,16 @@ impl IntegrityVerifier {
 fn build_os_exclusion_rules() -> std::collections::HashMap<String, HashSet<String>> {
     let mut rules = std::collections::HashMap::new();
 
-    // linux_sentinel: pid, ppid, uid, container_name, comm, command_line,
+    // Linux-Sentinel: pid, ppid, uid, container_name, comm, command_line,
     // parent_comm, shannon_entropy, execution_velocity, tuple_rarity, etc.
     // Must NOT contain Windows or network_tap fields.
+    // Key MUST be the wire X-Sensor-Type value ("Linux-Sentinel", set in
+    // parquet_transmitter.rs and sensor_profiles/linux_sentinel.toml), NOT the
+    // lowercase nexus.toml [schema_mappings.linux_sentinel] table key -- they
+    // intentionally differ (see that table's routing comment). Using the table
+    // key here silently skipped this lookup for every real batch.
     rules.insert(
-        "linux_sentinel".into(),
+        "Linux-Sentinel".into(),
         HashSet::from([
             "Image".into(), "parent_image".into(), "signature_name".into(),
             "CommandLine".into(), "DestIp".into(), "Port".into(),

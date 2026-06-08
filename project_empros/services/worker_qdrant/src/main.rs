@@ -46,6 +46,7 @@ struct SchemaMappings {
     cloud_flow: SchemaMapping,
     network_tap: SchemaMapping,
     suricata_eve: SchemaMapping,
+    falco_runtime: SchemaMapping,
     // Cloud sub-types: gcp_audit, gcp_scc, gcp_vpc_flow, vmware_syslog all share
     // the cloud_flow vector space and route through the cloud_flow mapping.
     // They are defined in nexus.toml for TOML deserialization completeness but
@@ -203,6 +204,9 @@ impl SiemAdapter for QdrantAdapter {
                 (&self.mappings.macos_sensor, "macos_sensor")
             } else if has_col(&self.mappings.windows_deepsensor.identifier_column) {
                 (&self.mappings.windows_deepsensor, "windows_deepsensor")
+            } else if has_col(&self.mappings.falco_runtime.identifier_column) && has_col("evt_type") {
+                // "rule" + "evt_type" is unique to Falco runtime telemetry (k8s).
+                (&self.mappings.falco_runtime, "falco_runtime")
             } else {
                 continue;
             };
@@ -363,6 +367,19 @@ impl SiemAdapter for QdrantAdapter {
                             raw_math[2].clamp(0.0, 1.0),
                             (raw_math[3] / 1500.0).clamp(0.0, 1.0),
                             (raw_math[4] / 100.0).clamp(0.0, 1.0),
+                        ]
+                    } else if active_vector_name == "falco_math" && raw_math.len() == 4 {
+                        // falco_runtime falco_math (4D) -- all inputs pre-normalised [0,1]
+                        // in falco_transmitter's compute_falco_math_features():
+                        //   [0] priority_score          -- Falco priority scale → [0,1]
+                        //   [1] container_scope_score   -- 1.0 if container.id present
+                        //   [2] network_activity_score  -- 1.0 if fd.sip/fd.dip present
+                        //   [3] privileged_score        -- 1.0 if user.uid == 0
+                        vec![
+                            raw_math[0].clamp(0.0, 1.0),
+                            raw_math[1].clamp(0.0, 1.0),
+                            raw_math[2].clamp(0.0, 1.0),
+                            raw_math[3].clamp(0.0, 1.0),
                         ]
                     } else if active_vector_name == "network_tap" && raw_math.len() == 8 {
                         vec![

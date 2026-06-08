@@ -326,10 +326,13 @@ impl TransmissionLayer {
         let mut current_backoff = Duration::from_secs(5);
         let max_backoff = Duration::from_secs(300);
 
-        // Define Arrow Schema matching the SQLite table
+        // Define Arrow Schema for Nexus transmission. Note: the "sensor_id" column
+        // (sourced from the local "endpoint_id" field) must be named to match
+        // [schema_mappings.linux_sentinel].sensor_id_column in the central nexus.toml
+        // contract, which identifies the reporting host for worker_qdrant routing.
         let schema = Arc::new(Schema::new(vec![
             Field::new("event_id", DataType::Utf8, false),
-            Field::new("endpoint_id", DataType::Utf8, false),
+            Field::new("sensor_id", DataType::Utf8, false),
             Field::new("timestamp", DataType::UInt64, false),
             Field::new("level", DataType::Utf8, false),
             Field::new("mitre_tactic", DataType::Utf8, false),

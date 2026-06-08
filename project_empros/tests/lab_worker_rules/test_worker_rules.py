@@ -187,7 +187,10 @@ class TestCircuitBreaker:
     """Redis circuit breaker -- prevents alert cascade from overwhelming a degraded Redis."""
 
     def test_trips_after_3_consecutive_failures(self):
-        assert 'ConsecutiveFailures::new(3)' in _src(), \
+        # failsafe 1.3's failure_policy::consecutive_failures(n, backoff) is a free
+        # function (ConsecutiveFailures has no ::new constructor in this version) --
+        # the literal "3," argument is what encodes the consecutive-failure threshold.
+        assert 'failure_policy::consecutive_failures(' in _src() and '3,' in _src(), \
             "Circuit breaker must open after 3 consecutive failures"
 
     def test_exponential_backoff_starts_at_2s(self):

@@ -57,7 +57,7 @@ export NEXUS_OFFLINE_MODE="$OFFLINE_MODE"
 #
 # Override flags:
 #   --force-bare-metal  always use bare-metal path (testing on any fleet size)
-#   --force-container   always use containerised path (CI/dev)
+#   --force-container   always use containerized path (CI/dev)
 BARE_METAL_THRESHOLD=20000
 BARE_METAL_ENABLED=false
 
@@ -88,7 +88,7 @@ except:
     elif [[ "$FORCE_CONTAINER" == "true" ]]; then
         BARE_METAL_ENABLED=false
         DEPLOYMENT_TIER="small"
-        log_warn "Forced containerised mode (--force-container)"
+        log_warn "Forced containerized mode (--force-container)"
     elif [[ "$endpoint_count" -gt "$BARE_METAL_THRESHOLD" ]]; then
         BARE_METAL_ENABLED=true
     else
@@ -296,7 +296,7 @@ main() {
         log_warn "BARE METAL PATH -- NATS/Qdrant/Analytics/GPU/MinIO deploy as native binaries on RAID NVMe"
         log_warn "Run infrastructure/bare-metal/scripts/validate-bare-metal.sh on each node BEFORE proceeding"
     else
-        log_info "CONTAINERISED PATH -- all services deployed as Podman Quadlets on VMs"
+        log_info "CONTAINERIZED PATH -- all services deployed as Podman Quadlets on VMs"
     fi
     echo ""
 
@@ -374,7 +374,7 @@ main() {
         log_info "  NATS + Qdrant: native binary on RAID10 NVMe (no Podman)"
         log_info "  Analytics: DuckDB + PyTorch on 32TB RAID0 NVMe scratch"
     else
-        log_info "━━ Stage 4/6 -- Deploy Core Infrastructure [CONTAINERISED] ━"
+        log_info "━━ Stage 4/6 -- Deploy Core Infrastructure [CONTAINERIZED] ━"
         log_info "  All services: Podman Quadlets on VMware VMs"
     fi
     chmod +x orchestration/scripts/04-deploy-core.sh

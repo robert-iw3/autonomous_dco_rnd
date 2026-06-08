@@ -224,7 +224,7 @@ preflight
 
 # --- Tier 0 + 4a: Python tests in Alpine container ----------------------------
 # tier0/run.sh builds an Alpine 3.23 image and runs pytest for both
-# tests/tier0 and tests/tier4 in a single containerised pass.
+# tests/tier0 and tests/tier4 in a single containerized pass.
 
 if $RUN_TIER0 || $RUN_TIER4; then
     T0_FLAGS=""

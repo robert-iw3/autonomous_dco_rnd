@@ -67,13 +67,17 @@ class TestWindowsC2SourceStructure:
                (TX_DIR / "src" / "lib.rs").exists()
 
     def test_deployment_artifact_exists(self):
-        # XDR agent is a .NET/C# project; deployment artifact is .csproj or .sln
-        # (not Docker-based; runs as a Windows service alongside sysmon_sensor)
+        # DeepXDR converged into a hybrid .NET 10 + Rust agent (readme.md):
+        # the .NET Windows Service project lives nested under agent/ (XdrAgent.csproj),
+        # not at XDR_DIR's top level -- glob non-recursively at top level for the
+        # workspace Cargo.toml (Rust ML engine) and recursively for .csproj/.sln
+        # (the .NET service), since both halves are real deployment artifacts here.
         has_docker = (XDR_DIR / "docker-compose.yaml").exists() or \
                      (XDR_DIR / "docker-compose.yml").exists() or \
                      (XDR_DIR / "Dockerfile").exists()
-        has_dotnet = any(XDR_DIR.glob("*.csproj")) or any(XDR_DIR.glob("*.sln"))
-        assert has_docker or has_dotnet
+        has_dotnet = any(XDR_DIR.rglob("*.csproj")) or any(XDR_DIR.rglob("*.sln"))
+        has_cargo = (XDR_DIR / "Cargo.toml").exists()
+        assert has_docker or has_dotnet or has_cargo
 
 
 # ── C2Row schema -- process NOT Image ────────────────────────────────────────
