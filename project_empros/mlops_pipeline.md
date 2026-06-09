@@ -65,10 +65,11 @@ The pipeline now produces training data across **12 source types** covering all 
 │  ├── linux_exploitation_behavioral_v1.jsonl (LinExpl,  13 cls, 156 recs) │
 │  ├── lotl_behavioral_v1.jsonl               (LOTL,     24 cls, 288 recs) │
 │  ├── windows_exploitation_behavioral_v1.jsonl (WinExp, 22 cls, 264 recs) │
-│  └── cross_source_temporal_v1.jsonl         (XSrc,      5 cls,  60 recs) │
-│      Total TTP corpus: 265 active classes, 3,180 SFT records             │
+│  └── cross_source_temporal_v1.jsonl         (XSrc,     10 cls, 120 recs) │
+│      Total TTP corpus: 270 active classes, 3,240 SFT records             │
 │      Sensors: sysmon_sensor, windows_deepsensor, network_tap,            │
-│               linux_sentinel, azure_entraid, aws_cloudtrail, macos_sensor│
+│               linux_sentinel, azure_entraid, aws_cloudtrail, gcp_audit,  │
+│               azure_activity, macos_sensor                               │
 │                                                                          │
 │  05_synthetic_data_gen.py --count 100    (optional, requires API key)    │
 │  └── synthetic_hard_negatives_v1.jsonl  (Claude-generated, validated)    │
@@ -254,7 +255,7 @@ make train-reward          # Bradley-Terry reward model
 make eval-spatial       # Model C: hallucination + schema + injection + spatial math
 make eval-network       # Model B: dual-gate TTP accuracy
 make eval-critic        # Model D: Phase 1 + 2 only (fast)
-make eval-critic-full   # Model D: Phase 1–4 + LLM-as-judge (full suite)
+make eval-critic-full   # Model D: Phase 1-4 + LLM-as-judge (full suite)
 
 make generate-synthetic # Claude API synthetic hard negative generation (requires ANTHROPIC_API_KEY)
 
@@ -425,7 +426,7 @@ Hard negatives are the most important training examples for FP reduction. Every 
   (pyarrow columnar, memory-mapped, graceful fallback when `pylance` absent).
   All 11 `stage_*_behavioral.py` scripts accept `--output-lance`. `02_train_sft_cot.py`
   prefers `.lance` files via `_load_ttp_dataset()` / `TTP_LANCE_SOURCES`. `corpus_config.toml`
-  has dual `*_staging` / `*_lance` entries. Expected gain: 4–10x faster I/O on epoch 2+.
+  has dual `*_staging` / `*_lance` entries. Expected gain: 4-10x faster I/O on epoch 2+.
 
 - [x] **P4-C: DeepSpeed ZeRO-3 for Model B** — `config/deepspeed_zero3.json` (stage=3,
   contiguous_gradients, 5e8 allgather/reduce buckets). `02_train_network.py` accepts
@@ -435,7 +436,7 @@ Hard negatives are the most important training examples for FP reduction. Every 
 
 - [x] **P4-D: Qdrant gRPC for Track 1 scroll** — `01_spool_datasets.py` uses
   `QdrantClient(host=QDRANT_HOST, port=QDRANT_GRPC_PORT, prefer_grpc=True)` (default port
-  6334). Env-configurable (`QDRANT_HOST`, `QDRANT_GRPC_PORT`). 2–3x faster than REST for
+  6334). Env-configurable (`QDRANT_HOST`, `QDRANT_GRPC_PORT`). 2-3x faster than REST for
   batch scrolls on large corpora. `Dockerfile.mlops` needs `qdrant-client[grpc]` extra for
   production gRPC.
 
@@ -451,10 +452,12 @@ Hard negatives are the most important training examples for FP reduction. Every 
 - [x] **ADDON-Ph2: PyRIT evaluator** -- `03_eval_pyrit.py` (5 scenarios, rule-based FAIL gate, hard-negative logging, 56 tests). See Phase 2 for full details.
 - [x] **ADDON-Ph3: Cross-source temporal expansion + corpus_utils alias sync** -- `cross_source_temporal.py` and `stage_cross_source_temporal.py` extended to 5 classes (60 records). `mlops/corpus_templates/corpus_utils.py` synced with `SENSOR_FIELD_ALIASES` + `_apply_aliases()` from mlops/scripts mirror; `fmt_edr()` now accepts live sensor Parquet field names (`path`→`Image`, `command_line`→`CommandLine`). 57 offline tests (`test_cross_source_temporal.py`, 0.08s).
 - [x] **ADDON-Ph4: RSI closed-loop orchestrator + Skill Library** -- `08_rsi_loop.py` + `skills_v1.jsonl` + all safety invariants (air-gap, NATS quorum, alignment gate, Ansible Vault). 49 offline tests (`test_rsi_loop.py`, 0.06s). See Phase 4 for full details.
-- [x] **PERF-Ph1: Training acceleration + ONNX export** -- Unsloth graceful-fallback added to `02_train_qlora.py` and `02_train_sft_cot.py` (FastLanguageModel path with smarter gradient checkpointing; degrades to standard BnB QLoRA if unsloth absent; guard prevents double `resize_token_embeddings` call). `mlops/scripts/export_model_a_onnx.py`: ONNX opset-17 export for BiLSTM-AE with fused z-score normalization (`NormalizedAE` wrapper), dynamic batch/seq axes, numerical equivalence check (max delta < 1e-4), SHA-384 manifest append. `mlops/Makefile`: `export-onnx` target. `planning_docs/PERFORMANCE_ENHANCEMENT_PLAN.md`: full 14-option decision matrix with phased implementation plan (Phases 1–5).
+- [x] **PERF-Ph1: Training acceleration + ONNX export** -- Unsloth graceful-fallback added to `02_train_qlora.py` and `02_train_sft_cot.py` (FastLanguageModel path with smarter gradient checkpointing; degrades to standard BnB QLoRA if unsloth absent; guard prevents double `resize_token_embeddings` call). `mlops/scripts/export_model_a_onnx.py`: ONNX opset-17 export for BiLSTM-AE with fused z-score normalization (`NormalizedAE` wrapper), dynamic batch/seq axes, numerical equivalence check (max delta < 1e-4), SHA-384 manifest append. `mlops/Makefile`: `export-onnx` target. `planning_docs/PERFORMANCE_ENHANCEMENT_PLAN.md`: full 14-option decision matrix with phased implementation plan (Phases 1-5).
 - [x] **PERF-TI: Threat Intelligence RAG service** -- `services/worker_ti_ingest/` new FastAPI Python service (port 8010). Hybrid retrieval: TurboVec IdMapIndex SIMD ANN (numpy brute-force fallback) + BM25Okapi keyword index. Embeddings: BAAI/bge-m3 1024D via sentence-transformers (TRANSFORMERS_OFFLINE=1). Reranker: CrossEncoder ms-marco-MiniLM-L-6-v2 (top-20→top-5, ~45ms CPU). Hybrid score: α=0.65 dense + (1-α)xBM25_normalized. Qdrant `nexus_ti_corpus` collection (ScalarQuantization INT8, named vector `ti_embed`). NATS publish to `nexus.ti.status` for progress events. Document parsers: PDF (PyMuPDF), STIX 2.x bundle, Sigma YAML, JSONL, IOC CSV (sliding window 400 tokens, 40 overlap). Endpoints: POST /ingest, GET /status/{job_id}, GET /corpus, DELETE /document/{doc_id}, POST /retrieve, GET /health. Dockerfile air-gap ready.
 - [x] **PERF-LG: Looking Glass TI Intelligence tab (7th view)** -- `services/looking_glass/src/routes/api/ti/+server.ts`: SvelteKit server endpoints proxying to worker_ti_ingest + SSE relay from `nexus.ti.status`. `stores.ts` extended with TIDocument, TICorpusStats, TIUploadEvent types and tiDocuments/tiStats/tiUploadLog/appendTIUploadEvent/refreshTICorpus. `+page.svelte`: drag-and-drop upload dropzone, SSE activity log, corpus stats cards, document browser table with retract buttons; `{ id: 'ti', label: 'TI Intelligence', icon: '◎' }` added to nav.
-- [x] **PERF-TV: TurboVec MLOps integrations** -- `mlops/scripts/corpus_utils.py`: TurboVecNgramIndex (char 2–4-gram hash → L2-normalised float32 vector, dim=256, TurboVec ANN + numpy brute-force fallback), TurboVecDeduplicator (threshold 0.92, check_and_add), HardNegativeMiner (cross-class contrastive DPO pair mining), SkillDeduplicator (dim=256, threshold 0.90, load_from_library). Three script integrations: (1) `01_spool_datasets.py` Track-6 dedup via `--dedup-threshold` (default 0.92); (2) `05_critic_loop.py` hard-negative mining: `_append_mined_negatives` writes `source='turbovec_hn_mining'` DPO pairs to `hard_negatives_sft_v1.jsonl`; (3) `08_rsi_loop.py` `promote_skill` near-dup guard via process-lifetime SkillDeduplicator singleton (warm from library file, updated on every successful promotion). 58/58 offline tests (`tests/test_turbovec_mlops.py`, 0.14s). Bug fix: `_get_skill_deduplicator` bumped from dim=64 to dim=256 to distinguish skills with same JSON schema structure.
+- [x] **PERF-TV: TurboVec MLOps integrations** -- `mlops/scripts/corpus_utils.py`: TurboVecNgramIndex (char 2-4-gram hash → L2-normalised float32 vector, dim=256, TurboVec ANN + numpy brute-force fallback), TurboVecDeduplicator (threshold 0.92, check_and_add), HardNegativeMiner (cross-class contrastive DPO pair mining), SkillDeduplicator (dim=256, threshold 0.90, load_from_library). Three script integrations: (1) `01_spool_datasets.py` Track-6 dedup via `--dedup-threshold` (default 0.92); (2) `05_critic_loop.py` hard-negative mining: `_append_mined_negatives` writes `source='turbovec_hn_mining'` DPO pairs to `hard_negatives_sft_v1.jsonl`; (3) `08_rsi_loop.py` `promote_skill` near-dup guard via process-lifetime SkillDeduplicator singleton (warm from library file, updated on every successful promotion). 58/58 offline tests (`tests/test_turbovec_mlops.py`, 0.14s). Bug fix: `_get_skill_deduplicator` bumped from dim=64 to dim=256 to distinguish skills with same JSON schema structure.
+
+- [x] **ADDON-Ph5: P13/P14 sprint — temporal expansion + alignment gate + P14 skeletons** (P14 ✅) -- (1) `stage_cross_source_temporal.py` + `corpus_templates/cross_source_temporal.py` expanded from 5→10 classes (+5: AzureVMRunCommand, GCPSAKeyExport, RansomwarePreEncryption, K8sLateralMovement, PrivEscToCloudAPI). 120 SFT records. `test_cross_source_temporal.py` expanded to 114 tests (sections I-M added). (2) Q-18: `tests/Execute-CognitiveBypass.sh` + `tests/Invoke-CrossPollinationStress.py` as blocking gates in `make deploy`; 12 new tests in `TestAlignmentGatePresence`. (3) M-17: `mlops/scripts/05_mine_cloud_fps.py` skeleton + 34 offline tests. (4) M-16 stub (`spool_ebpf_auditd_data`), M-18 stub (`run_closed_loop_auto_update`), M-19 stub (`--rlhf-mode autonomous`), M-20 TODO in `projector.py`, M-21/M-22 design notes in `model_config.toml`. Total Lab 13: 72/72 tests. Total new tests this sprint: 220.
 
 ---
 
@@ -466,11 +469,11 @@ Core infrastructure for continuous learning. No model architecture changes -- pu
 
 - [x] **Threat feed pipeline** (`mlops/scripts/07_feed_ingest.py` -- SKELETON) -- Four-stage atomic filter over local Atomic Red Team mirrors (no external egress). Three modes: `feed` (4-stage filter → sandbox queue + Track 6 index + `threat_feed_sft_v1.jsonl`), `kill-chains` (CISA advisory STIX → `kill_chain_sft_v1.jsonl`), `sigma-validate` (Sigma ↔ Track 6 gap → `mlops/todos.md`). All feeds read from `data/ti_feeds/` local mirrors. Makefile: `make feed-ingest`, `make kill-chains`, `make sigma-validate`. 26/26 tests.
 
-- [ ] **Cross-source temporal corpus expansion** -- Expanded from 3 → 5 classes/60 records (ADDON-Ph3 ✅): `LinuxBeaconAfterExec` (linux_sentinel exec from `/tmp/` + network_tap C2 beacon, T+20s) and `CloudLateralMovement` (azure_entraid impossible-travel + aws_cloudtrail IAM AttachUserPolicy, T+60s). Long-term target: ≥20 classes covering Azure VM RunCommand, GCP SA key export, and multi-cloud kill chains. Target: 240 SFT records.
+- [x] **Cross-source temporal corpus expansion** (P14 ✅ — BACKLOG C-20 ⏳ partial) -- ADDON-Ph5 expanded to 10 classes/120 records. New classes: `AzureVMRunCommand` (azure_activity RunCommand + linux_sentinel exec, T1651), `GCPSAKeyExport` (gcp_audit CreateKey + aws_cloudtrail OIDC pivot, T1552.001), `RansomwarePreEncryption` (sysmon VSS deletion + network_tap staging, T1490), `K8sLateralMovement` (linux_sentinel container exec + network_tap pod scan, T1609), `PrivEscToCloudAPI` (sysmon lsass dump + azure_activity RBAC write, T1134.001). `corpus_templates/cross_source_temporal.py` synced (byte-identical). 114/114 offline tests (`test_cross_source_temporal.py`, 0.20s). Long-term target: ≥20 classes (C-20 ⏳ continues).
 
-- [ ] **Negative transfer defense** -- Add cross-vector contamination tests to `03_eval_critic.py`: TP recall on `azure_entraid` must not drop >2% after any cloud_flow hard negative batch.
+- [x] **Negative transfer defense** (M-11 ✅) -- Cross-vector contamination tests added to `03_eval_critic.py`: 6 cases across 3 cohorts (regression_stability, cross_sensor_domain, os_artifact_bleed); hard exit(1) on any regression. `cross_sensor_domain` cohort covers azure_entraid → cloud_flow contamination guard.
 
-- [ ] **eBPF + auditd telemetry pipes** -- Ingest raw Linux eBPF + auditd events into `01_spool_datasets.py` Track 7 extension from sandbox farm captures.
+- [ ] **eBPF + auditd telemetry pipes** (M-16 SKELETON ✅) -- `spool_ebpf_auditd_data()` stub in `01_spool_datasets.py` Track 9. Activated by `LINUX_EBPF_AVAILABLE=1`. Awaiting eBPF CO-RE sandbox farm deployment. Pin note: sensor code in `linux/ebpf/` not yet production-deployed.
 
 ---
 
@@ -500,9 +503,9 @@ NeMo-Guardrails bounds every input and output channel before the execution engin
 
 - [x] **Schema enforcement** (`mlops/config/nemo_guardrails/remediation_schema.json`) -- JSON Schema draft-07, `additionalProperties: false`, 3 required fields: `target_component`, `remediation_script_base64` (base64), `verification_test_command`. `schema_enforcement.enabled: true`, `max_retries: 3`. Violations logged to `logs/schema_violations/` and appended to `hard_negatives_sft_v1.jsonl`. Makefile: `make guardrails-validate`.
 
-- [x] **HashiCorp Vault credential client** (`mlops/scripts/vault_client.py` -- I-9 SKELETON) -- `VaultClient` wraps hvac KV v2: lazy connect, process-lifetime cache, `invalidate()`. `get_secret(path)` module-level singleton. Well-known paths: `nexus/nats/password`, `nexus/qdrant/api_key`, `nexus/models/hf_token`, `nexus/sensors/hmac_key`, `nexus/soar/webhook_secret`. Wire into `worker_soar`, `core_ingress`, `worker_qdrant`. Requires `hvac>=2.0.0` + `VAULT_ADDR`/`VAULT_TOKEN` via Ansible Vault.
+- [x] **HashiCorp Vault credential client** (`mlops/scripts/vault_client.py` -- I-9 ✅ DONE) -- `VaultClient` wraps hvac KV v2: lazy connect, process-lifetime cache, `invalidate()`. `get_secret(path)` module-level singleton. Well-known paths: `nexus/nats/password`, `nexus/qdrant/api_key`, `nexus/models/hf_token`, `nexus/sensors/hmac_key`, `nexus/soar/webhook_secret`. Wired into `01_spool_datasets.py` (`_vault_secret()` helper, `S3_SECRET_KEY` via `nexus/s3/secret_key`, `QDRANT_API_KEY` via `nexus/qdrant/api_key`, `api_key=` passed to QdrantClient) and `08_rsi_loop.py` (`NATS_PASSWORD` via `nexus/nats/password`, injected into `nats.connect(user=, password=)`). Env-var fallback when `VAULT_TOKEN` absent (test/offline safe). Requires `hvac>=2.0.0` + `VAULT_ADDR`/`VAULT_TOKEN` via Ansible Vault.
 
-- [ ] **Multi-cloud hard negatives from real tenants** -- `05_mine_cloud_fps.py`: query SOAR for cloud FP incidents → `hard_negatives_operator_v1.jsonl`. Target: ≥200 real cloud FPs. Requires production deployment.
+- [ ] **Multi-cloud hard negatives from real tenants** (M-17 SKELETON ✅) -- `mlops/scripts/05_mine_cloud_fps.py` created: `mine()`, `_format_fp_record()`, `_verify_change_ticket()` skeleton + vault fallback + `--dry-run/--source/--limit` CLI. Writes `cloud_fps_hardneg_v1.jsonl`. 34/34 offline tests (`test_mine_cloud_fps.py`). Awaiting live operator dismissal corpus (Phase 1 production deployment). Pin note: `_load_dismissed_alerts()` returns empty list until SOAR is live.
 
 ---
 
@@ -510,21 +513,21 @@ NeMo-Guardrails bounds every input and output channel before the execution engin
 
 Full RSI cycle: corpus auto-update → train → adversarial gate → conditional deploy, no human in the loop for routine weight updates.
 
-- [ ] **Closed-loop corpus auto-update** -- `07_feed_ingest.py` sandbox results write directly to the correct `*_query_index.json` and re-run `make data-ttp` automatically when a new PoC verdict arrives. The pipeline detects the index update via filesystem watch and triggers `make train` without manual intervention.
+- [ ] **Closed-loop corpus auto-update** (M-18 SKELETON ✅) -- `run_closed_loop_auto_update()` stub in `02_train_qlora.py --rlhf-mode auto-update`. Subscribes to NATS `nexus.training.auto_update` and triggers micro-fine-tune when BATCH_THRESHOLD new correction records arrive. Activated by `AUTO_UPDATE_ENABLED=1`. Awaiting Phase 1 live deployment (07_feed_ingest.py must be operational).
 
-- [ ] **Autonomous fine-tuning on sandbox scores** -- Sandbox validation scores (exploited / mitigated) become the primary reward signal replacing SOAR operator labels. `02_train_qlora.py` runs in continuous mode: small LoRA delta trained on each batch of ≥50 new sandbox verdicts, evaluated against garak + PyRIT gate, promoted if both pass. Failed promotions trigger Critic loop retuning.
+- [ ] **Autonomous fine-tuning on sandbox scores** (M-19 SKELETON ✅) -- `--rlhf-mode autonomous` mode registered in `02_train_qlora.py`. Curriculum learning design noted in-file (MITRE coverage-gap weighting). Awaiting M-8 PPO loop production stability and M-17 FP mining diversity.
 
 - [x] **Tokenized Skill Library + RSI orchestrator** (`mlops/scripts/08_rsi_loop.py` -- ADDON-Ph4 ✅) -- Closed-loop RSI cycle: sandbox verdicts → `SkillEntry` schema validation (confidence ≥ 0.95, `sandbox_verdict` ∈ {mitigated|partial|failed}, 3 required remediation fields) → `promote_skill()` → `skills_v1.jsonl` → NATS `skill.update` hot-load. Safety invariants: `TRANSFORMERS_OFFLINE=1` enforced at entry (raises `RSISafetyViolation` if missing), alignment gate mandatory before `make deploy`, Ansible Vault for all credentials, NATS quorum checked before PPO checkpoint. No full retrain required for skill additions. Makefile: `make train-ppo`. 49/49 offline tests.
 
-- [ ] **Projector dimension alignment** -- Regenerate `spatial_tensors_v1.safetensors` with real sensor-dimension vectors (5D/8D) when all sensor pipelines are in production. Retrain each projector head from real data. All projector heads must be rebuilt when `hidden_dim` changes -- coordinate with Model C upgrade.
+- [ ] **Projector dimension alignment** (M-20 SKELETON ✅) -- Design for per-head alignment fine-tuning documented in `projector.py` (TODO block). Re-computes alignment loss per head post-PPO cycle; up-weights underperforming heads via InfoNCE contrastive loss. Activated by `PROJECTOR_ALIGN_ENABLED=1`. Awaiting M-8 PPO production for alignment training pairs.
 
-- [ ] **Federated training across air-gaps** -- For multi-tenant sovereign deployments, implement federated averaging across tenant-specific LoRA adapters. Each tenant trains on their own operator feedback; adapters are merged at the federated coordinator without raw data exchange. LoRA merge uses weighted averaging by tenant alert volume.
+- [ ] **Federated training across air-gaps** (M-21 SKELETON ✅) -- Design notes in `model_config.toml` (M-21 section): FedAvg/FedProx over LoRA adapter deltas, no raw telemetry exchange, mTLS transport. Prerequisites: secure adapter transport + multi-node EMPROS deployment. Gate condition: `FEDERATED_TRAIN_ENABLED=1` + ≥2 registered peer nodes.
 
-- [ ] **Llama-4 Scout upgrade (Model B)** -- When QLoRA is stable on MoE models, evaluate Scout's 10M context for nettap Track 4 (full session corpus rather than windowed samples). Requires custom gradient routing for MoE expert layers.
+- [ ] **Llama-4 Scout upgrade (Model B)** (M-22 SKELETON ✅) -- Candidate config block in `model_config.toml` (`models.b_scout_candidate`, commented). Target: Llama-4-Scout-17B-16E (hidden_dim=5120, 10M context). Blockers: offline weight availability + LoRA target name verification + full eval-network regression. Pin note: awaiting Scout weights in offline model repo.
 
 - [ ] **Model C hidden_dim upgrade** -- Migrate from Llama-3.1-8B (4096D) to Llama-3.3-70B (8192D) on a dedicated GPU node. Set `hidden_dim=8192` in `model_config.toml` and rebuild all projector heads. Coordinate with projector dimension alignment milestone.
 
-- [ ] **Formal alignment audit (standing CI gate)** -- Promote `tests/Execute-CognitiveBypass.sh` and `tests/Invoke-CrossPollinationStress.py` from manual red team playbooks to mandatory CI gates in `make deploy`. Any production weight swap blocked unless both pass. Gate failure dumps full conversation logs and blocks the pipeline until a human reviews.
+- [x] **Formal alignment audit (standing CI gate)** (Q-18 ✅ P14) -- `tests/Execute-CognitiveBypass.sh` (8 bypass probes, offline stub, `NEXUS_EVAL_OFFLINE=1` safe) and `tests/Invoke-CrossPollinationStress.py` (7 cross-pollination probes, offline stub) created and wired as blocking gates in `make deploy`. Both exit 1 on gate failure. 12/12 offline tests in `TestAlignmentGatePresence` (72/72 Lab 13 total). Live probes activate when `NEXUS_EVAL_OFFLINE=0` + `NEXUS_EVAL_ENDPOINT` is set.
 
 ---
 

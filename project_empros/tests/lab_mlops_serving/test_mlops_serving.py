@@ -365,3 +365,82 @@ class TestMlopsStructuralFixes:
         data_all_section = makefile.split("data-all:")[1].split("\n\n")[0]
         assert "stage_cross_source_temporal" in data_all_section, \
             "data-all must invoke stage_cross_source_temporal.py"
+
+
+# ── Q-18: Formal alignment gate presence ─────────────────────────────────────
+
+class TestAlignmentGatePresence:
+    """Q-18: Verify alignment gate scripts exist and are wired into the deploy target."""
+
+    TESTS_DIR = PROJECT_ROOT / "tests"
+
+    def test_cognitive_bypass_script_exists(self):
+        assert (self.TESTS_DIR / "Execute-CognitiveBypass.sh").is_file(), \
+            "tests/Execute-CognitiveBypass.sh is missing — Q-18 alignment gate not deployed"
+
+    def test_cross_pollination_script_exists(self):
+        assert (self.TESTS_DIR / "Invoke-CrossPollinationStress.py").is_file(), \
+            "tests/Invoke-CrossPollinationStress.py is missing — Q-18 alignment gate not deployed"
+
+    def test_cognitive_bypass_is_executable(self):
+        script = self.TESTS_DIR / "Execute-CognitiveBypass.sh"
+        assert script.is_file(), "Execute-CognitiveBypass.sh missing"
+        assert script.stat().st_mode & 0o111, "Execute-CognitiveBypass.sh is not executable"
+
+    def test_cross_pollination_script_is_valid_python(self):
+        import ast
+        src = (self.TESTS_DIR / "Invoke-CrossPollinationStress.py").read_text()
+        ast.parse(src)  # raises SyntaxError if invalid
+
+    def test_deploy_target_calls_cognitive_bypass(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        deploy_section = makefile.split("deploy:")[1].split("\nexport-onnx:")[0]
+        assert "Execute-CognitiveBypass.sh" in deploy_section, \
+            "Makefile deploy target must call Execute-CognitiveBypass.sh (Q-18 gate)"
+
+    def test_deploy_target_calls_cross_pollination(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        deploy_section = makefile.split("deploy:")[1].split("\nexport-onnx:")[0]
+        assert "Invoke-CrossPollinationStress.py" in deploy_section, \
+            "Makefile deploy target must call Invoke-CrossPollinationStress.py (Q-18 gate)"
+
+    def test_cognitive_bypass_script_has_offline_mode(self):
+        src = (self.TESTS_DIR / "Execute-CognitiveBypass.sh").read_text()
+        assert "NEXUS_EVAL_OFFLINE" in src, \
+            "Execute-CognitiveBypass.sh must support offline/CI mode via NEXUS_EVAL_OFFLINE"
+
+    def test_cross_pollination_script_has_offline_mode(self):
+        src = (self.TESTS_DIR / "Invoke-CrossPollinationStress.py").read_text()
+        assert "NEXUS_EVAL_OFFLINE" in src, \
+            "Invoke-CrossPollinationStress.py must support offline/CI mode via NEXUS_EVAL_OFFLINE"
+
+    def test_cognitive_bypass_blocks_on_gate_fail(self):
+        src = (self.TESTS_DIR / "Execute-CognitiveBypass.sh").read_text()
+        assert "exit 1" in src, \
+            "Execute-CognitiveBypass.sh must exit 1 on gate failure to block deploy"
+
+    def test_cross_pollination_blocks_on_gate_fail(self):
+        src = (self.TESTS_DIR / "Invoke-CrossPollinationStress.py").read_text()
+        assert "return 1" in src or "sys.exit(main())" in src, \
+            "Invoke-CrossPollinationStress.py must return exit code 1 on gate failure"
+
+    def test_offline_cognitive_bypass_runs_cleanly(self):
+        import subprocess
+        result = subprocess.run(
+            ["bash", str(self.TESTS_DIR / "Execute-CognitiveBypass.sh")],
+            env={**__import__("os").environ, "NEXUS_EVAL_OFFLINE": "1"},
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, \
+            f"Execute-CognitiveBypass.sh offline run failed:\n{result.stdout}\n{result.stderr}"
+
+    def test_offline_cross_pollination_runs_cleanly(self):
+        import subprocess
+        result = subprocess.run(
+            ["python3", str(self.TESTS_DIR / "Invoke-CrossPollinationStress.py"), "--offline"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, \
+            f"Invoke-CrossPollinationStress.py offline run failed:\n{result.stdout}\n{result.stderr}"

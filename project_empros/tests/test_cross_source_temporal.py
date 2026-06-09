@@ -4,15 +4,20 @@ test_cross_source_temporal.py -- Offline contracts for the cross-source temporal
 Validates both copies of the temporal staging script and both corpus_utils.py files.
 
 Coverage:
-  A. TOOL_CLASSES registry -- 5 classes, correct MITRE, generators callable
+  A. TOOL_CLASSES registry -- 10 classes (C-20), correct MITRE, generators callable
   B. Generator record shape -- messages list, classification, ttp_category, source_type
   C. TP/FP classification correctness -- TPs contain threat indicators, FPs don't
-  D. New class: LinuxBeaconAfterExec -- linux_sentinel fields + C2 beacon
-  E. New class: CloudLateralMovement -- azure_entraid + aws_cloudtrail IAM escalation
-  F. S3_QUERIES -- all 5 classes present, no empty WHERE clauses
+  D. Class: LinuxBeaconAfterExec -- linux_sentinel fields + C2 beacon
+  E. Class: CloudLateralMovement -- azure_entraid + aws_cloudtrail IAM escalation
+  F. S3_QUERIES -- all 10 classes present, no empty WHERE clauses
   G. corpus_utils.py sync -- mlops/corpus_templates copy has SENSOR_FIELD_ALIASES
      and _apply_aliases(), fmt_edr() applies aliases before _clean()
   H. Both staging scripts produce identical TOOL_CLASSES keys
+  I. Class: AzureVMRunCommand -- azure_activity RunCommand + linux_sentinel exec
+  J. Class: GCPSAKeyExport -- gcp_audit SA key creation + aws_cloudtrail OIDC pivot
+  K. Class: RansomwarePreEncryption -- sysmon VSS deletion + network_tap staging
+  L. Class: K8sLateralMovement -- linux_sentinel container exec + network_tap pod scan
+  M. Class: PrivEscToCloudAPI -- sysmon lsass dump + azure_activity RBAC write
 """
 
 import sys
@@ -60,13 +65,15 @@ _cu_spec.loader.exec_module(_cu_mod)
 
 class TestToolClassesRegistry:
 
-    def test_five_classes_registered(self):
-        assert len(TOOL_CLASSES) == 5
+    def test_ten_classes_registered(self):
+        assert len(TOOL_CLASSES) == 10
 
     def test_required_class_names_present(self):
         expected = {
             "LateralMovementPsExec", "C2CheckinAfterLOTL", "CredentialTheftExfil",
             "LinuxBeaconAfterExec", "CloudLateralMovement",
+            "AzureVMRunCommand", "GCPSAKeyExport", "RansomwarePreEncryption",
+            "K8sLateralMovement", "PrivEscToCloudAPI",
         }
         assert set(TOOL_CLASSES.keys()) == expected
 
@@ -83,6 +90,26 @@ class TestToolClassesRegistry:
     def test_cloud_lateral_mitre_includes_cloud_accounts(self):
         mitre, _, _ = TOOL_CLASSES["CloudLateralMovement"]
         assert "T1078.004" in mitre
+
+    def test_azure_runcommand_mitre_includes_t1651(self):
+        mitre, _, _ = TOOL_CLASSES["AzureVMRunCommand"]
+        assert "T1651" in mitre
+
+    def test_gcp_sa_key_mitre_includes_t1552(self):
+        mitre, _, _ = TOOL_CLASSES["GCPSAKeyExport"]
+        assert "T1552.001" in mitre
+
+    def test_ransomware_mitre_includes_t1490(self):
+        mitre, _, _ = TOOL_CLASSES["RansomwarePreEncryption"]
+        assert "T1490" in mitre
+
+    def test_k8s_lateral_mitre_includes_t1609(self):
+        mitre, _, _ = TOOL_CLASSES["K8sLateralMovement"]
+        assert "T1609" in mitre
+
+    def test_privesc_cloud_mitre_includes_t1134(self):
+        mitre, _, _ = TOOL_CLASSES["PrivEscToCloudAPI"]
+        assert "T1134.001" in mitre
 
 
 # ── B. Generator record shape ─────────────────────────────────────────────────
@@ -290,7 +317,7 @@ class TestCloudLateralMovement:
 
 class TestS3Queries:
 
-    def test_all_five_classes_have_s3_query(self):
+    def test_all_ten_classes_have_s3_query(self):
         for cls in TOOL_CLASSES:
             assert cls in S3_QUERIES, f"Missing S3_QUERY for {cls}"
 
@@ -319,6 +346,41 @@ class TestS3Queries:
     def test_cloud_lateral_where_uses_sign_in(self):
         where = S3_QUERIES["CloudLateralMovement"]["where"]
         assert "Sign-in" in where
+
+    def test_azure_runcommand_uses_azure_activity(self):
+        assert S3_QUERIES["AzureVMRunCommand"]["sensor"] == "azure_activity"
+
+    def test_azure_runcommand_where_uses_runcommand(self):
+        where = S3_QUERIES["AzureVMRunCommand"]["where"]
+        assert "runCommand" in where
+
+    def test_gcp_sa_key_uses_gcp_audit(self):
+        assert S3_QUERIES["GCPSAKeyExport"]["sensor"] == "gcp_audit"
+
+    def test_gcp_sa_key_where_uses_createkey_method(self):
+        where = S3_QUERIES["GCPSAKeyExport"]["where"]
+        assert "CreateServiceAccountKey" in where
+
+    def test_ransomware_uses_sysmon_sensor(self):
+        assert S3_QUERIES["RansomwarePreEncryption"]["sensor"] == "sysmon_sensor"
+
+    def test_ransomware_where_uses_vssadmin_or_wmic(self):
+        where = S3_QUERIES["RansomwarePreEncryption"]["where"]
+        assert "vssadmin" in where or "wmic" in where
+
+    def test_k8s_lateral_uses_linux_sentinel(self):
+        assert S3_QUERIES["K8sLateralMovement"]["sensor"] == "linux_sentinel"
+
+    def test_k8s_lateral_where_uses_t1609(self):
+        where = S3_QUERIES["K8sLateralMovement"]["where"]
+        assert "T1609" in where
+
+    def test_privesc_cloud_uses_sysmon_sensor(self):
+        assert S3_QUERIES["PrivEscToCloudAPI"]["sensor"] == "sysmon_sensor"
+
+    def test_privesc_cloud_where_uses_lsass(self):
+        where = S3_QUERIES["PrivEscToCloudAPI"]["where"]
+        assert "lsass" in where
 
 
 # ── G. corpus_utils.py sync (mlops/corpus_templates copy) ────────────────────
@@ -401,3 +463,235 @@ class TestBothScriptsSynced:
             act_mitre   = _act_mod.TOOL_CLASSES[cls][0]
             assert sorted(mlops_mitre) == sorted(act_mitre), \
                 f"{cls}: MITRE mismatch between copies"
+
+
+# ── I. AzureVMRunCommand specifics ───────────────────────────────────────────
+
+class TestAzureVMRunCommand:
+
+    def setup_method(self):
+        self._tps = generate("AzureVMRunCommand", 5, 0)
+        self._fps = generate("AzureVMRunCommand", 0, 3)
+
+    def test_tp_prompt_contains_azure_activity(self):
+        for rec in self._tps:
+            assert "azure_activity" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_linux_sentinel(self):
+        for rec in self._tps:
+            assert "linux_sentinel" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_runcommand(self):
+        for rec in self._tps:
+            assert "runCommand" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_c2_callback(self):
+        for rec in self._tps:
+            assert "network_tap" in rec["messages"][1]["content"]
+
+    def test_tp_cot_references_implant_or_c2(self):
+        for rec in self._tps:
+            asst = rec["messages"][2]["content"].lower()
+            assert "implant" in asst or "c2" in asst or "callback" in asst
+
+    def test_tp_mitre_t1651_in_cot(self):
+        for rec in self._tps:
+            assert "T1651" in rec["messages"][2]["content"]
+
+    def test_fp_prompt_contains_change_ticket(self):
+        for rec in self._fps:
+            assert "change_ticket" in rec["messages"][1]["content"]
+
+    def test_fp_cot_is_dismiss(self):
+        for rec in self._fps:
+            assert "RECOMMENDED_ACTION: dismiss" in rec["messages"][2]["content"]
+
+
+# ── J. GCPSAKeyExport specifics ──────────────────────────────────────────────
+
+class TestGCPSAKeyExport:
+
+    def setup_method(self):
+        self._tps = generate("GCPSAKeyExport", 5, 0)
+        self._fps = generate("GCPSAKeyExport", 0, 3)
+
+    def test_tp_prompt_contains_gcp_audit(self):
+        for rec in self._tps:
+            assert "gcp_audit" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_aws_cloudtrail(self):
+        for rec in self._tps:
+            assert "aws_cloudtrail" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_user_managed_key(self):
+        for rec in self._tps:
+            assert "USER_MANAGED" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_assumerolewithwebidentity(self):
+        for rec in self._tps:
+            assert "AssumeRoleWithWebIdentity" in rec["messages"][1]["content"]
+
+    def test_tp_cot_references_cross_cloud_pivot(self):
+        for rec in self._tps:
+            asst = rec["messages"][2]["content"].lower()
+            assert "pivot" in asst or "cross-cloud" in asst or "lateral" in asst
+
+    def test_tp_mitre_t1552_in_cot(self):
+        for rec in self._tps:
+            assert "T1552.001" in rec["messages"][2]["content"]
+
+    def test_fp_prompt_contains_ci_cd_context(self):
+        for rec in self._fps:
+            user_text = rec["messages"][1]["content"]
+            assert "change_ticket" in user_text or "CiCd" in user_text
+
+    def test_fp_cot_is_dismiss(self):
+        for rec in self._fps:
+            assert "RECOMMENDED_ACTION: dismiss" in rec["messages"][2]["content"]
+
+
+# ── K. RansomwarePreEncryption specifics ─────────────────────────────────────
+
+class TestRansomwarePreEncryption:
+
+    def setup_method(self):
+        self._tps = generate("RansomwarePreEncryption", 5, 0)
+        self._fps = generate("RansomwarePreEncryption", 0, 3)
+
+    def test_tp_prompt_contains_sysmon_vssadmin(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "sysmon_sensor" in user_text
+            assert "vssadmin" in user_text.lower() or "shadowcopy" in user_text.lower()
+
+    def test_tp_prompt_contains_network_tap(self):
+        for rec in self._tps:
+            assert "network_tap" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_has_high_entropy_download(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "entropy" in user_text
+
+    def test_tp_cot_references_ransomware_or_recovery(self):
+        for rec in self._tps:
+            asst = rec["messages"][2]["content"].lower()
+            assert "ransomware" in asst or "recovery" in asst or "vss" in asst
+
+    def test_tp_mitre_t1490_in_cot(self):
+        for rec in self._tps:
+            assert "T1490" in rec["messages"][2]["content"]
+
+    def test_fp_prompt_uses_oldest_flag(self):
+        for rec in self._fps:
+            assert "/oldest" in rec["messages"][1]["content"]
+
+    def test_fp_prompt_references_backup_tool(self):
+        for rec in self._fps:
+            user_text = rec["messages"][1]["content"]
+            assert any(t in user_text for t in ("Veeam", "Commvault", "Acronis"))
+
+    def test_fp_cot_is_dismiss(self):
+        for rec in self._fps:
+            assert "RECOMMENDED_ACTION: dismiss" in rec["messages"][2]["content"]
+
+
+# ── L. K8sLateralMovement specifics ─────────────────────────────────────────
+
+class TestK8sLateralMovement:
+
+    def setup_method(self):
+        self._tps = generate("K8sLateralMovement", 5, 0)
+        self._fps = generate("K8sLateralMovement", 0, 3)
+
+    def test_tp_prompt_contains_linux_sentinel_container_exec(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "linux_sentinel" in user_text
+            assert "container exec" in user_text or "T1609" in user_text
+
+    def test_tp_prompt_contains_network_tap_scan(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "network_tap" in user_text
+
+    def test_tp_prompt_uid_is_root(self):
+        for rec in self._tps:
+            assert "uid=0" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_high_packet_count(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "packets_src=412" in user_text
+
+    def test_tp_cot_references_lateral_movement_or_pivot(self):
+        for rec in self._tps:
+            asst = rec["messages"][2]["content"].lower()
+            assert "lateral" in asst or "pivot" in asst or "scan" in asst
+
+    def test_tp_mitre_t1609_in_cot(self):
+        for rec in self._tps:
+            assert "T1609" in rec["messages"][2]["content"]
+
+    def test_fp_prompt_contains_prometheus(self):
+        for rec in self._fps:
+            assert "prometheus" in rec["messages"][1]["content"].lower()
+
+    def test_fp_prompt_uid_is_non_root(self):
+        for rec in self._fps:
+            assert "uid=1000" in rec["messages"][1]["content"]
+
+    def test_fp_cot_is_dismiss(self):
+        for rec in self._fps:
+            assert "RECOMMENDED_ACTION: dismiss" in rec["messages"][2]["content"]
+
+
+# ── M. PrivEscToCloudAPI specifics ───────────────────────────────────────────
+
+class TestPrivEscToCloudAPI:
+
+    def setup_method(self):
+        self._tps = generate("PrivEscToCloudAPI", 5, 0)
+        self._fps = generate("PrivEscToCloudAPI", 0, 3)
+
+    def test_tp_prompt_contains_sysmon_lsass_dump(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "sysmon_sensor" in user_text
+            assert "lsass" in user_text
+
+    def test_tp_prompt_has_full_access_granted(self):
+        for rec in self._tps:
+            assert "0x1fffff" in rec["messages"][1]["content"]
+
+    def test_tp_prompt_contains_azure_activity_rbac_write(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert "azure_activity" in user_text
+            assert "roleAssignments/write" in user_text
+
+    def test_tp_prompt_assigns_high_privilege_role(self):
+        for rec in self._tps:
+            user_text = rec["messages"][1]["content"]
+            assert any(r in user_text for r in ("Owner", "Contributor", "User Access Administrator"))
+
+    def test_tp_cot_references_credential_dump_or_escalation(self):
+        for rec in self._tps:
+            asst = rec["messages"][2]["content"].lower()
+            assert "dump" in asst or "escalat" in asst or "token" in asst
+
+    def test_tp_mitre_t1134_in_cot(self):
+        for rec in self._tps:
+            assert "T1134.001" in rec["messages"][2]["content"]
+
+    def test_fp_prompt_low_access_rights(self):
+        for rec in self._fps:
+            assert "0x1000" in rec["messages"][1]["content"]
+
+    def test_fp_prompt_assigns_reader_role(self):
+        for rec in self._fps:
+            assert "Reader" in rec["messages"][1]["content"]
+
+    def test_fp_cot_is_dismiss(self):
+        for rec in self._fps:
+            assert "RECOMMENDED_ACTION: dismiss" in rec["messages"][2]["content"]
