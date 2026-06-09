@@ -22,3 +22,8 @@ output "execution_policy_arn" {
   value       = aws_iam_policy.connector_execution_policy.arn
   description = "IAM policy ARN to attach to the EKS service account role"
 }
+
+output "auth_token_secret_arn" {
+  value       = aws_secretsmanager_secret.auth_token.arn
+  description = "Secrets Manager ARN for the connector bearer token"
+}

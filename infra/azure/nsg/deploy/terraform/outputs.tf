@@ -11,3 +11,14 @@ output "storage_account_url" {
 output "consumer_group" {
   value = azurerm_eventhub_consumer_group.nexus_consumer.name
 }
+
+output "connector_identity_id" {
+  value       = azurerm_user_assigned_identity.connector.id
+  description = "Managed identity resource ID for connector pod binding"
+}
+
+output "auth_token_secret_id" {
+  value       = azurerm_key_vault_secret.auth_token.id
+  sensitive   = true
+  description = "Key Vault secret ID for the connector bearer token"
+}

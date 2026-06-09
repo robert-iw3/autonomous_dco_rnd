@@ -15,6 +15,7 @@ pytestmark = pytest.mark.tier2
 _ENDPOINT_SERVICES = [
     "kms", "s3", "sqs", "dynamodb", "iam", "lambda",
     "eventbridge", "cloudformation", "sts", "ec2", "logs", "guardduty",
+    "secretsmanager", "cloudwatch",
 ]
 
 def _override_tf(endpoint):
@@ -42,12 +43,24 @@ def _plugin_cache(tmp_path_factory):
     d = tmp_path_factory.mktemp("tf_plugin_cache")
     return str(d)
 
+def _patch_backend_to_local(workdir):
+    """Replace backend "s3" {} with backend "local" {} so terraform apply
+    works without real S3 credentials during container-based testing.
+    The partial config approach (backend "s3" {}) requires -backend-config
+    flags at deploy time; for tests we swap in local state."""
+    for tf_file in workdir.glob("*.tf"):
+        content = tf_file.read_text()
+        patched = content.replace('backend "s3" {}', 'backend "local" {}')
+        if patched != content:
+            tf_file.write_text(patched)
+
 @pytest.fixture
 def tf_workdir(tf_dir, tmp_path, moto_endpoint, _plugin_cache):
     if not shutil.which("terraform"):
         pytest.skip("terraform not installed (present in the tier2 container)")
     dst = tmp_path / "tf"
     shutil.copytree(tf_dir, dst)
+    _patch_backend_to_local(dst)
     (dst / "zz_moto_override.tf").write_text(_override_tf(moto_endpoint))
     stub = dst / "orchestrator_payload.zip"
     if not stub.exists():
@@ -66,7 +79,9 @@ def _tf(workdir, *args, cache=None):
 
 class TestTerraformConverges:
     def test_init_and_validate(self, tf_workdir, connector_name, _plugin_cache):
-        r = _tf(tf_workdir, "init", "-no-color", "-input=false", cache=_plugin_cache)
+        # -backend=false: skips remote backend init; backend config is provided at
+        # deploy time via -backend-config flags, not baked into the source.
+        r = _tf(tf_workdir, "init", "-no-color", "-input=false", "-backend=false", cache=_plugin_cache)
         assert r.returncode == 0, f"{connector_name}: init failed\n{r.stderr[-2000:]}"
         r = _tf(tf_workdir, "validate", "-no-color")
         assert r.returncode == 0, f"{connector_name}: validate failed\n{r.stderr[-2000:]}"
@@ -87,6 +102,8 @@ class TestTerraformConverges:
                 f"emulate (e.g. data.aws_guardduty_detector) -- convergence deferred to "
                 f"the gated real-AWS run"
             )
+        # No -backend=false here: the workdir has backend "local" {} (patched by tf_workdir
+        # fixture), so init must configure the local backend before apply can use it.
         r = _tf(tf_workdir, "init", "-no-color", "-input=false", cache=_plugin_cache)
         assert r.returncode == 0, f"{connector_name}: init failed\n{r.stderr[-1500:]}"
         r = _tf(tf_workdir, "apply", "-no-color", "-auto-approve", "-input=false", cache=_plugin_cache)

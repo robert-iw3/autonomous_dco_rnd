@@ -277,6 +277,7 @@ impl Transmitter {
             let result = self
                 .client
                 .post(&self.config.gateway_url)
+                .bearer_auth(&self.config.auth_token)
                 .header("Content-Type", "application/vnd.apache.parquet")
                 .header("X-Batch-Sequence", sequence.to_string())
                 .header("X-Batch-Timestamp", timestamp.to_string())

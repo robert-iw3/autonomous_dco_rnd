@@ -1,3 +1,16 @@
+terraform {
+  required_version = ">= 1.9"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  backend "s3" {}
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -11,6 +24,7 @@ resource "aws_kms_key" "nexus_key" {
   description             = "KMS key for Nexus VPC Flow Logs encryption"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  tags                    = var.tags
 
   # CKV2_AWS_64: explicit key policy. Root keeps IAM-based delegation so the
   # connector_execution_policy / lambda role grants below remain authoritative;
@@ -48,6 +62,7 @@ resource "aws_kms_alias" "nexus_key_alias" {
 resource "aws_s3_bucket" "flow_logs" {
   bucket        = "${var.project_name}-${var.environment}-storage"
   force_destroy = false
+  tags          = var.tags
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "flow_logs_encryption" {
@@ -110,6 +125,7 @@ resource "aws_sqs_queue" "flow_logs_dlq" {
   name                      = "${var.project_name}-${var.environment}-dlq"
   message_retention_seconds = 1209600
   kms_master_key_id         = aws_kms_key.nexus_key.arn
+  tags                      = var.tags
 }
 
 resource "aws_sqs_queue" "flow_logs_queue" {
@@ -117,6 +133,7 @@ resource "aws_sqs_queue" "flow_logs_queue" {
   visibility_timeout_seconds = 300
   message_retention_seconds  = 864000
   kms_master_key_id          = aws_kms_key.nexus_key.arn
+  tags                       = var.tags
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.flow_logs_dlq.arn
@@ -181,18 +198,26 @@ resource "aws_dynamodb_table" "metadata_store" {
     enabled = true
   }
 
-  tags = {
-    Environment = var.environment
-    Project     = "Nexus"
-  }
+  tags = var.tags
 }
 
 # ------------------------------------------------------------------------------
-# 5. IAM Operational Role Permissions for EKS Pod Assumable Use (IRSA)
+# 5. Secrets Manager (connector bearer token)
+# ------------------------------------------------------------------------------
+resource "aws_secretsmanager_secret" "auth_token" {
+  name        = "${var.project_name}-${var.environment}-auth-token"
+  description = "Bearer token for Nexus gateway authentication"
+  kms_key_id  = aws_kms_key.nexus_key.arn
+  tags        = var.tags
+}
+
+# ------------------------------------------------------------------------------
+# 6. IAM Operational Role Permissions for EKS Pod Assumable Use (IRSA)
 # ------------------------------------------------------------------------------
 resource "aws_iam_policy" "connector_execution_policy" {
   name        = "${var.project_name}-${var.environment}-execution-policy"
   description = "Least privilege permission profile for the Nexus EKS Rust ETL engine"
+  tags        = var.tags
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -228,17 +253,25 @@ resource "aws_iam_policy" "connector_execution_policy" {
           "kms:GenerateDataKey"
         ]
         Resource = aws_kms_key.nexus_key.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.auth_token.arn
       }
     ]
   })
 }
 
 # ------------------------------------------------------------------------------
-# 6. Automated Discovery & Enablement (EventBridge -> Lambda)
+# 7. Automated Discovery & Enablement (EventBridge -> Lambda)
 # ------------------------------------------------------------------------------
 resource "aws_cloudwatch_event_rule" "vpc_creation_rule" {
   name        = "${var.project_name}-vpc-discovery"
   description = "Triggers on CreateVpc API calls"
+  tags        = var.tags
 
   event_pattern = jsonencode({
     "source"      = ["aws.ec2"],
@@ -258,6 +291,7 @@ resource "aws_cloudwatch_event_target" "invoke_lambda" {
 # enable flow logs, or deploy the StackSet).
 resource "aws_iam_role" "lambda_exec_role" {
   name = "${var.project_name}-lambda-role"
+  tags = var.tags
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -310,6 +344,7 @@ resource "aws_sqs_queue" "lambda_dlq" {
   name                      = "${var.project_name}-orchestrator-dlq"
   message_retention_seconds = 1209600
   kms_master_key_id         = aws_kms_key.nexus_key.arn
+  tags                      = var.tags
 }
 
 resource "aws_lambda_function" "vpc_orchestrator" {
@@ -318,6 +353,7 @@ resource "aws_lambda_function" "vpc_orchestrator" {
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "bootstrap.handler"
   runtime       = "provided.al2023"
+  tags          = var.tags
 
   kms_key_arn                    = aws_kms_key.nexus_key.arn
   reserved_concurrent_executions = 5
@@ -336,4 +372,26 @@ resource "aws_lambda_function" "vpc_orchestrator" {
       DYNAMO_TABLE      = aws_dynamodb_table.metadata_store.name
     }
   }
+}
+
+# ------------------------------------------------------------------------------
+# 8. CloudWatch Alarm: connector DLQ depth
+# ------------------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  alarm_name        = "${var.project_name}-${var.environment}-dlq-depth"
+  alarm_description = "Dead letter queue has unprocessed messages requiring investigation"
+  namespace         = "AWS/SQS"
+  metric_name       = "ApproximateNumberOfMessagesVisible"
+  dimensions = {
+    QueueName = aws_sqs_queue.flow_logs_dlq.name
+  }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  alarm_actions       = var.alert_notification_arns
+  ok_actions          = var.alert_notification_arns
+  treat_missing_data  = "notBreaching"
+  tags                = var.tags
 }

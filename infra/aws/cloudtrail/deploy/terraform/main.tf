@@ -1,3 +1,16 @@
+terraform {
+  required_version = ">= 1.9"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  backend "s3" {}
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -8,9 +21,10 @@ resource "aws_kms_key" "nexus_key" {
   description             = "KMS key for Nexus CloudTrail Logs encryption"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  tags                    = var.tags
 
-  # CKV2_AWS_64: explicit key policy (was missing). Root retains IAM-based
-  # delegation; CloudTrail service is allowed to use the key for log delivery.
+  # CKV2_AWS_64: explicit key policy. Root retains IAM-based delegation;
+  # CloudTrail service is allowed to use the key for log delivery.
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -38,6 +52,7 @@ resource "aws_kms_alias" "nexus_key_alias" {
 resource "aws_s3_bucket" "cloudtrail_logs" {
   bucket        = "${var.project_name}-${var.environment}-storage"
   force_destroy = false
+  tags          = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "cloudtrail_versioning" {
@@ -88,12 +103,14 @@ resource "aws_sqs_queue" "cloudtrail_dlq" {
   name                      = "${var.project_name}-${var.environment}-dlq"
   message_retention_seconds = 1209600
   kms_master_key_id         = aws_kms_key.nexus_key.arn
+  tags                      = var.tags
 }
 
 resource "aws_sqs_queue" "cloudtrail_queue" {
   name                       = "${var.project_name}-${var.environment}-queue"
   visibility_timeout_seconds = 300
   kms_master_key_id          = aws_kms_key.nexus_key.arn
+  tags                       = var.tags
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.cloudtrail_dlq.arn
     maxReceiveCount     = 5
@@ -146,15 +163,20 @@ resource "aws_dynamodb_table" "identity_metadata" {
     enabled = true
   }
 
-  tags = {
-    Environment = var.environment
-    Project     = "Nexus"
-  }
+  tags = var.tags
+}
+
+resource "aws_secretsmanager_secret" "auth_token" {
+  name        = "${var.project_name}-${var.environment}-auth-token"
+  description = "Bearer token for Nexus gateway authentication"
+  kms_key_id  = aws_kms_key.nexus_key.arn
+  tags        = var.tags
 }
 
 resource "aws_iam_policy" "connector_execution_policy" {
   name        = "${var.project_name}-${var.environment}-execution-policy"
   description = "Least-privilege permissions for the Nexus CloudTrail ETL engine"
+  tags        = var.tags
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -178,7 +200,31 @@ resource "aws_iam_policy" "connector_execution_policy" {
         Effect   = "Allow"
         Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = aws_kms_key.nexus_key.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.auth_token.arn
       }
     ]
   })
+}
+
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  alarm_name        = "${var.project_name}-${var.environment}-dlq-depth"
+  alarm_description = "Dead letter queue has unprocessed messages requiring investigation"
+  namespace         = "AWS/SQS"
+  metric_name       = "ApproximateNumberOfMessagesVisible"
+  dimensions = {
+    QueueName = aws_sqs_queue.cloudtrail_dlq.name
+  }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  alarm_actions       = var.alert_notification_arns
+  ok_actions          = var.alert_notification_arns
+  treat_missing_data  = "notBreaching"
+  tags                = var.tags
 }

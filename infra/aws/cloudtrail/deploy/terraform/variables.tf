@@ -15,3 +15,15 @@ variable "project_name" {
   default     = "nexus-cloudtrail"
   description = "Project name prefix for resource naming"
 }
+
+variable "tags" {
+  type        = map(string)
+  default     = {}
+  description = "Tags applied to all resources"
+}
+
+variable "alert_notification_arns" {
+  type        = list(string)
+  default     = []
+  description = "SNS topic ARNs to notify on CloudWatch alarms"
+}

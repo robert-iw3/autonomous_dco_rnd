@@ -14,7 +14,7 @@ one shared workbench covers all three rather than three near-duplicate ones.
 carries `storage_account_url`/`storage_container`/`table_storage_url` and
 spool-bound fields that activity/entraid lack or vary -- and string literals.)
 
-## Two tiers
+## Three tiers
 
 `nexus-azure-{nsg,activity,entraid}-connector` are pure Rust binary crates --
 there is no embedded Python interpreter, so pytest cannot drive
@@ -48,11 +48,32 @@ The workbench therefore mirrors the pattern established in
   there is no `cargo test` step -- `cargo check` is the layer that actually
   exercises the real, fixed source Tier 0 can only mirror.
 
+- **Tier 2** (`tier2/`, containerized): validates the `deploy/terraform/` IaC
+  for all three connectors. Unlike the AWS workbench (which uses moto for an
+  emulated `terraform apply`), there is no Azure equivalent of moto, so
+  convergence is split:
+  - `terraform init` + `terraform validate` + `terraform fmt -check` run in
+    CI (provider schema validation, no live credentials needed).
+  - `terraform apply` is deferred to the gated real-Azure run.
+  - **Posture** (`test_iac_posture.py`): asserts Azure-specific security
+    controls via static TF parse -- Storage TLS 1.2 / GRS replication /
+    private containers / blob versioning / delete-retention; EventHub Standard
+    SKU / message retention; listen-only authorization rules (no send, no
+    manage); checkov scan with a small documented N/A skip list.
+  - **Runtime contract** (`test_iac_runtime_contract.py`): asserts the IaC
+    wires the event-source correctly per connector -- EventGrid BlobCreated →
+    EventHub for nsg; `azurerm_monitor_diagnostic_setting` with required log
+    categories (Administrative / Security / Policy) for activity;
+    `azurerm_monitor_aad_diagnostic_setting` with all five Entra ID log
+    categories for entraid. Also asserts the connector egress to Nexus is
+    still Parquet (guards tier0 contract drift).
+
 ## Running
 
 ```bash
 ./test/run.sh              # Tier 0 only (fast, no Docker/Podman needed)
-./test/run.sh --all        # Tier 0 + Tier 1
+./test/run.sh --all        # Tier 0 + Tier 1 + Tier 2
 ./test/run.sh --tier 0
 ./test/run.sh --tier 1     # requires docker or podman
+./test/run.sh --tier 2     # requires docker or podman
 ```

@@ -17,6 +17,7 @@ REQUIRED_RUNTIME_ACTIONS = {
     "dynamodb:GetItem",
     "dynamodb:BatchGetItem",
     "kms:Decrypt",
+    "secretsmanager:GetSecretValue",
 }
 
 # Granted but not strictly required by a read-only puller -- surfaced as a
@@ -104,8 +105,9 @@ FLOWLOG = {
 # fixes are applied to their stacks.
 # ---------------------------------------------------------------------------
 CHECKOV_SKIP = {
-    "CKV_AWS_18":  "S3 server access logging handled at the org log-archive level, not per-bucket",
-    "CKV_AWS_117": "orchestrator Lambda calls AWS control-plane APIs only; no VPC attachment needed",
-    "CKV_AWS_144": "single-region telemetry store; cross-region replication is out of scope",
-    "CKV_AWS_272": "Lambda code-signing not used in this pipeline",
+    "CKV_AWS_18":   "S3 server access logging handled at the org log-archive level, not per-bucket",
+    "CKV_AWS_117":  "orchestrator Lambda calls AWS control-plane APIs only; no VPC attachment needed",
+    "CKV_AWS_144":  "single-region telemetry store; cross-region replication is out of scope",
+    "CKV_AWS_272":  "Lambda code-signing not used in this pipeline",
+    "CKV2_AWS_57":  "Auth token rotation managed out-of-band via CI/CD pipeline; Lambda-based rotation is not appropriate for this bearer token pattern",
 }

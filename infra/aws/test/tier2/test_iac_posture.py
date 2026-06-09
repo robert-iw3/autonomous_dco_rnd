@@ -93,6 +93,39 @@ class TestOrchestratorPosture:
             assert "dead_letter_config" in body, f"{connector_name}: {name} has no DLQ"
             assert "kms_key_arn" in body, f"{connector_name}: {name} env vars not CMK-encrypted"
 
+class TestSecretsManagerPosture:
+    def test_auth_token_secret_exists(self, tf_src, connector_name):
+        secrets = list(P.iter_resources(tf_src, "aws_secretsmanager_secret"))
+        assert secrets, (
+            f"{connector_name}: no aws_secretsmanager_secret found -- "
+            f"connector auth token must be stored in Secrets Manager"
+        )
+
+    def test_auth_token_secret_encrypted_with_cmk(self, tf_src, connector_name):
+        secrets = list(P.iter_resources(tf_src, "aws_secretsmanager_secret"))
+        assert secrets, f"{connector_name}: no aws_secretsmanager_secret found"
+        for name, body in secrets:
+            assert "aws_kms_key.nexus_key.arn" in body, (
+                f"{connector_name}: secret {name} not encrypted with the Nexus CMK "
+                f"(kms_key_id must reference aws_kms_key.nexus_key.arn)"
+            )
+
+
+class TestCloudWatchAlarmPosture:
+    def test_dlq_depth_alarm_declared(self, tf_src, connector_name):
+        alarms = list(P.iter_resources(tf_src, "aws_cloudwatch_metric_alarm"))
+        assert alarms, (
+            f"{connector_name}: no aws_cloudwatch_metric_alarm found -- "
+            f"DLQ depth must be monitored to catch failed message processing"
+        )
+
+    def test_dlq_alarm_watches_sqs_namespace(self, tf_src, connector_name):
+        for name, body in P.iter_resources(tf_src, "aws_cloudwatch_metric_alarm"):
+            assert "AWS/SQS" in body, (
+                f"{connector_name}: alarm {name} does not watch SQS namespace"
+            )
+
+
 class TestPolicyScanners:
     def test_checkov_enforces_all_but_documented_na(self, tf_dir, connector_name):
         if not shutil.which("checkov"):

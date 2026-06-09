@@ -8,6 +8,7 @@ pub struct Config {
     /// Enable a UDP listener in addition to TCP (commonly uses UDP/514).
     pub enable_udp: bool,
     pub gateway_url: String,
+    pub auth_token: String,
     pub integrity_secret: String,
     pub sensor_id: String,
     pub sensor_type: String,
@@ -26,6 +27,7 @@ impl Config {
             syslog_bind: env::var("SYSLOG_BIND").unwrap_or_else(|_| "0.0.0.0:1514".to_string()),
             enable_udp: env::var("ENABLE_UDP").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false),
             gateway_url: env::var("GATEWAY_URL").expect("GATEWAY_URL must be set"),
+            auth_token: env::var("AUTH_TOKEN").expect("AUTH_TOKEN must be set"),
             integrity_secret: env::var("INTEGRITY_SECRET").expect("INTEGRITY_SECRET must be set"),
             sensor_id: env::var("SENSOR_ID").unwrap_or_else(|_| "vmware-connector-default".to_string()),
             sensor_type: "vmware_syslog".to_string(),
