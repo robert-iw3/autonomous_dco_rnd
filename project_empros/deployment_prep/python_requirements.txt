@@ -1,13 +1,26 @@
-# Aggregated Python requirements for offline pip wheel download.
-# Generated from: mlops/requirements.txt + analytics/llm_hunter/requirements.txt
-# + infrastructure/ansible/roles/nexus_hunter/files/requirements.txt
-# + deployment_prep/scan/requirements.txt
+# ==============================================================================
+# deployment_prep/python_requirements.txt
 #
-# Usage (on internet-connected machine):
-#   pip download -r python_requirements.txt -d ../deployment_prep/wheels/
+# CANONICAL Python dependency list for Project Empros.
+# This file is the SINGLE SOURCE OF TRUTH for:
+#   1. Offline pip wheel download (Phase 3: 03_download_python_deps.sh)
+#   2. GuardDog supply-chain scanning (Phase 5c: 05c_scan_python_supply_chain.sh)
+#   3. Offline install on air-gapped target (make install-deps)
 #
-# Usage (on air-gapped target):
+# MAINTENANCE: Update this file whenever a new Python dependency is introduced
+# anywhere in the project (mlops/, analytics/, services/, infrastructure/).
+# Regenerate/sync from component requirements files:
+#   mlops/requirements.txt
+#   analytics/llm_hunter/requirements.txt
+#   infrastructure/ansible/roles/nexus_hunter/files/requirements.txt
+#   deployment_prep/scan/requirements.txt
+#
+# Usage (online prep machine):
+#   pip download -r python_requirements.txt -d deployment_prep/wheels/
+#
+# Usage (air-gapped target):
 #   pip install --no-index --find-links /path/to/wheels/ -r python_requirements.txt
+# ==============================================================================
 
 # -- Anchore scanner deps ------------------------------------------------------
 tqdm

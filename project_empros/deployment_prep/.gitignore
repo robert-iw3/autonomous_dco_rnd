@@ -8,6 +8,8 @@ scan/reports/
 scan/anchore_scan_*.log
 manifests/sha256sums.txt
 manifests/deployment_manifest.json
+supply_chain/reports/
+supply_chain/guarddog_scan_results.txt
 
 # Packaged bundles
 nexus_bundle_*.tar.gz

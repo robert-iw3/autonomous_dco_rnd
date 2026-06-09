@@ -30,6 +30,7 @@ ARTIFACT_DIRS=(
     "${PREP_DIR}/collections"
     "${PREP_DIR}/providers"
     "${PREP_DIR}/scan/reports"
+    "${PREP_DIR}/supply_chain/reports"
 )
 
 log_info "=== Phase 7: SHA-256 Hash + Manifest Generation ==="
@@ -59,12 +60,13 @@ prep_dir = Path(sys.argv[1])
 manifests_dir = Path(sys.argv[2])
 
 sections = {
-    "runtime_images":      "images",
-    "custom_images":       "custom-images",
-    "python_wheels":       "wheels",
-    "ansible_collections": "collections",
-    "terraform_providers": "providers",
-    "scan_reports":        "scan/reports",
+    "runtime_images":        "images",
+    "custom_images":         "custom-images",
+    "python_wheels":         "wheels",
+    "ansible_collections":   "collections",
+    "terraform_providers":   "providers",
+    "scan_reports":          "scan/reports",
+    "supply_chain_reports":  "supply_chain/reports",
 }
 
 manifest = {

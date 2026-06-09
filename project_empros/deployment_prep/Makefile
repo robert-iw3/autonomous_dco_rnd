@@ -3,10 +3,13 @@
 # Orchestrates online (preparation) and offline (target) phases.
 #
 # ONLINE (internet-connected prep machine):
-#   make prep              -- full end-to-end: pull → build → deps → scan → hash → package
+#   make prep              -- full end-to-end: pull → build → deps → cargo-audit →
+#                             supply-chain → scan → hash → package
 #   make pull              -- pull and save all runtime + build-base images
 #   make build             -- build and save all custom Nexus images
 #   make deps              -- download Python wheels, Ansible collections, Terraform providers
+#   make cargo-audit       -- run cargo audit on all Rust workspaces (Phase 5b)
+#   make supply-chain      -- run GuardDog Python supply-chain scan (Phase 5c)
 #   make scan              -- run syft + grype on all images
 #   make hash              -- generate sha256sums.txt + deployment_manifest.json
 #   make package           -- tar all artifacts into nexus_bundle_<timestamp>.tar.gz
@@ -20,6 +23,8 @@
 # Environment variables:
 #   NEXUS_CONTAINER_RUNTIME=docker|podman   override auto-detection
 #   SCAN_WORKERS=N                          concurrent scan workers (default: 4)
+#   CARGO_AUDIT_DENY=critical|high|all|none deny threshold for Rust audits (default: critical)
+#   GUARDDOG_DENY=true|false                block on Python supply-chain findings (default: false)
 # ==============================================================================
 
 SHELL := /usr/bin/env bash
@@ -30,9 +35,10 @@ SCAN_WORKERS ?= 4
 
 # -- Online phase --------------------------------------------------------------
 
-.PHONY: prep pull build deps scan hash package
+.PHONY: prep pull build deps deps-python deps-ansible deps-terraform \
+        cargo-audit supply-chain scan hash package
 
-prep: pull build deps scan hash package
+prep: pull build deps cargo-audit supply-chain scan hash package
 	@echo ""
 	@echo "[+] prep complete -- bundle ready for transport."
 
@@ -57,6 +63,14 @@ deps-ansible:
 deps-terraform:
 	@echo "[*] Phase 5: Mirror Terraform providers..."
 	bash $(SCRIPTS_DIR)/05_download_terraform_deps.sh
+
+cargo-audit:
+	@echo "[*] Phase 5b: Cargo audit + lockfile verification (all Rust workspaces)..."
+	bash $(SCRIPTS_DIR)/05b_cargo_audit.sh
+
+supply-chain:
+	@echo "[*] Phase 5c: Python supply-chain scan (GuardDog)..."
+	bash $(SCRIPTS_DIR)/05c_scan_python_supply_chain.sh
 
 scan:
 	@echo "[*] Phase 6: Syft + Grype image scans..."
@@ -94,7 +108,7 @@ deploy-offline: verify load install-deps
 
 # -- Helpers -------------------------------------------------------------------
 
-.PHONY: status clean-artifacts
+.PHONY: status clean-artifacts validate
 
 status:
 	@echo "=== deployment_prep/ Status ==="
@@ -103,11 +117,17 @@ status:
 	@echo "Python wheels:    $$(ls wheels/*.whl 2>/dev/null | wc -l) wheels"
 	@echo "Ansible colls:    $$(ls collections/*.tar.gz 2>/dev/null | wc -l) archives"
 	@echo "Scan reports:     $$(ls scan/reports/*.json 2>/dev/null | wc -l) reports"
+	@echo "Supply chain:     $$(ls supply_chain/reports/*.json supply_chain/reports/*.txt 2>/dev/null | wc -l) reports"
 	@echo "Bundles:          $$(ls nexus_bundle_*.tar.gz 2>/dev/null | wc -l) bundles"
+
+validate:
+	@echo "[*] Running deployment prep validation..."
+	python3 $(SCRIPTS_DIR)/validate_deployment.py
 
 clean-artifacts:
 	@echo "[!] Removing all downloaded artifacts (keeps scripts, manifests, configs)..."
 	rm -rf images/ custom-images/ wheels/ collections/ providers/
 	rm -rf scan/reports/
+	rm -rf supply_chain/reports/
 	rm -f nexus_bundle_*.tar.gz nexus_bundle_*.tar.gz.sha256
 	@echo "[+] Clean complete."

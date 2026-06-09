@@ -436,6 +436,10 @@ def check_prep_structure(report: Report):
         PREP / "scan/scan_config.json",
         PREP / "scan/deploy_anchore.py",
         PREP / "scan/requirements.txt",
+        PREP / "supply_chain/Dockerfile",
+        PREP / "supply_chain/guarddog-config.yaml",
+        PREP / "supply_chain/requirements.txt",
+        PREP / "supply_chain/scan-requirements.sh",
         PREP / "scripts/lib_container.sh",
         *[PREP / f"scripts/0{i}_{name}.sh" for i, name in [
             (1,"pull_and_save_images"), (2,"build_custom_images"),
@@ -444,6 +448,8 @@ def check_prep_structure(report: Report):
             (7,"hash_and_manifest"), (8,"package_bundle"),
             (9,"verify_bundle"),
         ]],
+        PREP / "scripts/05b_cargo_audit.sh",
+        PREP / "scripts/05c_scan_python_supply_chain.sh",
         PREP / "scripts/10_load_images.sh",
     ]
     missing = [str(p.relative_to(REPO)) for p in required if not p.exists()]
@@ -607,6 +613,116 @@ def check_manifest_uniqueness(report: Report, manifest: dict):
                   f"All {total} entries have unique repo + save_as values")
 
 
+# -- Check 12: supply_chain/ integration --------------------------------------
+
+def check_supply_chain_integration(report: Report):
+    """
+    Verify supply_chain/ lives inside deployment_prep/, has all required files,
+    GuardDog config is valid YAML, and all pipeline scripts correctly reference
+    supply_chain/reports/ as their output directory.
+    """
+    SC_DIR = PREP / "supply_chain"
+    issues = []
+
+    # Required files
+    for f in ("Dockerfile", "guarddog-config.yaml", "requirements.txt", "scan-requirements.sh"):
+        if not (SC_DIR / f).exists():
+            issues.append(f"supply_chain/{f} missing")
+
+    # Validate guarddog-config.yaml
+    cfg_path = SC_DIR / "guarddog-config.yaml"
+    if cfg_path.exists():
+        try:
+            import yaml as _yaml
+            cfg = _yaml.safe_load(cfg_path.read_text())
+            if "rules" not in (cfg or {}):
+                issues.append("supply_chain/guarddog-config.yaml: 'rules' section absent")
+        except Exception as e:
+            issues.append(f"supply_chain/guarddog-config.yaml parse error: {e}")
+
+    # scan-requirements.sh must target python_requirements.txt (not the old supply_chain copy)
+    scan_sh = SC_DIR / "scan-requirements.sh"
+    if scan_sh.exists():
+        text = scan_sh.read_text()
+        if "python_requirements.txt" not in text and "REQUIREMENTS_FILE" not in text:
+            issues.append(
+                "supply_chain/scan-requirements.sh: does not reference python_requirements.txt "
+                "(should default to the canonical central list)"
+            )
+
+    # 05b must output to supply_chain/reports/
+    audit_script = PREP / "scripts/05b_cargo_audit.sh"
+    if audit_script.exists():
+        if "supply_chain/reports" not in audit_script.read_text():
+            issues.append("05b_cargo_audit.sh: supply_chain/reports/ not referenced as output dir")
+
+    # 05c must target python_requirements.txt as canonical scan target
+    gdog_script = PREP / "scripts/05c_scan_python_supply_chain.sh"
+    if gdog_script.exists():
+        txt = gdog_script.read_text()
+        if "python_requirements.txt" not in txt:
+            issues.append(
+                "05c_scan_python_supply_chain.sh: does not reference python_requirements.txt "
+                "(must scan the canonical central list)"
+            )
+        if "supply_chain/reports" not in txt:
+            issues.append("05c_scan_python_supply_chain.sh: supply_chain/reports/ not referenced")
+
+    # 08_package_bundle must include supply_chain/
+    bundle_script = PREP / "scripts/08_package_bundle.sh"
+    if bundle_script.exists():
+        if "supply_chain" not in bundle_script.read_text():
+            issues.append("08_package_bundle.sh: supply_chain/ absent from INCLUDE_DIRS")
+
+    # 07_hash_and_manifest must hash supply_chain/reports
+    hash_script = PREP / "scripts/07_hash_and_manifest.sh"
+    if hash_script.exists():
+        if "supply_chain/reports" not in hash_script.read_text():
+            issues.append("07_hash_and_manifest.sh: supply_chain/reports/ absent from ARTIFACT_DIRS")
+
+    if issues:
+        report.fail("supply_chain/ integration",
+                    f"{len(issues)} issue(s):\n" +
+                    "\n".join(f"    • {x}" for x in issues))
+    else:
+        report.ok("supply_chain/ integration",
+                  "supply_chain/ present; GuardDog targets canonical python_requirements.txt; "
+                  "cargo-audit + GuardDog output to supply_chain/reports/; "
+                  "bundle + hash phases include supply_chain/")
+
+
+def check_makefile_supply_chain_targets(report: Report):
+    """Verify Makefile has cargo-audit and supply-chain targets wired into prep."""
+    mk_path = PREP / "Makefile"
+    if not mk_path.exists():
+        report.fail("Makefile supply-chain targets", "Makefile not found")
+        return
+
+    content = mk_path.read_text()
+    issues = []
+
+    prep_line = next((l for l in content.splitlines() if l.startswith("prep:")), "")
+    if "cargo-audit" not in prep_line:
+        issues.append("prep: target missing cargo-audit phase")
+    if "supply-chain" not in prep_line:
+        issues.append("prep: target missing supply-chain phase")
+
+    if "05b_cargo_audit.sh" not in content:
+        issues.append("Makefile does not call 05b_cargo_audit.sh")
+    if "05c_scan_python_supply_chain.sh" not in content:
+        issues.append("Makefile does not call 05c_scan_python_supply_chain.sh")
+    if "supply_chain" not in content:
+        issues.append("Makefile has no supply_chain reference (status/clean targets)")
+
+    if issues:
+        report.fail("Makefile supply-chain targets",
+                    f"{len(issues)} gap(s):\n" +
+                    "\n".join(f"    • {x}" for x in issues))
+    else:
+        report.ok("Makefile supply-chain targets",
+                  "cargo-audit and supply-chain phases wired into prep target")
+
+
 # -- Check 12: 07-deploy-inference.sh offline awareness -----------------------
 
 def check_inference_deploy_offline(report: Report):
@@ -655,6 +771,8 @@ def main():
     check_deploy_sh(report)
     check_manifest_uniqueness(report, manifest)
     check_inference_deploy_offline(report)
+    check_supply_chain_integration(report)
+    check_makefile_supply_chain_targets(report)
 
     report.print()
     sys.exit(0 if report.passed_all() else 1)
