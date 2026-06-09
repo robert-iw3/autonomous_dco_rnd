@@ -39,8 +39,60 @@ Live sensor schemas (flat JSON, matching fields the sensor actually emits):
 """
 
 import json
+import logging
+from pathlib import Path
 
 SPATIAL_TOKEN = "<|spatial_vector|>"
+
+_lance_logger = logging.getLogger(__name__)
+
+try:
+    import lance as _lance_mod
+    import pyarrow as _pa
+    _LANCE_AVAILABLE = True
+except ImportError:
+    _LANCE_AVAILABLE = False
+
+
+def write_lance_dataset(records: list, output_path: str) -> bool:
+    """Write a list-of-dict SFT records as a Lance dataset (Arrow columnar format).
+
+    Alongside JSONL output from stage_*_behavioral.py scripts.  Reading the
+    Lance file from the training script avoids per-record JSON parsing and
+    enables memory-mapped zero-copy loading.
+
+    Returns True if the dataset was written, False if lance/pyarrow are not
+    installed (JSONL remains the authoritative format in that case).
+    """
+    if not _LANCE_AVAILABLE:
+        return False
+    if not records:
+        return False
+
+    all_keys = sorted({k for r in records for k in r.keys()})
+    columns: dict = {}
+    for key in all_keys:
+        values = [r.get(key) for r in records]
+        if any(isinstance(v, (dict, list)) for v in values if v is not None):
+            values = [json.dumps(v) if isinstance(v, (dict, list)) else
+                      (str(v) if v is not None else None) for v in values]
+            arr_type = _pa.string()
+        elif all(isinstance(v, bool) or v is None for v in values):
+            arr_type = _pa.bool_()
+        elif all(isinstance(v, int) or v is None for v in values):
+            arr_type = _pa.int64()
+        elif all(isinstance(v, float) or v is None for v in values):
+            arr_type = _pa.float64()
+        else:
+            values = [str(v) if v is not None else None for v in values]
+            arr_type = _pa.string()
+        columns[key] = _pa.array(values, type=arr_type)
+
+    schema = _pa.schema([(k, columns[k].type) for k in all_keys])
+    table  = _pa.table(columns, schema=schema)
+    _lance_mod.write_dataset(table, output_path, mode="overwrite")
+    _lance_logger.info(f"    Lance dataset → {output_path}  ({len(records)} rows)")
+    return True
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -64,7 +116,7 @@ class TurboVecNgramIndex:
 
     Args:
         dim:       Embedding dimension (256 is SIMD-friendly and discriminative).
-        bit_width: TurboVec quantization bits (2 or 4; 4 is default).
+        bit_width: TurboVec quantisation bits (2 or 4; 4 is default).
     """
 
     def __init__(self, dim: int = 256, bit_width: int = 4) -> None:
@@ -253,7 +305,7 @@ class SkillDeduplicator:
     ANN near-duplicate detection for the RSI skill library.
 
     Prevents promoting semantically redundant skills that differ only in phrasing.
-    Key text = trigger_pattern + serialized action dict (sorted keys).
+    Key text = trigger_pattern + serialised action dict (sorted keys).
     """
 
     def __init__(self, dim: int = 64, threshold: float = 0.90) -> None:
@@ -285,7 +337,7 @@ class SkillDeduplicator:
     def size(self) -> int:
         return self._idx.size
 
-# -- Sysmon event ID → human name ----------------------------------------------
+# ── Sysmon event ID → human name ──────────────────────────────────────────────
 SYSMON_EVENT_NAMES = {
     1:  "Process Create",
     2:  "File Creation Time Changed",
@@ -311,9 +363,9 @@ SYSMON_EVENT_NAMES = {
     26: "FileDeleteDetected",
 }
 
-# -- sysmon_sensor: fields per event ID ----------------------------------------
+# ── sysmon_sensor: fields per event ID ────────────────────────────────────────
 # Only fields the sensor actually populates for each event type.
-# None values are stripped before JSON serialization.
+# None values are stripped before JSON serialisation.
 SYSMON_EVENT_FIELDS = {
     1:  ["Image", "CommandLine", "ParentImage", "ParentCommandLine",
          "User", "IntegrityLevel", "ProcessId", "ParentProcessId", "Hashes"],
@@ -337,20 +389,20 @@ SYSMON_EVENT_FIELDS = {
     26: ["Image", "TargetFilename", "User"],
 }
 
-# -- windows_deepsensor (EdrRow) fields ---------------------------------------
+# ── windows_deepsensor (EdrRow) fields ───────────────────────────────────────
 _EDR_FIELDS = [
     "Image", "CommandLine", "destination_ip", "pid", "ppid",
     "event_type", "category", "score", "avg_entropy", "max_velocity",
     "tactic", "technique", "severity",
 ]
 
-# -- linux_sentinel fields -----------------------------------------------------
+# ── linux_sentinel fields ─────────────────────────────────────────────────────
 _LIN_FIELDS = [
     "comm", "command_line", "uid", "dest_ip", "pid", "ppid",
     "target_file", "anomaly_score", "mitre_tactic", "mitre_technique",
 ]
 
-# -- Cloud fields --------------------------------------------------------------
+# ── Cloud fields ──────────────────────────────────────────────────────────────
 _AZURE_FIELDS = [
     "user_principal_name", "result_type", "ip_address", "error_code",
     "app_display_name", "operation_name",
@@ -361,7 +413,7 @@ _AWS_FIELDS = [
 ]
 
 
-# -- Sensor field-name alias map -----------------------------------------------
+# ── Sensor field-name alias map ───────────────────────────────────────────────
 # The live sensor Parquet columns sometimes differ from the canonical field names
 # that prompts and training records use.  Apply these aliases before _clean() so
 # that payloads arriving from the real sensors produce the same prompt format as
@@ -406,7 +458,7 @@ def _clean(payload: dict, allowed: list) -> dict:
     return {k: v for k, v in payload.items() if k in allowed and v is not None}
 
 
-# -- Public formatters ---------------------------------------------------------
+# ── Public formatters ─────────────────────────────────────────────────────────
 
 def fmt_sysmon(host: str, event_id: int, payload: dict) -> str:
     """

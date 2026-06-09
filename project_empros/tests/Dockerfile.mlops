@@ -3,7 +3,7 @@
 #          test_s3_query_alignment, test_cross_source_temporal,
 #          test_worker_ti_ingest, mlops_eval_minilab/
 # Deps:    pytest, numpy, pandas, pyarrow, duckdb, fakeredis, safetensors,
-#          torch (CPU), requests, qdrant-client, rich, python-dotenv
+#          torch (CPU), requests, qdrant-client[grpc], rich, python-dotenv
 #   docker build -f project_empros/tests/Dockerfile.mlops -t nexus-test-mlops .
 #
 # NOTE: Uses python:3.12-slim (Debian/glibc) instead of Alpine because PyTorch
@@ -32,7 +32,7 @@ RUN pip install --no-cache-dir \
     "redis>=5.0.0" \
     "requests>=2.31.0" \
     "pydantic>=2.7.1" \
-    "qdrant-client>=1.9.0" \
+    "qdrant-client[grpc]>=1.9.0" \
     "rich>=13.0.0" \
     "python-dotenv>=1.0.0"
 

@@ -124,7 +124,13 @@ The pipeline now produces training data across **12 source types** covering all 
 │  ├── Mistral-Small-3.1-24B, QLoRA 4-bit NF4                             │
 │  ├── Track 2 curriculum: C2 beacon/exfil/DGA classification             │
 │  ├── Track 4 curriculum: 42-field L7 session forensic analysis          │
-│  └── Dual early-stopping gates: T2 ≥98%, T4 ≥95% accuracy               │
+│  ├── Dual early-stopping gates: T2 ≥98%, T4 ≥95% accuracy               │
+│  └── DeepSpeed ZeRO-3 (multi-GPU): config/deepspeed_zero3.json          │
+│      Shards params+grads+optimizer → fits 24B on dual A100 80GB         │
+│      Invoke via: deepspeed 02_train_network.py --deepspeed              │
+│                  config/deepspeed_zero3.json  (make train-network-zero3)│
+│      Fallback:   config/deepspeed_zero2.json  (make train-network-zero2)│
+│      Single-GPU: python3 02_train_network.py  (make train-network)      │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -235,13 +241,15 @@ make data-tools         # stage-tools + Track 6 S3 match
 make data-sysmon        # Track 7: spool live sysmon_sensor Parquet from S3 cold storage
 
 # ── Model Training ─────────────────────────────────────────────────────────────
-make train-all          # Full sequence: baseline → sft-cot → spatial → network → critic → reward
-make train-baseline     # Model A: BiLSTM-AE
-make train-sft-cot      # Model C CoT SFT (golden + hard negatives + ALL 6 TTP corpora + sysmon live)
-make train-spatial      # Model C QLoRA + SpatialProjector
-make train-network      # Model B QLoRA on Mistral-Small-3.1-24B
-make train-critic       # Model D DPO/IPO with hard negatives
-make train-reward       # Bradley-Terry reward model
+make train-all             # Full sequence: baseline → sft-cot → spatial → network-zero3 → critic → reward
+make train-baseline        # Model A: BiLSTM-AE
+make train-sft-cot         # Model C CoT SFT (golden + hard negatives + ALL 6 TTP corpora + sysmon live)
+make train-spatial         # Model C QLoRA + SpatialProjector
+make train-network-zero3   # Model B DeepSpeed ZeRO-3 (PREFERRED — multi-GPU, 24B)
+make train-network-zero2   # Model B DeepSpeed ZeRO-2 (fallback — multi-GPU)
+make train-network         # Model B single-GPU path (no DeepSpeed)
+make train-critic          # Model D DPO/IPO with hard negatives
+make train-reward          # Bradley-Terry reward model
 
 make eval-spatial       # Model C: hallucination + schema + injection + spatial math
 make eval-network       # Model B: dual-gate TTP accuracy
@@ -411,6 +419,26 @@ Hard negatives are the most important training examples for FP reduction. Every 
 
 ## Future Roadmap
 
+### Phase 4 Performance Enhancements (P11 — complete)
+
+- [x] **P4-A: Lance Arrow dataset format** — `write_lance_dataset()` in `corpus_utils.py`
+  (pyarrow columnar, memory-mapped, graceful fallback when `pylance` absent).
+  All 11 `stage_*_behavioral.py` scripts accept `--output-lance`. `02_train_sft_cot.py`
+  prefers `.lance` files via `_load_ttp_dataset()` / `TTP_LANCE_SOURCES`. `corpus_config.toml`
+  has dual `*_staging` / `*_lance` entries. Expected gain: 4–10x faster I/O on epoch 2+.
+
+- [x] **P4-C: DeepSpeed ZeRO-3 for Model B** — `config/deepspeed_zero3.json` (stage=3,
+  contiguous_gradients, 5e8 allgather/reduce buckets). `02_train_network.py` accepts
+  `--deepspeed` arg; `train-all` calls `train-network-zero3` (deepspeed launcher + ZeRO-3
+  config). ZeRO-2 fallback retained in `config/deepspeed_zero2.json`. ZeRO-3 shards
+  parameters + gradients + optimizer states — required for 24B on dual A100 80GB without OOM.
+
+- [x] **P4-D: Qdrant gRPC for Track 1 scroll** — `01_spool_datasets.py` uses
+  `QdrantClient(host=QDRANT_HOST, port=QDRANT_GRPC_PORT, prefer_grpc=True)` (default port
+  6334). Env-configurable (`QDRANT_HOST`, `QDRANT_GRPC_PORT`). 2–3x faster than REST for
+  batch scrolls on large corpora. `Dockerfile.mlops` needs `qdrant-client[grpc]` extra for
+  production gRPC.
+
 ### Completed (this cycle)
 
 - [x] **TTP behavioral corpus (12 phases, 263 active classes, 3,156 records)** -- Twelve MITRE ATT&CK tactic phases with behavioral-only detection. Covers Recon, Persistence, C2, Bypass/Evasion, Lateral Movement, Malware, Exfiltration, AD, Windows Exploitation, Linux Exploitation, LOTL, and Cross-Source Temporal. `stage_tools_supplemental.py` retired -- all 25 classes migrated to correct category scripts.
@@ -424,7 +452,7 @@ Hard negatives are the most important training examples for FP reduction. Every 
 - [x] **ADDON-Ph3: Cross-source temporal expansion + corpus_utils alias sync** -- `cross_source_temporal.py` and `stage_cross_source_temporal.py` extended to 5 classes (60 records). `adversarial_corpus_templates/corpus_utils.py` synced with `SENSOR_FIELD_ALIASES` + `_apply_aliases()` from mlops mirror; `fmt_edr()` now accepts live sensor Parquet field names (`path`→`Image`, `command_line`→`CommandLine`). 57 offline tests (`test_cross_source_temporal.py`, 0.08s).
 - [x] **ADDON-Ph4: RSI closed-loop orchestrator + Skill Library** -- `08_rsi_loop.py` + `skills_v1.jsonl` + all safety invariants (air-gap, NATS quorum, alignment gate, Ansible Vault). 49 offline tests (`test_rsi_loop.py`, 0.06s). See Phase 4 for full details.
 - [x] **PERF-Ph1: Training acceleration + ONNX export** -- Unsloth graceful-fallback added to `02_train_qlora.py` and `02_train_sft_cot.py` (FastLanguageModel path with smarter gradient checkpointing; degrades to standard BnB QLoRA if unsloth absent; guard prevents double `resize_token_embeddings` call). `mlops/scripts/export_model_a_onnx.py`: ONNX opset-17 export for BiLSTM-AE with fused z-score normalization (`NormalizedAE` wrapper), dynamic batch/seq axes, numerical equivalence check (max delta < 1e-4), SHA-384 manifest append. `mlops/Makefile`: `export-onnx` target. `planning_docs/PERFORMANCE_ENHANCEMENT_PLAN.md`: full 14-option decision matrix with phased implementation plan (Phases 1–5).
-- [x] **PERF-TI: Threat Intelligence RAG service** -- `services/worker_ti_ingest/` new FastAPI Python service (port 8010). Hybrid retrieval: TurboVec IdMapIndex SIMD ANN (numpy brute-force fallback) + BM25Okapi keyword index. Embeddings: BAAI/bge-m3 1024D via sentence-transformers (TRANSFORMERS_OFFLINE=1). Reranker: CrossEncoder ms-marco-MiniLM-L-6-v2 (top-20→top-5, ~45ms CPU). Hybrid score: α=0.65 dense + (1-α)×BM25_normalized. Qdrant `nexus_ti_corpus` collection (ScalarQuantization INT8, named vector `ti_embed`). NATS publish to `nexus.ti.status` for progress events. Document parsers: PDF (PyMuPDF), STIX 2.x bundle, Sigma YAML, JSONL, IOC CSV (sliding window 400 tokens, 40 overlap). Endpoints: POST /ingest, GET /status/{job_id}, GET /corpus, DELETE /document/{doc_id}, POST /retrieve, GET /health. Dockerfile air-gap ready.
+- [x] **PERF-TI: Threat Intelligence RAG service** -- `services/worker_ti_ingest/` new FastAPI Python service (port 8010). Hybrid retrieval: TurboVec IdMapIndex SIMD ANN (numpy brute-force fallback) + BM25Okapi keyword index. Embeddings: BAAI/bge-m3 1024D via sentence-transformers (TRANSFORMERS_OFFLINE=1). Reranker: CrossEncoder ms-marco-MiniLM-L-6-v2 (top-20→top-5, ~45ms CPU). Hybrid score: α=0.65 dense + (1-α)xBM25_normalized. Qdrant `nexus_ti_corpus` collection (ScalarQuantization INT8, named vector `ti_embed`). NATS publish to `nexus.ti.status` for progress events. Document parsers: PDF (PyMuPDF), STIX 2.x bundle, Sigma YAML, JSONL, IOC CSV (sliding window 400 tokens, 40 overlap). Endpoints: POST /ingest, GET /status/{job_id}, GET /corpus, DELETE /document/{doc_id}, POST /retrieve, GET /health. Dockerfile air-gap ready.
 - [x] **PERF-LG: Looking Glass TI Intelligence tab (7th view)** -- `services/looking_glass/src/routes/api/ti/+server.ts`: SvelteKit server endpoints proxying to worker_ti_ingest + SSE relay from `nexus.ti.status`. `stores.ts` extended with TIDocument, TICorpusStats, TIUploadEvent types and tiDocuments/tiStats/tiUploadLog/appendTIUploadEvent/refreshTICorpus. `+page.svelte`: drag-and-drop upload dropzone, SSE activity log, corpus stats cards, document browser table with retract buttons; `{ id: 'ti', label: 'TI Intelligence', icon: '◎' }` added to nav.
 - [x] **PERF-TV: TurboVec MLOps integrations** -- `mlops/scripts/corpus_utils.py`: TurboVecNgramIndex (char 2–4-gram hash → L2-normalised float32 vector, dim=256, TurboVec ANN + numpy brute-force fallback), TurboVecDeduplicator (threshold 0.92, check_and_add), HardNegativeMiner (cross-class contrastive DPO pair mining), SkillDeduplicator (dim=256, threshold 0.90, load_from_library). Three script integrations: (1) `01_spool_datasets.py` Track-6 dedup via `--dedup-threshold` (default 0.92); (2) `05_critic_loop.py` hard-negative mining: `_append_mined_negatives` writes `source='turbovec_hn_mining'` DPO pairs to `hard_negatives_sft_v1.jsonl`; (3) `08_rsi_loop.py` `promote_skill` near-dup guard via process-lifetime SkillDeduplicator singleton (warm from library file, updated on every successful promotion). 58/58 offline tests (`tests/test_turbovec_mlops.py`, 0.14s). Bug fix: `_get_skill_deduplicator` bumped from dim=64 to dim=256 to distinguish skills with same JSON schema structure.
 

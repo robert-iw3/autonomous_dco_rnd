@@ -14,40 +14,40 @@ export NEXUS_CONTAINER_RUNTIME=podman   # or docker
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  PHASE A -- ONLINE (internet-connected preparation machine)                   │
+│  PHASE A -- ONLINE (internet-connected preparation machine)                  │
 │                                                                              │
 │  make prep                                                                   │
-│  ├── 01 pull_and_save_images.sh   -- pull 34 base/runtime → images/*.tar.gz   │
-│  ├── 02 build_custom_images.sh    -- load bases, build 14 final images:       │
+│  ├── 01 pull_and_save_images.sh   -- pull 34 base/runtime → images/*.tar.gz  │
+│  ├── 02 build_custom_images.sh    -- load bases, build 14 final images:      │
 │  │       Rust services (6): nexus-ingress, worker-qdrant, worker-rules,      │
 │  │                          worker-s3-archive, worker-soar, worker-rlhf      │
 │  │       Python/Node  (4): nexus-hunter (model baked), nexus-n8n (CLIs),     │
 │  │                         nexus-looking-glass (npm built), nexus-mlops      │
 │  │       Infrastructure (4): nexus-nats, nexus-qdrant, nexus-haproxy,        │
 │  │                            nexus-redis  → custom-images/*.tar.gz          │
-│  ├── 03 download_python_deps.sh   -- pip download → wheels/                   │
-│  ├── 04 download_ansible_deps.sh  -- ansible-galaxy → collections/            │
-│  ├── 05 download_terraform_deps.sh-- tf providers → providers/                │
-│  ├── 06 scan_all_images.sh        -- syft + grype on all 48 images            │
+│  ├── 03 download_python_deps.sh   -- pip download → wheels/                  │
+│  ├── 04 download_ansible_deps.sh  -- ansible-galaxy → collections/           │
+│  ├── 05 download_terraform_deps.sh-- tf providers → providers/               │
+│  ├── 06 scan_all_images.sh        -- syft + grype on all 48 images           │
 │  │                                  → scan/reports/                          │
-│  ├── 07 hash_and_manifest.sh      -- sha256sums.txt + manifest.json           │
+│  ├── 07 hash_and_manifest.sh      -- sha256sums.txt + manifest.json          │
 │  └── 08 package_bundle.sh         → nexus_bundle_<ts>.tar.gz                 │
 │                                     + nexus_bundle_<ts>.tar.gz.sha256        │
 └──────────────────────────────────────────────────────────────────────────────┘
                           │  (physical transport)
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  PHASE B -- OFFLINE (air-gapped target machine)                      │
+│  PHASE B -- OFFLINE (air-gapped target machine)                     │
 │                                                                     │
 │  sha256sum -c nexus_bundle_<ts>.tar.gz.sha256                       │
 │  tar -xzf nexus_bundle_<ts>.tar.gz                                  │
 │  cd deployment_prep                                                 │
 │                                                                     │
 │  make deploy-offline                                                │
-│  ├── 09 verify_bundle.sh    -- verify all SHA-256 hashes             │
-│  ├── 10 load_images.sh      -- docker/podman load *.tar.gz           │
-│  ├── install-deps           -- pip + ansible-galaxy offline          │
-│  └── ../deploy.sh --offline -- full stack deployment                 │
+│  ├── 09 verify_bundle.sh    -- verify all SHA-256 hashes            │
+│  ├── 10 load_images.sh      -- docker/podman load *.tar.gz          │
+│  ├── install-deps           -- pip + ansible-galaxy offline         │
+│  └── ../deploy.sh --offline -- full stack deployment                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

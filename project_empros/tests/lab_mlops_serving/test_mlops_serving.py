@@ -215,3 +215,106 @@ class TestAirGapCompliance:
             local = cfg.get("local_path", "")
             assert not local.startswith("https://"), \
                 f"Model {name} local_path must not be an HTTPS URL -- air-gap violation"
+
+
+# ── Phase 4 performance enhancements ─────────────────────────────────────────
+
+class TestPhase4PerformanceEnhancements:
+    """P4-A Lance, P4-C DeepSpeed, P4-D Qdrant gRPC contract tests."""
+
+    # P4-C: DeepSpeed ZeRO-2
+    def test_deepspeed_zero2_config_exists(self):
+        cfg = MLOPS_DIR / "config" / "deepspeed_zero2.json"
+        assert cfg.exists(), "mlops/config/deepspeed_zero2.json must exist (P4-C)"
+
+    def test_deepspeed_zero2_config_valid_json(self):
+        import json
+        cfg = MLOPS_DIR / "config" / "deepspeed_zero2.json"
+        data = json.loads(cfg.read_text())
+        assert "zero_optimization" in data, "deepspeed_zero2.json must have zero_optimization key"
+        assert data["zero_optimization"]["stage"] == 2, "ZeRO stage must be 2"
+
+    def test_train_network_deepspeed_arg(self):
+        src = (SCRIPTS_DIR / "02_train_network.py").read_text()
+        assert "--deepspeed" in src, \
+            "02_train_network.py must expose --deepspeed argument (P4-C)"
+        assert "deepspeed=args.deepspeed" in src, \
+            "02_train_network.py must wire deepspeed into TrainingArguments (P4-C)"
+
+    # P4-D: Qdrant gRPC
+    def test_spool_datasets_grpc_vars(self):
+        src = (SCRIPTS_DIR / "01_spool_datasets.py").read_text()
+        assert "QDRANT_GRPC_PORT" in src, \
+            "01_spool_datasets.py must define QDRANT_GRPC_PORT env var (P4-D)"
+        assert "prefer_grpc=True" in src, \
+            "01_spool_datasets.py must pass prefer_grpc=True to QdrantClient (P4-D)"
+
+    # P4-A: Lance format
+    def test_corpus_utils_has_write_lance(self):
+        src = (SCRIPTS_DIR / "corpus_utils.py").read_text()
+        assert "write_lance_dataset" in src, \
+            "corpus_utils.py must define write_lance_dataset() helper (P4-A)"
+        assert "_LANCE_AVAILABLE" in src, \
+            "corpus_utils.py must have _LANCE_AVAILABLE graceful fallback (P4-A)"
+
+    def test_stage_scripts_have_output_lance_flag(self):
+        stage_scripts = [
+            "stage_recon_behavioral.py", "stage_c2_behavioral.py",
+            "stage_bypass_behavioral.py", "stage_persistence_behavioral.py",
+            "stage_lateral_movement_behavioral.py", "stage_exfiltration_behavioral.py",
+            "stage_active_directory_behavioral.py", "stage_malware_behavioral.py",
+            "stage_linux_exploitation_behavioral.py", "stage_lotl_behavioral.py",
+            "stage_windows_exploitation_behavioral.py",
+        ]
+        for script in stage_scripts:
+            src = (SCRIPTS_DIR / script).read_text()
+            assert "--output-lance" in src, \
+                f"{script} must have --output-lance argument (P4-A)"
+            assert "write_lance_dataset" in src, \
+                f"{script} must call write_lance_dataset (P4-A)"
+
+    def test_train_sft_cot_lance_detection(self):
+        src = (SCRIPTS_DIR / "02_train_sft_cot.py").read_text()
+        assert "_LANCE" in src, \
+            "02_train_sft_cot.py must have Lance detection flag (P4-A)"
+        assert "TTP_LANCE_SOURCES" in src, \
+            "02_train_sft_cot.py must define TTP_LANCE_SOURCES dict (P4-A)"
+        assert "_load_ttp_dataset" in src, \
+            "02_train_sft_cot.py must define _load_ttp_dataset() helper (P4-A)"
+
+    def test_corpus_config_has_lance_paths(self):
+        import tomllib
+        cfg = (MLOPS_DIR / "corpus_config.toml").read_bytes()
+        data = tomllib.loads(cfg.decode())
+        ttp = data.get("ttp_corpus", {})
+        assert "recon_lance" in ttp, \
+            "corpus_config.toml [ttp_corpus] must have lance path entries (P4-A)"
+        assert ttp["recon_lance"].endswith(".lance"), \
+            "recon_lance must point to a .lance file (P4-A)"
+
+    # P4-C upgrade: DeepSpeed ZeRO-3 (primary for Model B 24B multi-GPU)
+    def test_deepspeed_zero3_config_exists(self):
+        cfg = MLOPS_DIR / "config" / "deepspeed_zero3.json"
+        assert cfg.exists(), "mlops/config/deepspeed_zero3.json must exist (P4-C ZeRO-3)"
+
+    def test_deepspeed_zero3_config_valid_json(self):
+        import json
+        cfg = MLOPS_DIR / "config" / "deepspeed_zero3.json"
+        data = json.loads(cfg.read_text())
+        assert "zero_optimization" in data, "deepspeed_zero3.json must have zero_optimization key"
+        assert data["zero_optimization"]["stage"] == 3, "ZeRO-3 stage must be 3"
+        assert data["zero_optimization"].get("contiguous_gradients") is True, \
+            "ZeRO-3 must set contiguous_gradients=true for memory-safe gradient accumulation"
+
+    def test_deepspeed_zero3_is_primary_train_all(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        assert "train-network-zero3" in makefile, \
+            "Makefile must have train-network-zero3 target (P4-C ZeRO-3)"
+        train_all_line = [l for l in makefile.splitlines() if l.startswith("train-all:")][0]
+        assert "train-network-zero3" in train_all_line, \
+            "train-all must call train-network-zero3 (ZeRO-3 is primary for 24B multi-GPU)"
+
+    def test_train_network_zero3_uses_correct_config(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        assert "deepspeed_zero3.json" in makefile, \
+            "Makefile train-network-zero3 must reference deepspeed_zero3.json"
