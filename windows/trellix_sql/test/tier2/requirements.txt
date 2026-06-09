@@ -1,0 +1,6 @@
+pyarrow>=14.0
+scikit-learn>=1.4
+numpy>=1.26
+requests>=2.31
+pytest>=8.0
+pytest-json-report>=1.5

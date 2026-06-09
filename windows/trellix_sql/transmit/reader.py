@@ -71,16 +71,13 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 
 _STOP = False
 
-
 def _handle_signal(sig: int, frame: Any) -> None:
     global _STOP
     log.info("Signal %d received -- draining and stopping.", sig)
     _STOP = True
 
-
 signal.signal(signal.SIGTERM, _handle_signal)
 signal.signal(signal.SIGINT, _handle_signal)
-
 
 # -- Batch sequence (persisted, monotonically increasing -- required by ingress
 #    replay/integrity protection in core_ingress::integrity::IntegrityVerifier) --
@@ -100,7 +97,6 @@ class _BatchSequence:
         tmp.replace(self._path)
         return self._current
 
-
 # -- SQL connection ------------------------------------------------------------
 
 def _make_connection() -> pyodbc.Connection:
@@ -114,7 +110,6 @@ def _make_connection() -> pyodbc.Connection:
     )
     return pyodbc.connect(dsn, autocommit=False)
 
-
 # -- Watermark helpers ---------------------------------------------------------
 
 def _get_watermark(con: pyodbc.Connection, stream: str) -> int:
@@ -124,7 +119,6 @@ def _get_watermark(con: pyodbc.Connection, stream: str) -> int:
         stream,
     ).fetchone()
     return row[0] if row else 0
-
 
 def _update_watermark(
     con: pyodbc.Connection,
@@ -140,7 +134,6 @@ def _update_watermark(
         stream, last_auto_id, rows_transmitted, batch_id,
     )
     con.commit()
-
 
 # -- Batch fetch ---------------------------------------------------------------
 
@@ -169,14 +162,12 @@ _AC_FILTER = """
    OR ThreatEventID BETWEEN 34000 AND 34999)
 """
 
-
 def _fetch_batch(
     con: pyodbc.Connection, stream: str, last_auto_id: int
 ) -> list[pyodbc.Row]:
     filt = _ENS_FILTER if stream == "ens" else _AC_FILTER
     sql = _FETCH_SQL.format(stream_filter=filt)
     return con.execute(sql, BATCH_SIZE, last_auto_id).fetchall()
-
 
 # -- Parquet serialization -----------------------------------------------------
 
@@ -201,7 +192,6 @@ def _rows_to_parquet(rows: list[dict]) -> bytes:
     pq.write_table(table, buf, compression="zstd")
     return buf.getvalue()
 
-
 # -- HMAC signing ---------------------------------------------------------------
 # Must match middleware/src/core_ingress/src/integrity.rs::compute_hmac exactly:
 #   mac.update(payload)
@@ -216,7 +206,6 @@ def _compute_hmac(payload: bytes, sequence: int, timestamp: int) -> str:
     mac.update(NEXUS_SENSOR_ID.encode("utf-8"))
     mac.update(struct.pack(">Q", timestamp))
     return mac.hexdigest()
-
 
 # -- Nexus POST ----------------------------------------------------------------
 
@@ -241,7 +230,6 @@ def _send_to_nexus(payload: bytes, batch_id: str, stream: str, sequence: int) ->
     resp.raise_for_status()
     log.info("batch_id=%s stream=%s seq=%d bytes=%d status=%d",
              batch_id, stream, sequence, len(payload), resp.status_code)
-
 
 # -- Main loop -----------------------------------------------------------------
 
@@ -309,7 +297,6 @@ def _process_stream(
     _update_watermark(con, stream, last_auto_id_new, len(out_rows), batch_id)
 
     return len(out_rows)
-
 
 def run() -> None:
     log.info("Transmission reader starting. host=%s db=%s batch=%d interval=%ds",

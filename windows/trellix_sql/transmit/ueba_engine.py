@@ -36,7 +36,6 @@ _STRIP_RE = re.compile(
 _MAX_WINDOW = 5000
 _ENTROPY_MAX = 4.0   # practical max for 8-bit chars over short strings
 
-
 class TrellixUEBAEngine:
     """Stateful UEBA engine. One instance per process; thread-safe via GIL."""
 
@@ -182,7 +181,6 @@ class TrellixUEBAEngine:
                     (key, count),
                 )
 
-
 # -- Module-level helpers (used by tests) -------------------------------------
 
 def _shannon_entropy(data: str) -> float:
@@ -192,19 +190,16 @@ def _shannon_entropy(data: str) -> float:
     probs = [v / len(data) for v in counts.values()]
     return -sum(p * math.log2(p) for p in probs if p > 0)
 
-
 def _normalise_threat_key(threat_name: Optional[str], threat_type: Optional[str]) -> str:
     """Strip volatile tokens (GUIDs, hex, timestamps) for stable frequency counting."""
     raw = f"{threat_name or ''}|{threat_type or ''}"
     return _STRIP_RE.sub("", raw).strip().lower()
-
 
 def _severity_to_float(severity: Optional[int]) -> float:
     """Map EPO ThreatSeverity 1-5 to [0.2, 1.0]."""
     if severity is None:
         return 0.0
     return float(np.clip(severity / 5.0, 0.0, 1.0))
-
 
 def _action_to_float(action: Optional[str]) -> float:
     """Map ActionTaken string to a risk weight."""
