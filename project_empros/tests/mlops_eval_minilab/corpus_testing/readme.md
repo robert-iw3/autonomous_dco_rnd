@@ -3,7 +3,7 @@
 Place new corpus JSONL files here to validate them before promoting to production MLOps.
 The eval runner discovers all JSONL files automatically -- no configuration needed.
 
-## Structure (mirrors adversarial_corpus_templates)
+## Structure (mirrors mlops/corpus_templates)
 
 ```
 corpus_testing/

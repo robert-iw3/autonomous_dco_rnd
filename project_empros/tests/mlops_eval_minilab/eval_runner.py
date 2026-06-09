@@ -670,7 +670,7 @@ def write_report(
             "Next steps:\n"
             "  1. Copy corpus JSONL to  [cyan]mlops/scripts/stage_<name>.py[/cyan]\n"
             "  2. Add to               [cyan]mlops/Makefile[/cyan]  (stage-<name>, data-<name>)\n"
-            "  3. Copy to              [cyan]adversarial_corpus_templates/<TTP>/[/cyan]  with manifest",
+            "  3. Copy to              [cyan]mlops/corpus_templates/<TTP>/[/cyan]  with manifest",
             border_style="green",
         ))
     else:

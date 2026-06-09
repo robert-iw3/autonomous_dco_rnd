@@ -290,7 +290,7 @@ Offline. Validates `mlops/scripts/03_eval_pyrit.py` -- PyRIT multi-turn attack o
 
 ### ADDON Phase 3: Cross-Source Temporal Corpus (`test_cross_source_temporal.py`)
 
-Offline. Validates both `adversarial_corpus_templates/cross_source_temporal.py` and `mlops/scripts/stage_cross_source_temporal.py` (5 classes) plus the alias sync in `adversarial_corpus_templates/corpus_utils.py`. 57 tests, 0.08s.
+Offline. Validates both `mlops/corpus_templates/cross_source_temporal.py` and `mlops/scripts/stage_cross_source_temporal.py` (5 classes) plus the alias sync in `mlops/corpus_templates/corpus_utils.py`. 57 tests, 0.08s.
 
 | Area | What is checked |
 |---|---|
@@ -300,7 +300,7 @@ Offline. Validates both `adversarial_corpus_templates/cross_source_temporal.py` 
 | Record shape | 3-turn message list (system/user/assistant); `source_type=multi_sensor`; `ttp_category=CrossSourceTemporal` |
 | TP/FP classification | TP → `TRUE POSITIVE` + contain/isolate/block/revoke; FP → `FALSE POSITIVE` + `RECOMMENDED_ACTION: dismiss` |
 | S3_QUERIES | 5 classes covered; no empty WHERE; `comm` field + `/tmp/` for linux; `result_type` + `Sign-in` for cloud |
-| corpus_utils.py sync | `SENSOR_FIELD_ALIASES` and `_apply_aliases()` present in adversarial_corpus_templates copy; values match mlops copy |
+| corpus_utils.py sync | `SENSOR_FIELD_ALIASES` and `_apply_aliases()` present in `mlops/corpus_templates` copy; values match `mlops/scripts` copy |
 | `fmt_edr()` aliases | Live sensor field names (`path`→`Image`, `command_line`→`CommandLine`) correctly mapped |
 | Cross-copy sync | Both staging scripts have identical TOOL_CLASSES keys, S3_QUERIES keys, and MITRE techniques |
 

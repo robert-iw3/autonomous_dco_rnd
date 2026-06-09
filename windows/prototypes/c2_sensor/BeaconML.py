@@ -25,10 +25,12 @@ Usage (called by C2Sensor Rust process via subprocess or COM bridge):
     )
     # stats is a FlowStats namedtuple with all 8 fields
 
-STATUS: WS-1 SKELETON -- field formulae are correct; integration with the
-        Rust ML engine's MPSC channel (C2SensorRecord) is pending.
-        Wire via: TransmissionLayer::enqueue_with_flow_stats(record, stats)
-        See: windows/prototypes/c2_sensor/transmission/src/lib.rs
+STATUS: WS-1 COMPLETE -- FlowStats are computed natively in Rust by
+        ml_engine/src/lib.rs (BehavioralEngine::evaluate_flow, both fast-path
+        and volumetric) and injected directly into the JSON alert payload sent
+        to TransmissionLayer via MPSC.  No pyo3 bridge needed.
+        This file serves as the Python reference/test implementation and as the
+        subprocess fallback for the PowerShell C# orchestration path.
 """
 
 from __future__ import annotations
@@ -166,29 +168,17 @@ def _beacon_score(cv: float, interval: float, size_std: float, entropy: float) -
     return min(score, 95.0)
 
 
-# -- TODO: wire into Rust transmission layer ------------------------------------
+# -- WS-1 COMPLETE: Rust-native FlowStats integration -------------------------
 #
-# Integration point (WS-1 pending):
+# ml_engine/src/lib.rs::BehavioralEngine::evaluate_flow computes the same 8D
+# vector natively (FlowStats struct, lines ~313-329) and injects it into the
+# serde_json alert payload sent over the MPSC channel to TransmissionLayer,
+# which writes all 7 columns to c2_ledger_queue (transmission/src/lib.rs).
 #
-#   In windows/prototypes/c2_sensor/transmission/src/lib.rs,
-#   the C2SensorRecord written to c2_ledger_queue currently uses DEFAULT values
-#   for the 7 flow-stat columns.  Replace with Python-computed values by:
-#
-#   1. Calling compute_flow_stats() from the Rust ML engine via pyo3 or subprocess:
-#        let stats = python_call!("BeaconML", "compute_flow_stats", packets, query)?;
-#
-#   2. Populating C2SensorRecord fields before enqueue:
-#        record.outbound_ratio   = stats.outbound_ratio;
-#        record.packet_size_mean = stats.packet_size_mean;
-#        record.packet_size_std  = stats.packet_size_std;
-#        record.interval         = stats.interval;
-#        record.cv               = stats.cv;
-#        record.entropy          = stats.entropy;
-#        record.cmd_entropy      = stats.cmd_entropy;
-#        record.score            = stats.score;
-#
-#   3. The pyo3 bridge skeleton is at:
-#        windows/prototypes/c2_sensor/ml_engine/src/ (Rust ML engine)
+# This file provides:
+#   • Python reference implementation (field formulae authoritative)
+#   • Subprocess entry point for PowerShell/C# orchestration path
+#   • Test fixture for cross-validating Rust vs Python values
 #
 # ------------------------------------------------------------------------------
 

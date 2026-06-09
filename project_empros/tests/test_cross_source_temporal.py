@@ -10,7 +10,7 @@ Coverage:
   D. New class: LinuxBeaconAfterExec -- linux_sentinel fields + C2 beacon
   E. New class: CloudLateralMovement -- azure_entraid + aws_cloudtrail IAM escalation
   F. S3_QUERIES -- all 5 classes present, no empty WHERE clauses
-  G. corpus_utils.py sync -- adversarial_corpus_templates copy has SENSOR_FIELD_ALIASES
+  G. corpus_utils.py sync -- mlops/corpus_templates copy has SENSOR_FIELD_ALIASES
      and _apply_aliases(), fmt_edr() applies aliases before _clean()
   H. Both staging scripts produce identical TOOL_CLASSES keys
 """
@@ -22,8 +22,8 @@ import importlib.util as _ilu
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent
-MLOPS_SCRIPTS  = REPO / "mlops/scripts"
-ACT_DIR        = REPO / "adversarial_corpus_templates"
+MLOPS_SCRIPTS    = REPO / "mlops/scripts"
+CORPUS_TEMPLATES = REPO / "mlops/corpus_templates"
 
 sys.path.insert(0, str(MLOPS_SCRIPTS))
 
@@ -39,18 +39,18 @@ TOOL_CLASSES = _mod.TOOL_CLASSES
 S3_QUERIES   = _mod.S3_QUERIES
 generate     = _mod.generate
 
-# ── Load adversarial_corpus_templates/cross_source_temporal.py ───────────────
+# ── Load mlops/corpus_templates/cross_source_temporal.py ─────────────────────
 _act_spec = _ilu.spec_from_file_location(
     "cross_source_temporal_act",
-    str(ACT_DIR / "cross_source_temporal.py"),
+    str(CORPUS_TEMPLATES / "cross_source_temporal.py"),
 )
 _act_mod = _ilu.module_from_spec(_act_spec)
 _act_spec.loader.exec_module(_act_mod)
 
-# ── Load adversarial_corpus_templates/corpus_utils.py ────────────────────────
+# ── Load mlops/corpus_templates/corpus_utils.py ───────────────────────────────
 _cu_spec = _ilu.spec_from_file_location(
     "corpus_utils_act",
-    str(ACT_DIR / "corpus_utils.py"),
+    str(CORPUS_TEMPLATES / "corpus_utils.py"),
 )
 _cu_mod = _ilu.module_from_spec(_cu_spec)
 _cu_spec.loader.exec_module(_cu_mod)
@@ -321,17 +321,17 @@ class TestS3Queries:
         assert "Sign-in" in where
 
 
-# ── G. corpus_utils.py sync (adversarial_corpus_templates copy) ──────────────
+# ── G. corpus_utils.py sync (mlops/corpus_templates copy) ────────────────────
 
 class TestCorpusUtilsSync:
 
     def test_sensor_field_aliases_present(self):
         assert hasattr(_cu_mod, "SENSOR_FIELD_ALIASES"), \
-            "adversarial_corpus_templates/corpus_utils.py missing SENSOR_FIELD_ALIASES"
+            "mlops/corpus_templates/corpus_utils.py missing SENSOR_FIELD_ALIASES"
 
     def test_apply_aliases_present(self):
         assert hasattr(_cu_mod, "_apply_aliases"), \
-            "adversarial_corpus_templates/corpus_utils.py missing _apply_aliases()"
+            "mlops/corpus_templates/corpus_utils.py missing _apply_aliases()"
 
     def test_windows_deepsensor_aliases_match_mlops(self):
         from corpus_utils import SENSOR_FIELD_ALIASES as mlops_aliases

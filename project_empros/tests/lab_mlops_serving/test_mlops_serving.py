@@ -318,3 +318,50 @@ class TestPhase4PerformanceEnhancements:
         makefile = (MLOPS_DIR / "Makefile").read_text()
         assert "deepspeed_zero3.json" in makefile, \
             "Makefile train-network-zero3 must reference deepspeed_zero3.json"
+
+
+class TestMlopsStructuralFixes:
+    """Validates corpus_templates location, path hygiene, and Makefile completeness."""
+
+    def test_corpus_templates_inside_mlops(self):
+        assert (MLOPS_DIR / "corpus_templates").is_dir(), \
+            "corpus_templates must live inside mlops/ (not at project root)"
+
+    def test_no_old_adversarial_dir_at_root(self):
+        old_path = MLOPS_DIR.parent / "adversarial_corpus_templates"
+        assert not old_path.exists(), \
+            "adversarial_corpus_templates at project root must be removed — use mlops/corpus_templates/"
+
+    def test_corpus_templates_has_cross_source_temporal(self):
+        assert (MLOPS_DIR / "corpus_templates" / "cross_source_temporal.py").exists()
+
+    def test_corpus_templates_corpus_utils_matches_scripts(self):
+        scripts_cu = (SCRIPTS_DIR / "corpus_utils.py").read_text()
+        templates_cu = (MLOPS_DIR / "corpus_templates" / "corpus_utils.py").read_text()
+        assert scripts_cu == templates_cu, \
+            "mlops/corpus_templates/corpus_utils.py must be identical to mlops/scripts/corpus_utils.py"
+
+    def test_stage_scripts_use_file_relative_paths(self):
+        issues = []
+        for script in SCRIPTS_DIR.glob("stage_*.py"):
+            text = script.read_text()
+            if 'Path("../data/' in text or "Path('../data/" in text:
+                issues.append(script.name)
+        assert not issues, \
+            f"Stage scripts must use Path(__file__).parent.parent not relative Path('../data/'): {issues}"
+
+    def test_spool_datasets_uses_file_relative_paths(self):
+        text = (SCRIPTS_DIR / "01_spool_datasets.py").read_text()
+        assert 'Path("../data/' not in text and "Path('../data/" not in text, \
+            "01_spool_datasets.py must use Path(__file__).parent.parent not relative ../data/"
+
+    def test_stage_cross_source_temporal_has_makefile_target(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        assert "stage-temporal" in makefile, \
+            "Makefile missing stage-temporal target for stage_cross_source_temporal.py"
+
+    def test_data_all_includes_cross_source_temporal(self):
+        makefile = (MLOPS_DIR / "Makefile").read_text()
+        data_all_section = makefile.split("data-all:")[1].split("\n\n")[0]
+        assert "stage_cross_source_temporal" in data_all_section, \
+            "data-all must invoke stage_cross_source_temporal.py"

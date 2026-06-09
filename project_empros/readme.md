@@ -183,7 +183,7 @@ PROJECT_EMPROS/
 │   │   ├── 05_serve_critic.py             # Model D: vLLM inference (port 8002), fails CLOSED, 3-token decision space
 │   │   ├── 05_synthetic_data_gen.py       # Claude-API synthetic hard negative generator (requires ANTHROPIC_API_KEY)
 │   │   └── serve_baseline.py              # Model A: NATS consumer, CPU-only, nexus.alerts.baseline
-│   ├── adversarial_corpus_templates/      # Training corpus documentation templates (one directory per TTP phase)
+│   ├── corpus_templates/                  # Training corpus source templates (one directory per TTP phase)
 │   │   ├── 1_Recon/                       # manifest.md + stage_recon_behavioral.py (with inline model-teaching annotations)
 │   │   ├── 2_Persistence/                 # manifest.md + stage_persistence_behavioral.py
 │   │   ├── 3_C2/                          # manifest.md + stage_c2_behavioral.py
@@ -193,7 +193,8 @@ PROJECT_EMPROS/
 │   │   ├── Active-Directory/              # manifest.md + stage_active_directory_behavioral.py
 │   │   ├── tools/                         # manifest.md + stage_tools_supplemental.py
 │   │   ├── 6_Malware_Tradecraft/          # manifest.md + stage_malware_behavioral.py (10 malware family behaviors)
-│   │   ├── corpus_utils.py                # Shared prompt formatters for all sensor types
+│   │   ├── corpus_utils.py                # Shared prompt formatters for all sensor types (canonical: mlops/scripts/corpus_utils.py)
+│   │   ├── cross_source_temporal.py       # Cross-source temporal corpus generator (mirrors mlops/scripts/stage_cross_source_temporal.py)
 │   │   └── readme.md                      # How to add a new TTP corpus stage
 │   ├── adversarial_edge_cases.jsonl       # Static adversarial training data injected by 01_spool_datasets.py
 │   ├── deployment/

@@ -300,7 +300,7 @@ echo "stage-mynew: python3 scripts/stage_my_new_behavioral.py" >> mlops/Makefile
 
 # 3. Copy to corpus templates
 cp corpus_testing/MY_NEW_CATEGORY/MyNewClass.jsonl \
-   adversarial_corpus_templates/MY_NEW_CATEGORY/
+   mlops/corpus_templates/MY_NEW_CATEGORY/
 
 # 4. Add to data-all target in Makefile
 # 5. Run make data-all
