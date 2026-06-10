@@ -1,8 +1,9 @@
-# Sentinel Nexus -- MLOps Maturation Plan: Embedded Benchmarking, Evaluation QA, and Fail-Fast Learning
+# MLOps Maturation Plan: Embedded Benchmarking, Evaluation QA, Fail-Fast Learning, and Training/Serving Plane Separation
 
 **Status:** PLAN (current beta testing gap analysis @RW)
+
 **Date:** 2026-06-09
-**Owner docs:** `mlops_pipeline.md` (pipeline), `analytics/notes.md` (swarm), `planning_docs/BACKLOG.md` (tracking)
+
 **Builds on:** P15 deep-analysis loop (thoroughness gate, symmetric critic, immunity eligibility) and RSI loop memory (`rsi_ledger_v1.jsonl`, regression gate M-24, score export M-25)
 
 ---
@@ -40,25 +41,25 @@ measurement plane. Every step emits; nothing new blocks the hot path.
                         ┌──────────────────────────────────────────────────────┐
                         │              MEASUREMENT PLANE                       │
                         │                                                      │
- swarm investigation ──►│ InvestigationMetrics record (§4.4)                   │
+ swarm investigation ──►│ InvestigationMetrics record (§3.4)                   │
  (orchestrator/response)│   nexus.metrics.investigation (NATS)                 │
                         │   └─► investigation_metrics_v1 (parquet ledger)      │
                         │   └─► Prometheus counters/histograms (existing)      │
                         │                                                      │
- operator action ──────►│ Outcome join (§4.4): worker_rlhf labels +            │
+ operator action ──────►│ Outcome join (§3.4): worker_rlhf labels +            │
  (worker_rlhf)          │   SOAR callbacks + 24h re-infection check            │
                         │   └─► delayed ground truth per investigation         │
                         │                                                      │
- closed investigation ─►│ Replay Bench candidate (§4.3): alert + data slice    │
+ closed investigation ─►│ Replay Bench candidate (§3.3): alert + data slice    │
                         │   + entity graph + adjudicated label, frozen         │
                         │                                                      │
- RSI cycle ────────────►│ 09_benchmark_runner.py (§4.1) scores candidate       │
+ RSI cycle ────────────►│ 09_benchmark_runner.py (§3.1) scores candidate       │
  (08_rsi_loop.py)       │   └─► RSI_EVAL_SCORES_FILE (M-25 contract)           │
                         │   └─► regression gate vs deployed baseline (M-24)    │
                         │   └─► rsi_ledger_v1.jsonl gate_scores (P15)          │
                         │                                                      │
- deployment ───────────►│ Shadow/canary comparison (§6.2) + live-metric        │
- (make deploy)          │   rollback trigger (§6.3)                            │
+ promotion ────────────►│ Shadow/canary comparison (§5.2) + live-metric        │
+ (registry, §6)         │   rollback trigger (§5.3)                            │
                         └──────────────────────────────────────────────────────┘
 ```
 
@@ -78,12 +79,12 @@ New: `mlops/scripts/09_benchmark_runner.py` + `mlops/benchmarks/registry.toml`.
 * **Registry** declares each benchmark: id, version, capability axis, dataset path
   (`mlops/benchmarks/<id>/v<N>/`), scorer, target (model A/B/C/D, swarm-e2e), runtime budget,
   and whether it gates deploys or only trends.
-* **Runner** (DefenderBench pattern): one CLI, `--bench <id|tier>`, `--target <endpoint>`,
+* **Runner**: one CLI, `--bench <id|tier>`, `--target <endpoint>`,
   `--config <quant-config>`; emits one `BenchmarkResult` JSONL row per case and one
   aggregate row per run into `mlops/data/benchmark_runs_v1.jsonl`; also writes the flat
   `{metric: float}` file consumed by the M-24 regression gate (this **completes M-25** — the
   benchmark harness becomes the score producer the RSI loop is already waiting for).
-* **Tiers** (fail-fast ordering, see §6.1):
+* **Tiers** (fail-fast ordering, see §5.1):
   * `tier-0 canary` — ≤5 min, ~100 cases, every checkpoint, hard gate.
   * `tier-1 capability` — ~30 min, full per-model suites, every RSI cycle, regression-gated.
   * `tier-2 e2e` — hours, swarm-level replay + adversarial, weekly + before any production swap.
@@ -95,15 +96,15 @@ Mapped to existing assets so v1 is mostly *formalization*, not new data:
 | Axis | Target | Seed data (exists today) | New in this plan |
 |---|---|---|---|
 | Verdict accuracy (TP/FP per source_type) | Model C / swarm | golden datasets, hard-negative matrix | per-source_type breakouts, partial credit |
-| Hard-negative discrimination | Model C/D | `hard_negatives_sft_v1`, operator HNs | held-out HN split never used in training (§5.1) |
-| TTP / kill-chain sequencing (AttackSeqBench) | Model C / swarm | `cross_source_temporal_v1`, `kill_chain_sft_v1` | ordering/causality scoring, multi-event cases |
+| Hard-negative discrimination | Model C/D | `hard_negatives_sft_v1`, operator HNs | held-out HN split never used in training (§4.1) |
+| TTP / kill-chain sequencing | Model C / swarm | `cross_source_temporal_v1`, `kill_chain_sft_v1` | ordering/causality scoring, multi-event cases |
 | L7 forensic quality | Model B | Track 4 gates (≥95%) | graded rubric instead of threshold-only |
 | Governance determinism | Model D | `03_eval_critic.py` Phases 1–4 | trend export, cohort drill-down |
 | Injection/adversarial robustness | all + swarm | garak, PyRIT, CognitiveBypass | scores trended per release, not just pass/fail |
-| Investigation thoroughness | swarm-e2e | **new** — Replay Bench (§4.3) | gate-override rate, entity-resolution ratio, evidence citation |
-| CTI distillation (AthenaBench-style) | TI/RAG path | OpenCTI mirror, worker_ti_ingest corpus | report→IOC/TTP extraction set |
+| Investigation thoroughness | swarm-e2e | **new** — Replay Bench (§3.3) | gate-override rate, entity-resolution ratio, evidence citation |
+| CTI distillation | TI/RAG path | OpenCTI mirror, worker_ti_ingest corpus | report→IOC/TTP extraction set |
 
-### 3.3 Investigation Replay Bench (the ExCyTIn move — our biggest lever)
+### 3.3 Investigation Replay Bench (the biggest lever)
 
 Every closed investigation already contains everything a benchmark case needs: the
 `UnifiedAlertSchema` trigger, the Parquet slice the experts queried, the entity board with
@@ -114,12 +115,13 @@ outcome. Freeze it:
   entity_graph, adjudicated_label, operator_rubric?}` into `mlops/benchmarks/replay/v<N>/`.
 * Selection policy: all operator-overridden cases (the misses — highest value), a stratified
   sample of agreed cases, and every `manual_review_required` escalation.
-* Scoring: verdict correctness (partial credit per DFIR-Metric), blast-radius recall
-  (entities found vs adjudicated graph), evidence grounding (claims in the incident report
-  traceable to tool outputs — ExCyTIn's explainable-ground-truth property), and efficiency
-  (turns, tokens, tool errors).
-* This makes the benchmark **dynamic by construction** (AthenaBench): the suite grows from
-  live traffic, and rotates quarterly with dedup (§5.1).
+* Scoring: verdict correctness (graded, not binary — correct verdict with wrong entity
+  attribution scores between full credit and zero), blast-radius recall (entities found vs
+  adjudicated graph), evidence grounding (every claim in the incident report must be
+  traceable to a tool output in the frozen data slice — explainable ground truth), and
+  efficiency (turns, tokens, tool errors).
+* This makes the benchmark **dynamic by construction**: the suite grows from live traffic,
+  and rotates quarterly with dedup (§4.1).
 
 ### 3.4 Per-investigation metrics (the embedded part)
 
@@ -146,13 +148,13 @@ Derived longitudinal metrics (Grafana panels + weekly roll-up into the ledger):
 | Critic value | critic override rate split TP→FP vs FP-weak endorsements | is the check step earning its latency |
 | Immunity precision | immunity hits later contradicted by operator | memory-step safety |
 | MTTV / cost | median wall time, tokens, provider fallbacks per verdict | efficiency regression detection |
-| **Time-to-learn** | miss adjudicated → weights deployed that fix its replay case | §6 fail-fast headline KPI |
+| **Time-to-learn** | miss adjudicated → weights deployed that fix its replay case | §5 fail-fast headline KPI |
 
 Joining keys already exist: `event_id` flows through worker_rlhf (`nexus.training.rlhf`)
 and SOAR callbacks (`nexus.soar.callback`). The join job is a small batch script
 (`11_join_outcomes.py`), not a new service.
 
-### 3.5 Config-axis track (AQUA-LLM)
+### 3.5 Config-axis track (quantization × fine-tune)
 
 Each tier-1 run records the target config `{base_model, adapter_version, quant}` so the
 ledger can answer "did 4-bit NF4 cost us robustness on this release?" When an edge/quantized
@@ -162,9 +164,9 @@ quant × fine-tune matrix before promotion.
 ### 3.6 Baseline ladder
 
 Score context against: (a) base instruct model with no adapter, (b) previous deployed
-adapter (already the M-24 baseline), (c) where mirrorable, one public security fine-tune
-from the Awesome-LLM4Cybersecurity list. (a) and (c) run quarterly, not per-cycle —
-they answer "is fine-tuning still paying for itself?"
+adapter (already the M-24 baseline), (c) optionally one mirrored public security fine-tune
+as an external reference point. (a) and (c) run quarterly, not per-cycle — they answer
+"is fine-tuning still paying for itself?"
 
 ---
 
@@ -181,14 +183,14 @@ Evaluations are code + data; they get the same QA discipline as the pipeline.
 * **Balance & coverage audit**: class balance per axis, MITRE tactic coverage map, per
   source_type counts; published as a manifest next to the dataset with SHA-384 (same
   integrity pattern as model manifests).
-* **Refresh policy** (AthenaBench): quarterly rotation; retired cases archived, never
-  deleted (longitudinal comparability via anchor subset that persists across versions).
+* **Refresh policy**: quarterly rotation; retired cases archived, never deleted
+  (longitudinal comparability via an anchor subset that persists across versions).
 
 ### 4.2 Determinism & reproducibility
 
 * All scored runs at temperature ≤0.1 with the M-10 consistency sweep extended to benchmark
   cases: any case with consistency <0.8 across N=4 samples is flagged `unstable` and scored
-  by majority, reported separately (DFIR-Metric's "task understanding" spirit).
+  by majority, reported separately from the stable population.
 * `BenchmarkResult` rows carry `{bench_version, dataset_sha384, model_versions, seed,
   runner_git_sha}` — a score that can't be reproduced is a bug.
 
@@ -196,8 +198,8 @@ Evaluations are code + data; they get the same QA discipline as the pipeline.
 
 The LLM-as-Judge ensemble (`04_reward_model.py --mode judge`, 40% rule / 60% LLM) currently
 has no ground-truth check. Add: monthly sample of judge-scored verdicts double-scored by
-operators using the VADER-style rubric (report quality 30%, evidence grounding 40%,
-action appropriateness 30%); compute judge↔operator agreement (Cohen's κ); κ < 0.6 freezes
+operators using a weighted rubric (report quality 30%, evidence grounding 40%, action
+appropriateness 30%); compute judge↔operator agreement (Cohen's κ); κ < 0.6 freezes
 judge-weighted promotion until recalibrated.
 
 ### 4.4 Harness CI
@@ -237,7 +239,7 @@ checkpoints. Three changes:
   dispatched*; no SOAR, no memory writes). Disagreements with the champion are auto-queued
   for operator adjudication = highest-information labels first (uncertainty sampling).
 * **Miss-driven micro-batches**: an operator override (miss or FP-burden case) immediately
-  (a) freezes a replay case (§4.3) and (b) generates counterexamples via the existing
+  (a) freezes a replay case (§3.3) and (b) generates counterexamples via the existing
   critic loop into the next batch — without waiting for the 50-verdict threshold. The
   threshold remains for *full* retrains; micro LoRA deltas may train on ≥10 adjudicated
   misses but can only be promoted through the same tier-0 + alignment + regression gates.
@@ -254,12 +256,163 @@ checkpoints. Three changes:
 post-swap, compare the live metric stream (operator agreement, FP burden, MTTV, critic
 override rate) against the pre-swap 7-day baseline with simple control bands (e.g., 3σ or
 fixed floors); a breach pages the operator and (for the unattended RSI path) executes the
-existing symlink rollback. The shadow-mode comparison (§6.2) is the first line; this is
+registry rollback (§6.4). The shadow-mode comparison (§5.2) is the first line; this is
 the backstop when shadow traffic missed a regime.
 
 ---
 
-## 6. Phased Roadmap
+## 6. Pillar 4 — Training/Serving Plane Separation & Model Registry
+
+### 6.1 The coupling problem
+
+Today `mlops/` is one plane: data staging, training, eval gates, the RSI loop, *and*
+deployment share one directory, one dependency stack, and the analytics node's GPUs — and
+`make deploy` runs **from the training context** with the power to symlink-swap weights and
+restart `vllm-inference.service` in production. Three concrete failure modes follow:
+
+1. **Detection latency coupling.** Investigations time out at `NEXUS_INVESTIGATION_TIMEOUT`
+   (120s) and a timeout floods the manual-review queue. A ZeRO-3 run on the 24B Model B
+   saturating the same GPUs as vLLM causes exactly that — a training job degrades live
+   detection.
+2. **Security blast radius.** The training plane handles the most dangerous material in the
+   system (Firecracker detonation output, threat-feed mirrors, operator feedback, subprocess
+   orchestration in `08_rsi_loop.py`) *and* holds write/exec power over production serving.
+   Push-based deployment from that context is the wrong trust direction.
+3. **Lifecycle entanglement.** Training churns trl/peft/deepspeed/unsloth versions; serving
+   wants a stable vLLM. One stack means every training-dep upgrade risks the inference
+   container, and a crashed training run shares a failure domain with detection.
+
+### 6.2 Target topology
+
+Three components with one contract between each pair:
+
+```
+┌─────────────────────────────┐      ┌──────────────────────────┐      ┌──────────────────────────────┐
+│   TRAINING PLANE            │      │   MODEL REGISTRY         │      │   SERVING PLANE              │
+│                             │      │  (S3/MinIO bucket        │      │                              │
+│ stage_* / 01_spool          │      │   nexus-model-registry,  │      │ vllm-inference / vllm-critic │
+│ 02_train_* / 04_reward      │ push │   versioned prefixes)    │ pull │ vllm-network / baseline-     │
+│ 06_sandbox / 07_feed_ingest ├─────►│                          │◄─────┤ detector quadlets            │
+│ 05_critic_loop              │      │ <model>/<version>/       │      │                              │
+│ 09_benchmark_runner (§3.1)  │      │   weights|adapters/      │      │ model_steward (new):         │
+│ 08_rsi_loop (ends at        │      │   manifest.json          │      │  subscribes                  │
+│   PUBLISH, no deploy)       │      │   gate_scores.json       │      │  nexus.models.promote,       │
+│                             │      │                          │      │  pulls, verifies, swaps,     │
+│ NATS: nexus.models.promote ─┼──────┼──────────────────────────┼─────►│  probes, rolls back          │
+└─────────────────────────────┘      └──────────────────────────┘      └──────────────────────────────┘
+        full GPU bursts                  the only shared state            latency-stable, pull-only
+```
+
+The promotion message follows the existing `skill.update` hot-load pattern (NATS subject +
+payload validated against a schema + consumer-side verification) — the codebase already
+proves this handoff style works.
+
+### 6.3 Registry contract (`manifest.json` per version)
+
+```
+nexus-model-registry/<model_id>/<version>/manifest.json
+  model_id          "model_c" | "model_b" | "model_d" | "model_a"
+  version           monotonic, timestamped (e.g. 20260609T2200-c41)
+  base_model        hf_id + revision (from model_config.toml)
+  artifact_type     merged_weights | lora_adapter | onnx
+  quant             nf4-4bit | fp16 | onnx-int8 ...        (§3.5 config axis)
+  sha384_manifest   full-directory integrity map (existing pattern, ATLAS AML.T0044)
+  gate_scores       copied from rsi_ledger_v1.jsonl gate_scores for this cycle
+  gates_passed      [tier0, garak, pyrit, regression, alignment]
+  rsi_cycle_id      provenance link into the RSI ledger
+  bench_versions    {bench_id: dataset_sha384} the scores were measured against
+  promoted_at       ISO 8601 UTC
+```
+
+Promotion is **refused by the serving plane** unless: SHA-384 verifies, `gates_passed`
+contains the full required set, and `gate_scores` are present (no scores, no swap — the
+serving side re-enforces what the training side claims). Credentials via Vault
+(`nexus/models/registry_key`), per-plane: training gets write-only to the registry,
+serving gets read-only. Retention: keep N=3 versions per model + every version referenced
+by a ledger `deployed` record.
+
+### 6.4 Promotion, boot order, and rollback
+
+* **Promotion (pull-based):** `08_rsi_loop.py` ends its cycle at *publish* — it uploads
+  artifacts + manifest and emits `nexus.models.promote`. A new `model_steward` agent on the
+  serving plane (small Python service, quadlet-managed like the vLLM containers) pulls,
+  verifies (§6.3), atomic-symlink-swaps into the local model store, restarts the target
+  vLLM unit, runs the readiness probe (existing 12×10s), and acks
+  `nexus.models.promoted`/`nexus.models.rejected` so the RSI ledger records the real
+  outcome. The training plane loses all exec/write access to serving — the current
+  `make deploy` mechanics move into `model_steward`, they don't get rewritten.
+* **Boot order — provisioning-first, not runtime-dependent:** "training loads first" holds
+  at *provisioning* time: the deployment_prep bundle ships gate-passed baseline weights as
+  registry version 0, so production never boots ungated weights. At *runtime* the
+  dependency is inverted: serving boots self-sufficiently from its local last-known-good
+  model store and never blocks on training-plane availability. Detection availability must
+  not depend on learning availability. **Fail-open serving, fail-closed promotion** — the
+  same asymmetry as the critic.
+* **Rollback = re-pin:** rollback (readiness failure, or the §5.3 live-metric breach)
+  becomes "re-pin previous registry version," symmetric with promotion and recorded in the
+  ledger. The shadow champion/challenger (§5.2) is served the same way — a challenger is
+  just a registry version pulled into a second adapter slot, which is why this pillar is a
+  prerequisite for Phase B3.
+
+### 6.5 Plane decomposition of today's `mlops/`
+
+| Component | Plane | Notes |
+|---|---|---|
+| `stage_*`, `01_spool`, `corpus_templates/`, `06_sandbox_runner`, `07_feed_ingest` | training | data + detonation never touch serving |
+| `02_train_*`, `04_reward_model`, `05_critic_loop`, `02_train_qlora --rlhf-mode *` | training | full GPU bursts allowed |
+| `03_eval_*`, garak/PyRIT, `09_benchmark_runner` tier-0/1 | training | pre-promotion gates run where the candidate lives |
+| `08_rsi_loop.py` | training | `make deploy` call replaced by publish (§6.4) |
+| `04_merge_weights.py` + manifest generation | training | output goes to registry, not to a serving path |
+| registry bucket + manifest schema | contract | the only shared state |
+| `model_steward` (new), vLLM quadlets, `serve_vllm.sh`, `05_serve_*` | serving | pull, verify, swap, probe, rollback |
+| tier-2 e2e smoke + live-metric rollback (§5.3) | serving | post-pull acceptance runs against the *served* endpoint |
+| `skills_v1.jsonl` hot-load | unchanged | already follows this pattern |
+
+### 6.6 Hardware: logical-first, physical when available
+
+Sovereign deployments may have a single GPU node, so the split is **by contract first,
+metal second**: separate quadlets, separate unix users, cgroup CPU/memory isolation, and
+either scheduled training windows or MIG/`CUDA_VISIBLE_DEVICES` partitioning on shared
+GPUs. Every interface above is identical when a dedicated training node arrives (already
+the trajectory for the Model C 70B upgrade), so the physical split is a host-inventory
+change in Ansible, not a redesign.
+
+### 6.7 Trade-off summary
+
+| | Split (this design) | Status quo (single plane) |
+|---|---|---|
+| Detection latency under training load | isolated (windows/MIG or separate node) | vLLM competes with ZeRO-3; investigation timeouts |
+| Trust direction | serving pulls signed artifacts; training has zero exec into prod | training context restarts production services |
+| Ungated weights in prod | impossible (steward refuses manifest without gates_passed) | possible via direct `make deploy` |
+| Shadow/challenger (B3), live rollback (B4) | native (registry versions, re-pin) | requires ad-hoc filesystem juggling |
+| Dependency lifecycles | independent bundles per plane | one stack; training churn risks inference |
+| Failure domains | training crash invisible to detection | shared node/service blast radius |
+| Cost | registry + steward + one more contract to test; 2 air-gap bundles | none (already built) |
+| Drift risk | new seam — needs `lab_infra_contracts` coverage from day one | no new seam (but implicit coupling everywhere) |
+| Learn-loop latency | +publish/pull step (automated, minutes) | direct swap |
+
+The cost column is real but bounded: the registry is an S3 prefix scheme on the MinIO that
+already exists, the steward reuses the current deploy/rollback code, and the contract-test
+pattern is established. The implicit-coupling row is the deciding one — the status quo's
+"no new seam" hides that training and serving are already coupled everywhere *without* a
+tested contract.
+
+### 6.8 Contract tests (non-negotiable, day one)
+
+The P13 QA cycle proved cross-layer vocabulary drift is this project's dominant failure
+mode. The registry seam ships with its contract suite or not at all:
+
+* manifest schema round-trip + rejection tests (missing gates, bad SHA-384, unknown quant);
+* `nexus.models.promote`/`promoted`/`rejected` subjects asserted in both publisher and
+  steward source + NATS authorization config (training user: publish-only; steward:
+  subscribe + ack publish);
+* steward refuses unverifiable manifests; rollback re-pin restores byte-identical prior
+  version; boot-from-local-cache works with the registry unreachable;
+* `08_rsi_loop.py` source contract: no `make deploy` invocation remains.
+
+---
+
+## 7. Phased Roadmap
 
 **Phase B0 — Contracts & plumbing (1 sprint)**
 `InvestigationMetrics` schema + NATS subject + parquet ledger writer in the orchestrator;
@@ -279,26 +432,38 @@ Dataset manifests + SHA-384, balance audits, consistency-sweep integration, judg
 calibration sampling + κ gate, `validate_pipeline.py` checks. *Acceptance: registering a
 bench with training-set leakage fails CI.*
 
-**Phase B3 — Fail-fast learning (2 sprints, needs production traffic)**
-Shadow champion/challenger; miss-driven micro-batch path with full gate reuse;
-failure-clustering gap reports; time-to-learn KPI on the ledger. *Acceptance: a seeded
-synthetic miss travels adjudication → replay case → micro-batch → gated deploy in <72h
-in the lab.*
+**Phase B2.5 — Plane split & model registry (1–2 sprints, prerequisite for B3/B4)**
+Registry bucket + manifest schema (§6.3); `model_steward` on the serving plane (deploy/
+rollback mechanics moved out of the Makefile training context); `08_rsi_loop.py` ends at
+publish; `nexus.models.promote/promoted/rejected` subjects + NATS per-plane authorization;
+deployment_prep ships baseline weights as registry v0; contract suite (§6.8).
+*Acceptance: a manifest with a missing gate or bad SHA-384 is refused by the steward;
+serving boots from local cache with the registry down; promotion and re-pin rollback both
+recorded in the RSI ledger.*
 
-**Phase B4 — Live rollback + config matrix (1 sprint)**
-24h post-deploy control bands + auto-rollback; AQUA-LLM quant matrix for Model A ONNX and
-any quantized variant; baseline-ladder quarterly run. *Acceptance: injected metric
-degradation in the lab triggers rollback without human action.*
+**Phase B3 — Fail-fast learning (2 sprints, needs B2.5 + production traffic)**
+Shadow champion/challenger (challenger = second registry version in a second adapter slot);
+miss-driven micro-batch path with full gate reuse; failure-clustering gap reports;
+time-to-learn KPI on the ledger. *Acceptance: a seeded synthetic miss travels
+adjudication → replay case → micro-batch → gated promotion in <72h in the lab.*
+
+**Phase B4 — Live rollback + config matrix (1 sprint, needs B2.5)**
+24h post-deploy control bands + auto re-pin rollback via the steward; quantization ×
+fine-tune matrix for Model A ONNX and any quantized variant; baseline-ladder quarterly
+run. *Acceptance: injected metric degradation in the lab triggers re-pin without human
+action.*
 
 Proposed backlog IDs (to be added to `planning_docs/BACKLOG.md` §1.2/§5 when implementation
 starts): **M-26** runner+registry, **M-27** investigation metrics + outcome join, **M-28**
 replay bench, **M-29** tier-0 canary in RSI loop, **M-30** shadow champion/challenger,
-**M-31** micro-batch miss path, **M-32** live-metric rollback, **Q-19** bench CI section,
-**Q-20** leakage/judge-calibration gates. M-25 is absorbed by M-26.
+**M-31** micro-batch miss path, **M-32** live-metric rollback, **M-33** model registry +
+manifest contract, **M-34** model_steward serving agent (deploy logic relocated),
+**Q-19** bench CI section, **Q-20** leakage/judge-calibration gates, **Q-21** registry/
+promotion contract tests. M-25 is absorbed by M-26.
 
 ---
 
-## 7. KPIs — how we know the program itself works
+## 8. KPIs — how we know the program itself works
 
 | KPI | Baseline (today) | Target after B4 |
 |---|---|---|
@@ -308,10 +473,12 @@ replay bench, **M-29** tier-0 canary in RSI loop, **M-30** shadow champion/chall
 | Doomed-checkpoint cost | full gate suite per attempt | tier-0 catches ≥80% of eventual gate failures in ≤5 min |
 | Benchmark trust | none (no leakage/judge checks) | 0 leaked cases; judge κ ≥ 0.6 |
 | Regression-gate coverage | vacuous (no scores file) | every deploy gated on ≥6 capability axes |
+| Weight provenance | symlink swap from training context | every served weight traceable to a signed registry manifest + gate scores |
+| Detection latency under training | shared GPUs, unmeasured | MTTV stable (±10%) during training windows |
 
 ---
 
-## 8. Risks & guardrails
+## 9. Risks & guardrails
 
 * **Goodhart on embedded metrics** — agreement rate can be gamed by timid verdicts. Always
   pair: agreement *and* miss proxy; FP burden *and* recall on replay misses. The regression
@@ -321,7 +488,12 @@ replay bench, **M-29** tier-0 canary in RSI loop, **M-30** shadow champion/chall
 * **Shadow-mode leakage into memory** — challenger paths must be hard-blocked from RAG
   writes, SOAR, and the immunity path (same pattern as the canary tripwire: assert in code,
   test in lab_agentic_swarm).
+* **Registry seam drift** — the plane split adds the one thing P13 proved dangerous: a new
+  cross-layer contract. Mitigation is structural: the §6.8 contract suite ships *with* the
+  seam (manifest schema, NATS subjects + per-plane authorization, refuse-on-unverifiable,
+  boot-with-registry-down), not after it.
 * **Air-gap discipline** — all external benchmark data via `data/ti_feeds/` mirrors;
-  `09_benchmark_runner.py` runs with `TRANSFORMERS_OFFLINE=1` like every RSI subprocess.
+  `09_benchmark_runner.py` runs with `TRANSFORMERS_OFFLINE=1` like every RSI subprocess;
+  the registry lives on the internal MinIO — promotion never crosses the enclave boundary.
 * **Privacy/sovereignty** — replay cases contain real telemetry; they live under the same
   storage controls as cold storage and never enter any externally-shared artifact.
