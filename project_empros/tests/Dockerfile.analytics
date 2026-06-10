@@ -1,21 +1,22 @@
 # SECTION: analytics
 # Tests:   lab_analytics_hunter/, lab_agentic_swarm/, lab_redteam/
-# Deps:    pytest, pydantic, PyYAML, numpy
+# Deps:    pytest, pydantic, PyYAML, numpy, duckdb/pandas/pyarrow
 #          (langchain_core / nats / redis / prometheus are stubbed in each test)
 #   docker build -f project_empros/tests/Dockerfile.analytics -t nexus-test-analytics .
-FROM docker.io/alpine:3.23
-
-RUN apk add --no-cache python3 py3-pip
+FROM docker.io/python:3.12-slim
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-RUN pip3 install --no-cache-dir \
+RUN pip install --no-cache-dir \
     "pytest>=7.4.0" \
     "numpy>=2.0.0" \
     "pydantic>=2.7.1" \
-    "PyYAML>=6.0"
+    "PyYAML>=6.0" \
+    "duckdb>=0.10.2" \
+    "pandas>=2.2.0" \
+    "pyarrow>=16.0.0"
 
 COPY project_empros/analytics/llm_hunter/       /repo/project_empros/analytics/llm_hunter/
 COPY project_empros/tests/lab_analytics_hunter/ /repo/project_empros/tests/lab_analytics_hunter/

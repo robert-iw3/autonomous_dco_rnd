@@ -5,10 +5,14 @@ Host Forensics Expert -- endpoint execution anomalies (Linux Sentinel / Windows 
 import logging
 
 from tools import HOST_ANALYST_TOOLS
+from tools.query_cookbook import render_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
 logger = logging.getLogger("nexus-host-expert")
+
+HOST_SENSORS = ["linux_sentinel", "windows_deepsensor", "sysmon_sensor",
+                "macos_sensor", "trellix_ens"]
 
 host_sop_prompt = """You are the Host Forensics Expert for an autonomous SOC Swarm.
 Your objective is to investigate endpoint execution anomalies using DuckDB and Qdrant.
@@ -69,6 +73,10 @@ CONSTRAINTS:
 - Do not guess column names. Rely strictly on the schemas provided above.
 - Provide a clear, step-by-step summary of the execution chain before yielding back to the Supervisor.
 """
+
+# Seed the expert with concrete, schema-correct DuckDB starting points. Better
+# query logic up front means fewer wasted turns and a more complete blast radius.
+host_sop_prompt += "\n\n" + render_playbook(HOST_SENSORS)
 
 EXECUTORS = make_executors(HOST_ANALYST_TOOLS, temperature=0.0)
 

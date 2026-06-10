@@ -5,10 +5,15 @@ Cloud Infrastructure Forensics Expert -- AWS and Azure telemetry.
 import logging
 
 from tools import CLOUD_ANALYST_TOOLS
+from tools.query_cookbook import render_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
 logger = logging.getLogger("nexus-cloud-expert")
+
+CLOUD_SENSORS = ["aws_vpc", "aws_cloudtrail", "aws_guardduty", "azure_nsg",
+                 "azure_activity", "azure_entraid", "gcp_audit", "gcp_scc",
+                 "gcp_vpc_flow", "vmware_syslog"]
 
 cloud_sop_prompt = """You are the Cloud Infrastructure Forensics Expert for an autonomous SOC Swarm.
 Your objective is to investigate anomalies originating from AWS, Azure, GCP, and VMware cloud/virtualization telemetry.
@@ -122,6 +127,8 @@ CONSTRAINTS:
 - Use ORDER BY timestamp DESC LIMIT 50 on all queries.
 - Parse sensor_id components (pipe-delimited) to extract account/subscription, environment, and region.
 """
+
+cloud_sop_prompt += "\n\n" + render_playbook(CLOUD_SENSORS)
 
 EXECUTORS = make_executors(CLOUD_ANALYST_TOOLS, temperature=0.0)
 

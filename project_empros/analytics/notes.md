@@ -158,6 +158,50 @@ LLM and embedder plumbing lives once in `llm_providers.py`.
 
 ### Changelog
 
+10JUN2026 -- Query Cookbook (DuckDB query logic up front):
+
+**Problem.** Expert SOPs described *what* to look for in prose but never *how* to
+write the query, so the model improvised SQL on every investigation --
+inconsistent column names, unbounded scans, missed aggregations, no temporal
+windowing. Detection quality is bounded by query quality.
+
+**`tools/query_cookbook.py`** -- a curated library of 30 parameterized,
+schema-correct, guardrail-safe DuckDB `QueryPattern`s, ordered by the seven
+investigative phases (introspect → scope → lineage → correlate → aggregate →
+nullify → pivot). Each carries the sensor(s) it targets, MITRE IDs, a
+`str.format` SQL template (`{src}` = S3 glob, value slots filled from the alert),
+and a NOTE on when to use it. `SENSOR_SCHEMA` is the production cold-storage
+column contract (from the SOPs -- distinct from the training *staging* schema in
+`tests/test_s3_query_alignment.py`); `render_playbook(sensors)` produces the
+prompt block. This is the analytical counterpart to the corpus
+`s3_query.where` detection predicates: predicates answer "does this row match
+the TTP?", cookbook patterns answer "what happened around the alert, and can I
+disprove the benign hypothesis?".
+
+**Wiring.** Every expert appends `render_playbook(<its sensors>)` to its SOP --
+host (5 sensors, 14 patterns), net (3, 8), cloud (10, 7), nettap (1, 7) -- so
+each agent starts from proven query logic and adapts, rather than discovering
+SQL from scratch. They are explicitly told these are starting points to adapt
+and combine -- the better the priors, the fewer wasted turns and the more
+complete the blast-radius resolution (which the P15 thoroughness gate rewards).
+
+**Schema fidelity caught real bugs.** A static + executable column audit found
+`windows_c2` uses capitalized `DestIp`/`Port` (not `dst_ip`), `suricata_eve`
+uses `dest_ip`, and `network_tap` uses `timestamp_start` -- patterns spanning
+those were split per-schema (`c2_jitter_beacon_win`, `suricata_ioc_summary`).
+
+**Tests.** `tests/lab_analytics_hunter/test_query_cookbook.py` (+163 cases):
+every pattern × sensor EXECUTES against a synthetic table built from exactly that
+sensor's schema (a missing column is a DuckDB binder error -> fail; the cookbook
+analogue of `test_track6_dryrun`), passes the real DuckDBQueryTool guardrail
+regexes (lifted from source via `ast`, no package import), is bounded + read-only,
+and `render_playbook` resolves `{src}` to the cold-storage glob in phase order.
+`Dockerfile.analytics` moved Alpine→`python:3.12-slim` for DuckDB glibc wheels.
+`mlops/corpus_templates/QUERY_PATTERNS.md` documents the predicate↔cookbook
+alignment and the predicate-authoring checklist. analytics section 228→391.
+
+---
+
 09JUN2026 -- Deep-Analysis Loop (trigger → context → action → check → memory):
 
 **1 -- Deterministic thoroughness gate (supervisor).** The "clear every entity

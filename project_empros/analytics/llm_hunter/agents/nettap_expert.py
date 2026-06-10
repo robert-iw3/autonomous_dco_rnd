@@ -6,10 +6,13 @@ import logging
 from typing import Dict, Any
 
 from tools import NETTAP_ANALYST_TOOLS
+from tools.query_cookbook import render_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
 logger = logging.getLogger("nexus-nettap-expert")
+
+NETTAP_SENSORS = ["network_tap"]
 
 nettap_sop_prompt = """You are the Network Tap Forensics Expert for an autonomous SOC Swarm.
 Your objective is to investigate anomalies from the enterprise network defense stack --
@@ -85,6 +88,8 @@ CONSTRAINTS:
 - Prefer aggregations (GROUP BY, COUNT, AVG) over raw row retrieval.
 - When pivoting on JA3 hashes or IPs, use list(DISTINCT ...) to summarize infrastructure.
 """
+
+nettap_sop_prompt += "\n\n" + render_playbook(NETTAP_SENSORS)
 
 
 def _baseline_context(alert: Dict[str, Any]) -> str:
