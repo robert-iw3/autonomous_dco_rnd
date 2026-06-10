@@ -223,6 +223,7 @@ from state import (
     GLOBAL_DO_NOT_PIVOT,
     MAX_ENTITIES,
 )
+import state as _state
 from sanitizer import CognitiveSanitizer
 
 # Import orchestrator for live routing functions
@@ -399,8 +400,32 @@ class TestSupervisorRouter:
         state = {"verdict": {"is_true_positive": True}}
         assert _orch.supervisor_router(state) == "critic"
 
-    def test_false_positive_verdict_routes_to_response_agent(self):
+    def test_high_confidence_fp_routes_to_response_agent(self):
+        # A strong dismissal (>= FP_CONFIDENCE_GATE, complete analysis) skips review.
+        state = {"verdict": {"is_true_positive": False, "confidence": 0.95},
+                 "analysis_complete": True}
+        assert _orch.supervisor_router(state) == "response_agent"
+
+    def test_low_confidence_fp_routes_to_critic(self):
+        # A weak dismissal must survive Red-Team review before it can be stored.
+        state = {"verdict": {"is_true_positive": False, "confidence": 0.40},
+                 "analysis_complete": True}
+        assert _orch.supervisor_router(state) == "critic"
+
+    def test_fp_without_confidence_routes_to_critic(self):
+        # Missing confidence is treated as 0.0 -- never an unreviewed dismissal.
         state = {"verdict": {"is_true_positive": False}}
+        assert _orch.supervisor_router(state) == "critic"
+
+    def test_incomplete_analysis_fp_routes_to_critic(self):
+        # Unresolved blast radius forces review even at high confidence.
+        state = {"verdict": {"is_true_positive": False, "confidence": 0.95},
+                 "analysis_complete": False}
+        assert _orch.supervisor_router(state) == "critic"
+
+    def test_fp_at_exact_gate_routes_to_response_agent(self):
+        state = {"verdict": {"is_true_positive": False,
+                             "confidence": _state.FP_CONFIDENCE_GATE}}
         assert _orch.supervisor_router(state) == "response_agent"
 
     def test_no_verdict_routes_to_response_agent(self):
@@ -414,6 +439,94 @@ class TestSupervisorRouter:
     def test_missing_verdict_key_routes_to_response_agent(self):
         state = {}
         assert _orch.supervisor_router(state) == "response_agent"
+
+
+# ── D2. Deep-analysis loop: thoroughness gate + immunity eligibility ─────────
+
+SUPERVISOR_SRC  = (HUNTER_DIR / "agents/supervisor.py").read_text()
+RESPONSE_SRC    = (HUNTER_DIR / "agents/response.py").read_text()
+CRITIC_SRC      = (HUNTER_DIR / "agents/critic.py").read_text()
+EXPERT_BASE_SRC = (HUNTER_DIR / "agents/expert_base.py").read_text()
+
+
+class TestThoroughnessGate:
+    """The FINISH gate must be deterministic code in the supervisor node,
+    bounded by MAX_GATE_OVERRIDES, and escalate (not dismiss) on exhaustion."""
+
+    def test_state_tracks_gate_overrides(self):
+        assert "gate_overrides" in _state.InvestigativeState.__annotations__
+
+    def test_state_tracks_analysis_complete(self):
+        assert "analysis_complete" in _state.InvestigativeState.__annotations__
+
+    def test_max_gate_overrides_bounded(self):
+        assert isinstance(_state.MAX_GATE_OVERRIDES, int)
+        assert _state.MAX_GATE_OVERRIDES >= 1
+
+    def test_supervisor_enforces_gate_in_node(self):
+        assert "THOROUGHNESS GATE" in SUPERVISOR_SRC
+        assert "gate_overrides" in SUPERVISOR_SRC
+
+    def test_gate_rejects_finish_over_unresolved_board(self):
+        # FINISH + unresolved entities must re-route, never pass the verdict through.
+        assert "_unresolved_entities" in SUPERVISOR_SRC
+        assert "route_for_source_type" in SUPERVISOR_SRC
+
+    def test_gate_exhaustion_marks_analysis_incomplete(self):
+        assert '"analysis_complete": False' in SUPERVISOR_SRC
+
+    def test_blast_radius_cap_marks_analysis_incomplete(self):
+        # The forced-FINISH cap path must also carry the incomplete flag.
+        cap_block = SUPERVISOR_SRC.split("BLAST RADIUS]")[1].split("def ")[0]
+        assert '"analysis_complete": False' in cap_block
+
+    def test_orchestrator_seeds_gate_keys_in_initial_state(self):
+        assert '"gate_overrides": 0' in ORCHESTRATOR_SRC
+        assert '"analysis_complete": None' in ORCHESTRATOR_SRC
+
+    def test_shared_route_helper_matches_initial_route(self):
+        for source_type, expected in [
+            ("aws_cloudtrail", "cloud_expert"), ("azure_nsg", "cloud_expert"),
+            ("network_tap", "nettap_expert"), ("suricata_eve", "net_expert"),
+            ("linux_c2", "net_expert"), ("sysmon_sensor", "host_expert"),
+        ]:
+            assert _state.route_for_source_type(source_type) == expected
+            assert _orch._initial_route(source_type) == expected
+
+    def test_expert_tasking_lists_unresolved_entity_board(self):
+        assert "UNRESOLVED ENTITY BOARD" in EXPERT_BASE_SRC
+        # Entity notes can carry adversary-influenced pivot strings.
+        assert "neutralize_string" in EXPERT_BASE_SRC
+
+
+class TestImmunityEligibility:
+    """Only complete-analysis FP verdicts at/above FP_CONFIDENCE_GATE may mint
+    immunity memory; the supervisor must refuse to act on ineligible points."""
+
+    def test_fp_confidence_gate_in_valid_range(self):
+        assert 0.0 < _state.FP_CONFIDENCE_GATE <= 1.0
+
+    def test_memory_payload_carries_immunity_flag(self):
+        assert '"immunity_eligible"' in RESPONSE_SRC
+
+    def test_response_computes_eligibility_from_gate_and_completeness(self):
+        assert "FP_CONFIDENCE_GATE" in RESPONSE_SRC
+        assert "analysis_complete" in RESPONSE_SRC
+
+    def test_supervisor_recall_checks_eligibility(self):
+        assert 'payload.get("immunity_eligible"' in SUPERVISOR_SRC
+
+    def test_incomplete_analysis_surfaces_as_manual_review(self):
+        # A dismissal over an unresolved blast radius must hit the manual queue,
+        # not vanish as a silent no-action FP.
+        assert '"action_type": "manual_review_required"' in RESPONSE_SRC
+
+    def test_critic_reviews_fp_dismissals(self):
+        assert "FALSE POSITIVE" in CRITIC_SRC
+        assert "EVIDENCE OF WORK" in CRITIC_SRC
+
+    def test_critic_never_escalates_to_containment(self):
+        assert "never escalate to containment" in CRITIC_SRC
 
 
 # ── E & F. Canary generation ──────────────────────────────────────────────────

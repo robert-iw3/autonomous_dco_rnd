@@ -48,15 +48,17 @@ RUN pip install --no-cache-dir bitsandbytes || \
 
 # Mirror repo layout: project_empros at /repo/project_empros, windows at /repo/windows
 # so REPO.parent/windows resolves correctly for test_phase1_pipeline.py
-COPY project_empros/mlops/                          /repo/project_empros/mlops/
-COPY project_empros/services/worker_ti_ingest/      /repo/project_empros/services/worker_ti_ingest/
-COPY project_empros/tests/test_phase1_pipeline.py   /repo/project_empros/tests/
-COPY project_empros/tests/test_phase2_pipeline.py   /repo/project_empros/tests/
-COPY project_empros/tests/test_phase3_guardrails.py /repo/project_empros/tests/
-COPY project_empros/tests/lab_mlops_serving/        /repo/project_empros/tests/lab_mlops_serving/
-COPY project_empros/tests/lab_mlops_train/          /repo/project_empros/tests/lab_mlops_train/
-COPY project_empros/tests/pytest.ini                /repo/project_empros/tests/
-COPY windows/                                       /repo/windows/
+COPY project_empros/mlops/                                  /repo/project_empros/mlops/
+COPY project_empros/services/worker_ti_ingest/              /repo/project_empros/services/worker_ti_ingest/
+COPY project_empros/tests/test_phase1_pipeline.py           /repo/project_empros/tests/
+COPY project_empros/tests/test_phase2_pipeline.py           /repo/project_empros/tests/
+COPY project_empros/tests/test_phase3_guardrails.py         /repo/project_empros/tests/
+COPY project_empros/tests/lab_mlops_serving/                /repo/project_empros/tests/lab_mlops_serving/
+COPY project_empros/tests/lab_mlops_train/                  /repo/project_empros/tests/lab_mlops_train/
+COPY project_empros/tests/pytest.ini                        /repo/project_empros/tests/
+COPY project_empros/tests/Execute-CognitiveBypass.sh        /repo/project_empros/tests/
+COPY project_empros/tests/Invoke-CrossPollinationStress.py  /repo/project_empros/tests/
+COPY windows/                                               /repo/windows/
 
 ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
 WORKDIR /repo/project_empros

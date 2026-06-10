@@ -80,11 +80,15 @@ back to the supervisor rather than its full ReAct transcript.
   detection, plus a Model-A baseline-reconstruction cross-reference path.
 
 ### 7. Critic -- independent Red-Team review (`critic.py`)
-Routed to only when the supervisor proposes a True Positive. Grades evidence on
-three axes (benign alternative ruled out, behavioral proof of execution, blast
-radius fully cleared) and may override to dismiss. It **fails closed**: if every
-LLM provider is unreachable it demotes to `monitor` rather than letting an
-unreviewed containment proceed.
+Review is **symmetric**: routed to when the supervisor proposes a True Positive
+(grades benign alternative ruled out, behavioral proof of execution, blast
+radius fully cleared; may override to dismiss) AND when it proposes a weak
+False Positive -- confidence below `FP_CONFIDENCE_GATE` or an incomplete blast
+radius (grades evidence of work, unexplained behavior, blast radius; an
+unendorsed dismissal is returned at low confidence so it can never mint
+immunity, and the critic never escalates to containment itself). It **fails
+closed**: if every LLM provider is unreachable it demotes to `monitor` rather
+than letting an unreviewed containment proceed.
 
 ### 8. Response -- report, governance, action, memory (`response.py`)
 * Synthesizes the `messages` history into a chronological Markdown incident report.
@@ -153,6 +157,48 @@ LLM and embedder plumbing lives once in `llm_providers.py`.
 ---
 
 ### Changelog
+
+09JUN2026 -- Deep-Analysis Loop (trigger → context → action → check → memory):
+
+**1 -- Deterministic thoroughness gate (supervisor).** The "clear every entity
+before FINISH" rule was prompt-only; nothing stopped a lazy FINISH over a
+'pending' blast radius. The gate now lives in code in the supervisor node
+(mirroring the blast-radius cap relocation): a FINISH with unresolved entities
+is rejected and re-routed to the responsible expert (shared
+`route_for_source_type` in `state.py`), bounded by `NEXUS_MAX_GATE_OVERRIDES`
+(default 2, tracked in `gate_overrides`). On exhaustion the verdict is accepted
+but marked `analysis_complete=False` -- critic-reviewed, surfaced as
+`manual_review_required`, never a silent dismissal. The blast-radius-cap and
+all-providers-failed paths also mark `analysis_complete=False` (the cap
+previously *said* "escalated for manual review" but published nothing).
+
+**2 -- Symmetric critic (the FP self-poisoning fix).** Previously only True
+Positives were critic-reviewed; a wrong FP went straight to response and was
+written into RAG memory, where immunity would auto-dismiss that signature
+forever. `supervisor_router` now also routes FP verdicts with confidence below
+`FP_CONFIDENCE_GATE` (env `NEXUS_FP_CONFIDENCE_GATE`, default 0.80) or
+`analysis_complete=False` through the critic, whose prompt gained a
+dismissal-review branch (evidence of work / unexplained behavior / blast
+radius). An unendorsed dismissal comes back at low confidence by instruction.
+
+**3 -- Immunity eligibility (memory step hardened).** `_persist_memory` now
+stamps `immunity_eligible` on every point: true only for an FP with
+`analysis_complete` and confidence ≥ `FP_CONFIDENCE_GATE` (i.e. strong enough
+to skip the critic, or critic-endorsed). The supervisor's recall refuses to
+short-circuit on ineligible points (legacy points without the flag default to
+eligible). Invariant: **only check-passed verdicts grant immunity.**
+
+**4 -- Unresolved entity board in expert tasking.** Experts previously saw only
+the anchor alert; temporal-pivot entities sat 'pending' with nobody explicitly
+tasked. `expert_base.run_expert` now renders every pending/investigating entity
+(notes neutralized -- pivot values are adversary-influenced) with the
+instruction to mark each cleared/malicious before concluding.
+
+Contract tests: `lab_agentic_swarm` TestThoroughnessGate +
+TestImmunityEligibility + router additions (228 passing);
+`lab_analytics_hunter` routing source checks moved to `state.py`.
+
+---
 
 29MAY2026:
 

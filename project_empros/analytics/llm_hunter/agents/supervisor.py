@@ -8,10 +8,12 @@ import logging
 from typing import Literal, Optional, Dict, List, Any
 
 import duckdb
+from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 
-from state import InvestigativeState, VerdictSchema, MAX_ENTITIES, build_memory_signature
+from state import (InvestigativeState, VerdictSchema, MAX_ENTITIES, MAX_GATE_OVERRIDES,
+                   build_memory_signature, route_for_source_type)
 from agents.llm_providers import (build_failover_chain, get_embedder, CONFIG,
                                    circuit_is_callable, record_call_success, record_call_failure)
 from tools.nexus_config import apply_s3_settings
@@ -131,6 +133,14 @@ async def _temporal_pivot(trigger_time, source_endpoint, source_type, source_eve
     )
 
 
+def _unresolved_entities(entities: Dict[str, dict]) -> List[str]:
+    """Entity IDs whose blast-radius status is not yet a terminal cleared/malicious."""
+    return [
+        entity_id for entity_id, data in (entities or {}).items()
+        if str(data.get("status", "pending")).lower() in ("pending", "investigating")
+    ]
+
+
 # Structured output the LLM must generate to control the graph.
 class SupervisorDecision(BaseModel):
     reasoning: str = Field(description="Why you are making this routing decision.")
@@ -163,7 +173,7 @@ AVAILABLE EXPERTS:
 DETERMINISTIC ROUTING LOGIC (STRICT):
 1. Review the BLAST RADIUS state machine above.
 2. If ANY entity has a status of 'pending' or 'investigating', you MUST route to the appropriate expert to clear it.
-3. If ALL entities have a status of 'cleared' or 'malicious', the investigation is complete. You MUST set next_agent to 'FINISH' and generate a VerdictSchema. Do not loop back to the experts if the board is clear.
+3. If ALL entities have a status of 'cleared' or 'malicious', the investigation is complete. You MUST set next_agent to 'FINISH' and generate a VerdictSchema. Do not loop back to the experts if the board is clear. A FINISH issued while any entity is still 'pending' or 'investigating' is REJECTED by a deterministic gate and re-routed to an expert -- verdicts are only accepted over a fully resolved board.
 4. SOURCE-TYPE ROUTING:
    - source_type in {sysmon_sensor, windows_deepsensor, linux_sentinel, macos_sensor, trellix_ens} → route to 'host_expert'.
    - source_type starts with 'aws_', 'azure_', 'gcp_', or 'vmware_' → route to 'cloud_expert'.
@@ -197,6 +207,9 @@ async def supervisor_agent(state: InvestigativeState):
                 ),
                 "recommended_action": "monitor",
             },
+            # Forced halt: the blast radius was never cleared, so this verdict must
+            # not be trusted as a reviewed dismissal nor mint immunity memory.
+            "analysis_complete": False,
         }
 
     # ── 1. RAG-Driven Immunity (Memory Recall) -- aligned signature ──
@@ -212,7 +225,11 @@ async def supervisor_agent(state: InvestigativeState):
                 limit=1,
                 score_threshold=IMMUNITY_THRESHOLD,
             )
-            if hits and not hits[0].payload.get("is_true_positive", True):
+            # Immunity requires an *eligible* stored FP: complete blast radius and
+            # confidence at/above FP_CONFIDENCE_GATE (critic-reviewed otherwise).
+            # Default True only for legacy points written before the flag existed.
+            if (hits and not hits[0].payload.get("is_true_positive", True)
+                    and hits[0].payload.get("immunity_eligible", True)):
                 m = hits[0]
                 logger.warning(
                     f"RAG IMMUNITY TRIGGERED: match with historical False Positive "
@@ -229,6 +246,7 @@ async def supervisor_agent(state: InvestigativeState):
                         ),
                         "recommended_action": "monitor",
                     },
+                    "analysis_complete": True,
                 }
         except Exception as e:
             logger.error(f"Memory recall failed, proceeding with standard investigation: {e}")
@@ -314,14 +332,79 @@ async def supervisor_agent(state: InvestigativeState):
                 "justification": f"All LLM providers failed. Last: {last_error}",
                 "recommended_action": "monitor",
             },
+            # No analysis happened at all -- never a trusted dismissal.
+            "analysis_complete": False,
             **({"entities_of_interest": temporal_entities} if temporal_entities else {}),
         }
+
+    # ── 4. Deterministic Thoroughness Gate (enforced in code, not prompt) ──
+    # The system prompt orders the LLM to clear every entity before FINISH, but a
+    # prompt is not a guardrail: nothing stopped a lazy FINISH over a 'pending'
+    # blast radius. Mirror of the blast-radius relocation -- the gate lives in the
+    # node where its state mutation actually takes effect.
+    if decision.next_agent == "FINISH":
+        combined_entities = {**entities, **temporal_entities}
+        unresolved = _unresolved_entities(combined_entities)
+        if unresolved:
+            overrides = int(state.get("gate_overrides", 0) or 0)
+            if overrides < MAX_GATE_OVERRIDES:
+                target_expert = route_for_source_type(alert.get("source_type", ""))
+                logger.warning(
+                    f"[THOROUGHNESS GATE] FINISH rejected: {len(unresolved)} unresolved "
+                    f"entities ({', '.join(unresolved[:5])}). Override "
+                    f"{overrides + 1}/{MAX_GATE_OVERRIDES} -- re-routing to {target_expert}."
+                )
+                gate_msg = HumanMessage(content=(
+                    f"[THOROUGHNESS GATE] Your verdict was rejected: these entities are still "
+                    f"unresolved: {', '.join(unresolved)}. Every entity must be marked "
+                    f"'cleared' or 'malicious' (update_entity_status) with supporting evidence "
+                    f"before a verdict is accepted. Re-route override {overrides + 1} of "
+                    f"{MAX_GATE_OVERRIDES}."
+                ))
+                result: Dict[str, Any] = {
+                    "next_agent": target_expert,
+                    "verdict": None,
+                    "gate_overrides": overrides + 1,
+                    "messages": [gate_msg],
+                }
+                if temporal_entities:
+                    result["entities_of_interest"] = temporal_entities
+                return result
+
+            # Overrides exhausted: stop fighting the model. Accept FINISH but mark
+            # the analysis incomplete -- the router sends it through the critic and
+            # the response agent surfaces it as manual_review_required instead of a
+            # clean autonomous verdict, and it can never mint immunity memory.
+            logger.error(
+                f"[THOROUGHNESS GATE] Exhausted {MAX_GATE_OVERRIDES} overrides with "
+                f"{len(unresolved)} entities still unresolved. Escalating to manual review."
+            )
+            verdict_dict = decision.verdict.model_dump() if decision.verdict else {
+                "is_true_positive": False, "confidence": 0.0,
+                "justification": "FINISH issued without a verdict after gate overrides exhausted.",
+                "recommended_action": "monitor",
+            }
+            verdict_dict["justification"] = (
+                f"[INCOMPLETE BLAST RADIUS: {len(unresolved)} unresolved entities after "
+                f"{MAX_GATE_OVERRIDES} thoroughness-gate overrides] "
+                + verdict_dict.get("justification", "")
+            )
+            result = {
+                "next_agent": "FINISH",
+                "verdict": verdict_dict,
+                "analysis_complete": False,
+            }
+            if temporal_entities:
+                result["entities_of_interest"] = temporal_entities
+            return result
 
     logger.info(f"Supervisor Decision: Route to -> {decision.next_agent}")
     result: Dict[str, Any] = {
         "next_agent": decision.next_agent,
         "verdict": decision.verdict.model_dump() if decision.verdict else None,
     }
+    if decision.next_agent == "FINISH":
+        result["analysis_complete"] = True
     if temporal_entities:
         result["entities_of_interest"] = temporal_entities
     return result

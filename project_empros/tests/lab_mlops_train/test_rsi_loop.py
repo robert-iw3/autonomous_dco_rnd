@@ -428,3 +428,183 @@ class TestSkillLibraryLocation:
         if content:
             for line in content.splitlines():
                 json.loads(line)  # each line must be valid JSON
+
+
+# ── K. Cycle ledger (loop memory) ─────────────────────────────────────────────
+
+_load_ledger             = _mod._load_ledger
+_append_ledger           = _mod._append_ledger
+_last_cursor             = _mod._last_cursor
+_batch_hash              = _mod._batch_hash
+_batch_failure_count     = _mod._batch_failure_count
+_deployed_baseline_scores = _mod._deployed_baseline_scores
+_load_candidate_scores   = _mod._load_candidate_scores
+_regression_gate         = _mod._regression_gate
+
+
+def _record(**overrides) -> dict:
+    base = {
+        "cycle_id": "abcd1234", "started_at": "2026-06-09T00:00:00+00:00",
+        "finished_at": "2026-06-09T01:00:00+00:00", "batch_hash": "deadbeefdeadbeef",
+        "verdict_cursor_start": 0, "verdict_cursor_end": 50, "retrain_count": 1,
+        "gate_scores": {}, "outcome": "deployed", "deployed": True,
+        "halt_reason": None,
+    }
+    base.update(overrides)
+    return base
+
+
+class TestRSILedger:
+
+    def _live(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(_mod, "RSI_LEDGER_FILE", tmp_path / "rsi_ledger_v1.jsonl")
+        monkeypatch.setattr(_mod, "RSI_DRY_RUN", False)
+
+    def test_load_missing_ledger_returns_empty(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        assert _load_ledger() == []
+
+    def test_append_and_load_roundtrip(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        _append_ledger(_record(cycle_id="c1"))
+        _append_ledger(_record(cycle_id="c2", outcome="gate_failed", deployed=False))
+        records = _load_ledger()
+        assert [r["cycle_id"] for r in records] == ["c1", "c2"]
+
+    def test_append_skipped_in_dry_run(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "RSI_LEDGER_FILE", tmp_path / "rsi_ledger_v1.jsonl")
+        monkeypatch.setattr(_mod, "RSI_DRY_RUN", True)
+        _append_ledger(_record())
+        assert not (tmp_path / "rsi_ledger_v1.jsonl").exists()
+
+    def test_corrupt_lines_skipped(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        ledger = tmp_path / "rsi_ledger_v1.jsonl"
+        ledger.write_text(json.dumps(_record()) + "\n{not json}\n")
+        assert len(_load_ledger()) == 1
+
+    def test_last_cursor_zero_without_ledger(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        assert _last_cursor() == 0
+
+    def test_last_cursor_resumes_from_max(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        _append_ledger(_record(verdict_cursor_end=50))
+        _append_ledger(_record(verdict_cursor_end=120))
+        _append_ledger(_record(verdict_cursor_end=80))
+        assert _last_cursor() == 120
+
+
+class TestBatchQuarantine:
+
+    def _live(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(_mod, "RSI_LEDGER_FILE", tmp_path / "rsi_ledger_v1.jsonl")
+        monkeypatch.setattr(_mod, "RSI_DRY_RUN", False)
+
+    def test_batch_hash_stable(self):
+        lines = ['{"a": 1}', '{"b": 2}']
+        assert _batch_hash(lines) == _batch_hash(list(lines))
+        assert len(_batch_hash(lines)) == 16
+
+    def test_batch_hash_differs_on_content(self):
+        assert _batch_hash(['{"a": 1}']) != _batch_hash(['{"a": 2}'])
+
+    def test_failure_count_counts_only_gate_failed_same_hash(self, tmp_path, monkeypatch):
+        self._live(monkeypatch, tmp_path)
+        _append_ledger(_record(batch_hash="aaaa", outcome="gate_failed", deployed=False))
+        _append_ledger(_record(batch_hash="aaaa", outcome="gate_failed", deployed=False))
+        _append_ledger(_record(batch_hash="aaaa", outcome="deployed"))
+        _append_ledger(_record(batch_hash="bbbb", outcome="gate_failed", deployed=False))
+        assert _batch_failure_count("aaaa") == 2
+        assert _batch_failure_count("bbbb") == 1
+        assert _batch_failure_count("cccc") == 0
+
+    def test_quarantine_threshold_default_is_2(self):
+        assert _mod.RSI_BATCH_QUARANTINE_THRESHOLD == 2
+
+
+class TestRegressionGate:
+
+    def test_no_baseline_passes(self):
+        ok, regressions = _regression_gate({"t2_acc": 0.50}, {})
+        assert ok and regressions == []
+
+    def test_no_candidate_scores_passes(self):
+        ok, _ = _regression_gate({}, {"t2_acc": 0.99})
+        assert ok
+
+    def test_equal_scores_pass(self):
+        ok, _ = _regression_gate({"t2_acc": 0.99}, {"t2_acc": 0.99})
+        assert ok
+
+    def test_drop_within_epsilon_passes(self):
+        ok, _ = _regression_gate({"t2_acc": 0.985}, {"t2_acc": 0.99}, epsilon=0.02)
+        assert ok
+
+    def test_drop_beyond_epsilon_fails(self):
+        ok, regressions = _regression_gate({"t2_acc": 0.95}, {"t2_acc": 0.99}, epsilon=0.02)
+        assert not ok
+        assert "t2_acc" in regressions[0]
+
+    def test_unshared_metrics_ignored(self):
+        ok, _ = _regression_gate({"new_metric": 0.10}, {"t2_acc": 0.99})
+        assert ok
+
+    def test_deployed_baseline_picks_latest_deployed(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "RSI_LEDGER_FILE", tmp_path / "rsi_ledger_v1.jsonl")
+        monkeypatch.setattr(_mod, "RSI_DRY_RUN", False)
+        _append_ledger(_record(gate_scores={"t2_acc": 0.97}, deployed=True))
+        _append_ledger(_record(gate_scores={"t2_acc": 0.99}, deployed=True))
+        _append_ledger(_record(gate_scores={"t2_acc": 0.10}, outcome="gate_failed",
+                               deployed=False))
+        assert _deployed_baseline_scores() == {"t2_acc": 0.99}
+
+    def test_candidate_scores_missing_file_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "EVAL_SCORES_FILE", tmp_path / "absent.json")
+        assert _load_candidate_scores() == {}
+
+    def test_candidate_scores_reads_flat_floats(self, tmp_path, monkeypatch):
+        scores = tmp_path / "latest.json"
+        scores.write_text(json.dumps({"t2_acc": 0.99, "note": "ignored", "f1": 1}))
+        monkeypatch.setattr(_mod, "EVAL_SCORES_FILE", scores)
+        assert _load_candidate_scores() == {"t2_acc": 0.99, "f1": 1.0}
+
+
+class TestLedgerSourceContracts:
+
+    def test_exit_code_4_documented(self):
+        assert "4 on batch quarantine" in RSI_SRC or "4 batch quarantined" in RSI_SRC
+
+    def test_cursor_resumes_from_ledger_in_loop(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        assert "_last_cursor()" in fn_body
+
+    def test_quarantine_checked_before_training(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        assert fn_body.find("_batch_failure_count") < fn_body.find("train-ppo")
+
+    def test_regression_gate_between_alignment_gate_and_deploy(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        align_pos  = fn_body.find("_run_alignment_gate(")
+        reg_pos    = fn_body.find("_regression_gate(")
+        deploy_pos = fn_body.find('"deploy"')
+        assert align_pos < reg_pos < deploy_pos, \
+            "Regression gate must run after the alignment gate and before deploy"
+
+    def test_every_terminal_outcome_writes_ledger(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        for outcome in ("quarantined", "spool_failed", "deployed", "deploy_failed",
+                        "gate_failed"):
+            assert f'"{outcome}"' in fn_body, f"outcome {outcome} not recorded"
+
+    def test_makefile_has_rsi_loop_target(self):
+        makefile_path = SCRIPTS_DIR.parent / "Makefile"
+        if not makefile_path.exists():
+            pytest.skip("Makefile not shipped in this test container")
+        makefile = makefile_path.read_text()
+        assert "rsi-loop:" in makefile
+        assert "08_rsi_loop.py" in makefile

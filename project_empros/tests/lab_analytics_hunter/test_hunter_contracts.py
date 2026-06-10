@@ -54,6 +54,7 @@ from state import (
 from sanitizer import CognitiveSanitizer
 
 ORCHESTRATOR_SRC = (HUNTER_DIR / "orchestrator.py").read_text()
+STATE_SRC = (HUNTER_DIR / "state.py").read_text()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -345,38 +346,43 @@ class TestCognitiveSanitizer:
 
 
 class TestInitialRouteSourceCode:
-    """_initial_route routing logic verified from orchestrator.py source."""
+    """Deterministic first-hop routing verified from source. The routing body
+    lives in state.py (route_for_source_type) so the supervisor's
+    thoroughness-gate re-route shares it; orchestrator._initial_route delegates."""
+
+    def test_orchestrator_delegates_to_shared_route(self):
+        assert "route_for_source_type" in ORCHESTRATOR_SRC
 
     def test_aws_prefix_routes_to_cloud_expert(self):
-        assert "source_type.startswith('aws_')" in ORCHESTRATOR_SRC or \
-               'source_type.startswith("aws_")' in ORCHESTRATOR_SRC
+        assert "source_type.startswith('aws_')" in STATE_SRC or \
+               'source_type.startswith("aws_")' in STATE_SRC
 
     def test_azure_prefix_routes_to_cloud_expert(self):
-        assert "source_type.startswith('azure_')" in ORCHESTRATOR_SRC or \
-               'source_type.startswith("azure_")' in ORCHESTRATOR_SRC
+        assert "source_type.startswith('azure_')" in STATE_SRC or \
+               'source_type.startswith("azure_")' in STATE_SRC
 
     def test_gcp_prefix_routes_to_cloud_expert(self):
-        assert "source_type.startswith('gcp_')" in ORCHESTRATOR_SRC or \
-               'source_type.startswith("gcp_")' in ORCHESTRATOR_SRC
+        assert "source_type.startswith('gcp_')" in STATE_SRC or \
+               'source_type.startswith("gcp_")' in STATE_SRC
 
     def test_vmware_prefix_routes_to_cloud_expert(self):
-        assert "source_type.startswith('vmware_')" in ORCHESTRATOR_SRC or \
-               'source_type.startswith("vmware_")' in ORCHESTRATOR_SRC
+        assert "source_type.startswith('vmware_')" in STATE_SRC or \
+               'source_type.startswith("vmware_")' in STATE_SRC
 
     def test_network_tap_routes_to_nettap_expert(self):
-        assert "'network_tap'" in ORCHESTRATOR_SRC or '"network_tap"' in ORCHESTRATOR_SRC
-        assert "nettap_expert" in ORCHESTRATOR_SRC
+        assert "'network_tap'" in STATE_SRC or '"network_tap"' in STATE_SRC
+        assert "nettap_expert" in STATE_SRC
 
     def test_c2_in_source_type_routes_to_net_expert(self):
-        assert '"c2" in source_type' in ORCHESTRATOR_SRC or \
-               "'c2' in source_type" in ORCHESTRATOR_SRC
+        assert '"c2" in source_type' in STATE_SRC or \
+               "'c2' in source_type" in STATE_SRC
 
     def test_suricata_routes_to_net_expert(self):
-        assert "suricata_eve" in ORCHESTRATOR_SRC
+        assert "suricata_eve" in STATE_SRC
 
     def test_host_expert_is_default_route(self):
-        assert "return \"host_expert\"" in ORCHESTRATOR_SRC or \
-               "return 'host_expert'" in ORCHESTRATOR_SRC
+        assert "return \"host_expert\"" in STATE_SRC or \
+               "return 'host_expert'" in STATE_SRC
 
 
 class TestSupervisorRouterSourceCode:

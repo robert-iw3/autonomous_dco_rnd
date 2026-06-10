@@ -1,3 +1,4 @@
+import os
 import operator
 from typing import TypedDict, Annotated, List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, field_validator, constr
@@ -13,6 +14,37 @@ GLOBAL_DO_NOT_PIVOT = {
     "255.255.255.255", "0.0.0.0", "127.0.0.1", "169.254.169.254",
 }
 MAX_ENTITIES = 10  # hard cap on simultaneously tracked entities per investigation
+
+# ─── Deep-Analysis Loop Gates ──────────────────────────────────────
+# FP_CONFIDENCE_GATE is the single confidence threshold for the False Positive
+# review/memory contract: an FP verdict BELOW the gate is routed through the
+# Red-Team critic before the response agent (it cannot be dismissed unreviewed),
+# and only an FP verdict AT/ABOVE the gate with a complete blast radius may be
+# stored as immunity-eligible RAG memory. This closes the self-poisoning loop
+# where one lazy FP verdict granted permanent auto-dismissal of its signature.
+FP_CONFIDENCE_GATE = float(os.getenv("NEXUS_FP_CONFIDENCE_GATE", "0.80"))
+
+# Maximum number of times the supervisor's deterministic thoroughness gate may
+# reject a FINISH that left entities unresolved before escalating to manual
+# review (prevents an infinite supervisor↔expert ping-pong on a stuck entity).
+MAX_GATE_OVERRIDES = int(os.getenv("NEXUS_MAX_GATE_OVERRIDES", "2"))
+
+def route_for_source_type(source_type: str) -> str:
+    """
+    Deterministic source_type → expert routing. Single source of truth shared by
+    the orchestrator's first-hop route and the supervisor's thoroughness-gate
+    re-route (importing the orchestrator from an agent would be circular).
+    """
+    if (source_type.startswith("aws_") or source_type.startswith("azure_")
+            or source_type.startswith("gcp_") or source_type.startswith("vmware_")):
+        return "cloud_expert"
+    if source_type == "network_tap":
+        return "nettap_expert"
+    if source_type == "suricata_eve" or "c2" in source_type:
+        return "net_expert"
+    # Endpoint sensors: sysmon_sensor, windows_deepsensor, linux_sentinel,
+    # macos_sensor, trellix_ens → host_expert
+    return "host_expert"
 
 # ─── Alert Schema (Strictly Typed) ─────────────────────────────────
 class UnifiedAlertSchema(BaseModel):
@@ -109,7 +141,6 @@ def build_memory_signature(sensor_id: str, source_type: str, vector_name: str) -
     """
     return f"sensor:{sensor_id}|source_type:{source_type}|vector:{vector_name}"
 
-
 # ─── Entity State Machine ──────────────────────────────────────────
 class EntityTracking(BaseModel):
     type: Literal["ip", "domain", "pid", "hash", "user"]
@@ -171,3 +202,12 @@ class InvestigativeState(TypedDict):
     action_payload: Optional[Dict[str, Any]]
     incident_report: Optional[str]
     canary: Optional[str]  # OWASP LLM01 prompt-leak tripwire (injected into agent system prompts)
+    # ── Deep-analysis loop bookkeeping ──
+    # Number of times the supervisor's deterministic thoroughness gate rejected a
+    # FINISH that left unresolved entities (bounded by MAX_GATE_OVERRIDES).
+    gate_overrides: int
+    # False when the verdict was accepted with an unresolved blast radius (gate
+    # exhausted, blast-radius cap, or total provider failure). Such verdicts are
+    # critic-reviewed, surfaced as manual_review_required, and never mint
+    # immunity-eligible RAG memory.
+    analysis_complete: Optional[bool]

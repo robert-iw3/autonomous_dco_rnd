@@ -30,7 +30,8 @@ from prometheus_client import start_http_server, Counter, Histogram
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, VectorParams
 
-from state import InvestigativeState, UnifiedAlertSchema, SoarExecutionSchema
+from state import (InvestigativeState, UnifiedAlertSchema, SoarExecutionSchema,
+                   FP_CONFIDENCE_GATE, route_for_source_type)
 from agents.supervisor import supervisor_agent
 from agents.host_expert import host_expert_node
 from agents.net_expert import net_expert_node
@@ -101,12 +102,27 @@ def supervisor_router(state: InvestigativeState) -> str:
     Pure routing function -- NO state mutation (LangGraph discards mutations made
     in conditional-edge functions; the blast-radius cap that used to live here
     therefore never took effect and now lives in the supervisor node + reducer).
+
+    Critic review is symmetric: True Positives are reviewed before containment
+    (as before), and False Positives are reviewed before dismissal whenever the
+    dismissal is weak -- confidence below FP_CONFIDENCE_GATE or an incomplete
+    blast radius. An unreviewed weak FP previously went straight to the response
+    agent and was written into RAG memory, where immunity would auto-dismiss its
+    signature forever (the swarm's one self-reinforcing failure mode).
     """
     next_node = state.get("next_agent", "FINISH")
-    if next_node == "FINISH":
-        verdict = state.get("verdict") or {}
-        return "critic" if verdict.get("is_true_positive") else "response_agent"
-    return next_node
+    if next_node != "FINISH":
+        return next_node
+    verdict = state.get("verdict") or {}
+    if not verdict:
+        return "response_agent"  # nothing to review
+    if verdict.get("is_true_positive"):
+        return "critic"
+    if state.get("analysis_complete", True) is False:
+        return "critic"
+    if float(verdict.get("confidence", 0.0) or 0.0) < FP_CONFIDENCE_GATE:
+        return "critic"
+    return "response_agent"
 
 
 def build_graph(checkpointer):
@@ -138,17 +154,9 @@ def build_graph(checkpointer):
 
 
 def _initial_route(source_type: str) -> str:
-    """Deterministic first-hop routing based on alert source type."""
-    if (source_type.startswith("aws_") or source_type.startswith("azure_")
-            or source_type.startswith("gcp_") or source_type.startswith("vmware_")):
-        return "cloud_expert"
-    if source_type == "network_tap":
-        return "nettap_expert"
-    if source_type == "suricata_eve" or "c2" in source_type:
-        return "net_expert"
-    # Endpoint sensors: sysmon_sensor, windows_deepsensor, linux_sentinel,
-    # macos_sensor, trellix_ens → host_expert
-    return "host_expert"
+    """Deterministic first-hop routing -- delegates to the shared map in state.py
+    (also used by the supervisor's thoroughness-gate re-route)."""
+    return route_for_source_type(source_type)
 
 
 async def _broadcast_hud(alert: UnifiedAlertSchema, nc_client):
@@ -197,6 +205,8 @@ async def trigger_swarm(alert: UnifiedAlertSchema, js_client, nc_client, graph):
                 "action_payload": None,
                 "incident_report": None,
                 "canary": canary,
+                "gate_overrides": 0,
+                "analysis_complete": None,
             }
 
             config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
