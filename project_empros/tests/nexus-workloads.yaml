@@ -542,7 +542,7 @@ spec:
       metadata:
         natsServerMonitoringEndpoint: "nats-cluster.sentinel-nexus.svc.cluster.local:8222"
         account: "$G"
-        stream: "Telemetry_Stream"
+        stream: "Tier5_Telemetry"
         consumer: "S3_Cold_Archive_Group"
         # Archiving is async and high-throughput. We scale when backlog hits 10,000.
         lagThreshold: "10000"

@@ -45,7 +45,17 @@ async fn main() {
         config.ingress.integrity_ban_threshold,
     );
 
-    let client = async_nats::connect(&config.global.nats_url).await
+    // Authenticated connect — central NATS runs default-deny authorization.
+    // middleware_node credentials come from the Quadlet env (NATS_USER/NATS_PASS).
+    let nats_user = std::env::var("NATS_USER").unwrap_or_default();
+    let nats_pass = std::env::var("NATS_PASS").unwrap_or_default();
+    let connect_result = if !nats_user.is_empty() && !nats_pass.is_empty() {
+        async_nats::ConnectOptions::with_user_and_password(nats_user, nats_pass)
+            .connect(&config.global.nats_url).await
+    } else {
+        async_nats::connect(&config.global.nats_url).await
+    };
+    let client = connect_result
         .unwrap_or_else(|e| { error!("NATS connect failed: {}", e); std::process::exit(1); });
     let js = async_nats::jetstream::new(client);
 

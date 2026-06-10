@@ -10,6 +10,9 @@ Volume={{ config_dir }}/cim_mappings.yaml:/config/cim_mappings.yaml:ro,Z
 Volume={{ config_dir }}/ecs_mappings.yaml:/config/ecs_mappings.yaml:ro,Z
 Volume={{ cert_dir }}:/config/certs:ro,Z
 Environment=MIDDLEWARE_CONFIG=/config/middleware.toml
+# C2: central NATS runs default-deny authorization — middleware_node credentials
+Environment=NATS_USER=middleware_node
+Environment=NATS_PASS={{ vault_nats_middleware_pass }}
 PublishPort={{ middleware_ingress_port | default('8443') }}:{{ middleware_ingress_port | default('8443') }}
 PublishPort=9000:9000
 Network=host

@@ -60,6 +60,37 @@
       args:
         creates: "{{ cert_dir }}/server.pem"
 
+    # C7: mint the Bearer JWT the Nexus gateway requires (HS256, aud nexus-ingress,
+    # signed with vault_jwt_secret). Runs on the control node — the secret never
+    # leaves it; only the rendered 0640 config carries the token.
+    - name: Mint Nexus gateway JWT for the forwarder
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/../../../operations/scripts/mint-ingress-jwt.py"
+          - "--secret"
+          - "{{ vault_jwt_secret }}"
+          - "--subject"
+          - "middleware-forwarder"
+          - "--ttl-days"
+          - "{{ nexus_jwt_ttl_days | default(365) }}"
+      delegate_to: localhost
+      become: false
+      register: mint_result
+      changed_when: false
+      no_log: true
+      when:
+        - nexus_auth_token is not defined
+        - nexus_enabled | default(true)
+
+    - name: Register minted JWT for template rendering
+      ansible.builtin.set_fact:
+        minted_nexus_jwt: "{{ mint_result.stdout | trim }}"
+      no_log: true
+      when:
+        - nexus_auth_token is not defined
+        - nexus_enabled | default(true)
+
     - name: Template middleware configuration
       ansible.builtin.template:
         src: middleware.toml.j2

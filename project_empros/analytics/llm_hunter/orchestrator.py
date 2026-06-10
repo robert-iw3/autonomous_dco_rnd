@@ -617,6 +617,11 @@ async def _connect_nats_with_retry(url: str, max_attempts: int = 0) -> NATS:
     nc = NATS()
     attempt = 0
     backoff = 2.0
+    # C2: central NATS runs default-deny authorization — authenticate as the
+    # swarm_node user when credentials are provisioned (hunter.env).
+    nats_user = os.getenv("NATS_USER", "")
+    nats_pass = os.getenv("NATS_PASS", "")
+    auth_kwargs = {"user": nats_user, "password": nats_pass} if nats_user and nats_pass else {}
     while True:
         try:
             await nc.connect(
@@ -626,6 +631,7 @@ async def _connect_nats_with_retry(url: str, max_attempts: int = 0) -> NATS:
                 error_cb=lambda e: logger.error(f"[NATS] Connection error: {e}"),
                 max_reconnect_attempts=-1,   # nats.py built-in reconnect (-1 = infinite)
                 reconnect_time_wait=2,
+                **auth_kwargs,
             )
             logger.info(f"[NATS] Connected to {url}")
             return nc

@@ -182,7 +182,12 @@ async def _nats_publish(subject: str, payload: dict) -> None:
     try:
         import json
         import nats as nats_lib
-        nc = await nats_lib.connect(NATS_URL)
+        # Central NATS runs default-deny authorization — authenticate when
+        # credentials are provisioned (swarm_node user, see ti_ingest quadlet env).
+        user = os.getenv("NATS_USER", "")
+        password = os.getenv("NATS_PASS", "")
+        auth = {"user": user, "password": password} if user and password else {}
+        nc = await nats_lib.connect(NATS_URL, **auth)
         await nc.publish(subject, json.dumps(payload).encode())
         await nc.close()
     except Exception:

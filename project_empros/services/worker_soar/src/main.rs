@@ -443,7 +443,10 @@ async fn main() {
 
     let worker_cfg = WorkerConfig {
         nats_url: conf.global.nats_url.clone(),
-        stream_name: conf.global.telemetry_stream.clone(),
+        // C4: nexus.soar.execute lives in the Nexus_SOAR_Execute stream — binding
+        // the telemetry stream here makes consumer creation fail (filter subject
+        // is not a subset of Tier5_Telemetry's subjects).
+        stream_name: "Nexus_SOAR_Execute".into(),
         subject: "nexus.soar.execute".into(),
         consumer_name: "SOAR_Execution_Group".into(),
         dlq_prefix: conf.global.dlq_subject_prefix.clone(),

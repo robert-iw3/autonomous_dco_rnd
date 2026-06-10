@@ -25,6 +25,7 @@ require_cmd ssh-keygen
 N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)
 WEBUI_SECRET_KEY=$(openssl rand -base64 32)
 JWT_SECRET=$(openssl rand -hex 32)
+AUTHENTIK_SECRET_KEY_VALUE=$(openssl rand -hex 32)
 PG_PASS=$(openssl rand -hex 24)
 OAUTH_CLIENT_ID="nexus-$(openssl rand -hex 8)"
 OAUTH_CLIENT_SECRET=$(openssl rand -hex 32)
@@ -77,7 +78,7 @@ PG_PASS=${PG_PASS}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
 OPENID_PROVIDER_URL=https://${NEXUS_DOMAIN_SSO}/application/o/${NEXUS_SSO_OAUTH_APP_SLUG}/
-AUTHENTIK_SECRET_KEY=${JWT_SECRET}
+AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY_VALUE}
 
 # -- 4. Containment Provider Keys --
 EDR_API_KEY=${EDR_API_KEY}

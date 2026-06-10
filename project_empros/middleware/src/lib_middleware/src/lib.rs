@@ -15,6 +15,21 @@ pub trait ParquetWorker: Send + Sync {
     ) -> impl std::future::Future<Output = Result<(), String>> + Send;
 }
 
+/// Authenticated NATS connect — the central NATS cluster runs default-deny
+/// authorization. Credentials come from NATS_USER / NATS_PASS (middleware_node
+/// user provisioned via the middleware Quadlet env). Anonymous fallback for dev.
+pub async fn nats_connect(url: &str) -> Result<async_nats::Client, async_nats::ConnectError> {
+    let user = std::env::var("NATS_USER").unwrap_or_default();
+    let pass = std::env::var("NATS_PASS").unwrap_or_default();
+    if !user.is_empty() && !pass.is_empty() {
+        async_nats::ConnectOptions::with_user_and_password(user, pass)
+            .connect(url)
+            .await
+    } else {
+        async_nats::connect(url).await
+    }
+}
+
 pub async fn start_worker<W: ParquetWorker + 'static>(
     worker: W,
     nats_url: &str,
@@ -23,7 +38,7 @@ pub async fn start_worker<W: ParquetWorker + 'static>(
     consumer_name: &str,
     dlq_prefix: &str,
 ) {
-    let client = async_nats::connect(nats_url).await
+    let client = nats_connect(nats_url).await
         .unwrap_or_else(|e| { error!("NATS connect failed: {}", e); std::process::exit(1); });
     let js = jetstream::new(client.clone());
 

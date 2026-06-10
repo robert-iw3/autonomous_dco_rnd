@@ -224,7 +224,9 @@ async fn main() {
 
     let cfg = WorkerConfig {
         nats_url: std::env::var("NATS_URL").unwrap_or_else(|_| "nats://nats:4222".into()),
-        stream_name: std::env::var("NATS_STREAM").unwrap_or_else(|_| "Telemetry_Stream".into()),
+        // C5: default must match the stream created by streams_init.sh — a different
+        // name with the same subject is rejected by JetStream (subject overlap).
+        stream_name: std::env::var("NATS_STREAM").unwrap_or_else(|_| "Tier5_Telemetry".into()),
         subject: std::env::var("NATS_SUBJECT").unwrap_or_else(|_| "nexus.*.telemetry".into()),
         consumer_name: std::env::var("CONSUMER_NAME")
             .unwrap_or_else(|_| "S3_Cold_Archive_Group".into()),

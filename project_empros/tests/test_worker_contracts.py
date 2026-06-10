@@ -327,12 +327,16 @@ class TestNATSSubjectAuth:
             "unauthenticated clients can publish/subscribe to any subject"
 
     def test_prod_template_ingress_publish_only(self):
-        """ingress_node must only be able to publish (read-restricted pipeline)."""
+        """ingress_node must not subscribe to any data subject (v0.2 auth model:
+        only _INBOX.> for JetStream publish acks)."""
         src = self._read(NATS_PROD_TEMPLATE)
         assert "ingress_node" in src, "nats-server.conf.j2: ingress_node user missing"
-        # ingress must have subscribe deny -- ingress nodes must not read back
-        assert 'subscribe: { deny: [">"] }' in src, \
-            "ingress_node must have subscribe deny -- ingress reading pipeline data is a risk"
+        idx = src.find('"ingress_node"')
+        sect = src[idx:src.find("user:", idx + 10)]
+        sub_idx = sect.find("subscribe:")
+        sub_line = sect[sub_idx:sect.find("\n", sub_idx)]
+        assert "nexus." not in sub_line, \
+            "ingress_node must not subscribe to pipeline data subjects"
 
     def test_prod_template_worker_restricted_publish(self):
         """worker_node must not have wildcard publish access."""
@@ -342,12 +346,16 @@ class TestNATSSubjectAuth:
         assert 'nexus.dlq.>' in src, \
             "worker_node missing DLQ publish permission -- DLQ routing would fail"
 
-    def test_prod_template_swarm_restricted_to_soar(self):
-        """swarm_node must publish only to nexus.soar.actions -- not raw telemetry."""
+    def test_prod_template_swarm_publishes_soar_execute(self):
+        """swarm_node publishes SOAR orders on nexus.soar.execute (the subject
+        worker_soar actually consumes) -- nexus.soar.actions was pre-v0.2
+        vocabulary that nothing consumed."""
         src = self._read(NATS_PROD_TEMPLATE)
         assert "swarm_node" in src, "nats-server.conf.j2: swarm_node user missing"
-        assert "nexus.soar.actions" in src, \
-            "swarm_node missing publish permission for nexus.soar.actions"
+        assert "nexus.soar.execute" in src, \
+            "swarm_node missing publish permission for nexus.soar.execute"
+        assert "nexus.soar.actions" not in src, \
+            "nexus.soar.actions is dead vocabulary -- worker_soar consumes nexus.soar.execute"
 
     # ── Lab conf mirrors production ───────────────────────────────────────────
 

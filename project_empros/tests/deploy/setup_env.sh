@@ -28,8 +28,12 @@ EOF
 
 # ── 1. NATS Security ──────────────────────────────────────────────────────────
 echo -e "${C_CYAN}--- NATS Authentication ---${C_RESET}"
-read -p "Enter NATS JetStream NKey Seed (Starts with 'SU'): " NATS_SEED
-echo "NATS_NKEY_SEED=${NATS_SEED}" >> "$ENV_FILE"
+# Server auth is per-role user/password (see nats-server.conf.j2 authorization).
+read -p "Enter NATS user (e.g. worker_node): " NATS_USER
+read -s -p "Enter NATS password: " NATS_PASS
+echo ""
+echo "NATS_USER=${NATS_USER}" >> "$ENV_FILE"
+echo "NATS_PASS=${NATS_PASS}" >> "$ENV_FILE"
 
 # ── 2. AWS / S3 / MinIO Storage ───────────────────────────────────────────
 echo -e "\n${C_CYAN}--- S3 / MinIO Storage ---${C_RESET}"

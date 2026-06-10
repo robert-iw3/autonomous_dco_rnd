@@ -21,9 +21,14 @@ elastic_enabled = {{ elastic_enabled | default(false) | lower }}
 sql_enabled = {{ sql_enabled | default(false) | lower }}
 
 [nexus]
-gateway_url = "{{ nexus_gateway_url | default('') }}"
-auth_token = "{{ nexus_auth_token | default('') }}"
-integrity_secret = "{{ nexus_integrity_secret | default(middleware_integrity_secret) }}"
+# C7: gateway URL defaults to the first core-ingress node; auth_token is minted
+# at deploy time from vault_jwt_secret ("Mint Nexus gateway JWT" task, main.yml).
+gateway_url = "{{ nexus_gateway_url | default(('http://' ~ groups['ingress'][0] ~ ':8080/api/v1/telemetry') if (groups['ingress'] | default([]) | length > 0) else '') }}"
+auth_token = "{{ nexus_auth_token | default(minted_nexus_jwt | default('')) }}"
+# C8: the Nexus gateway verifies batches with vault_integrity_hmac_secret — the
+# transmitter MUST sign with that same key. vault_middleware_integrity_secret
+# guards the middleware's own ingress edge and is a different trust domain.
+integrity_secret = "{{ nexus_integrity_secret | default(vault_integrity_hmac_secret) }}"
 verify_tls = {{ nexus_verify_tls | default('true') | lower }}
 max_backoff_sec = 60
 

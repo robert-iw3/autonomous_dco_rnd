@@ -41,7 +41,7 @@ mkdir -p dist/
 # Strip debug symbols to minimize binary size and prevent reverse engineering
 STRIP_CMD=$(command -v x86_64-linux-musl-strip || command -v strip || echo "true")
 
-for bin in core_ingress worker_qdrant worker_s3_archive worker_rules worker_soar; do
+for bin in core_ingress worker_qdrant worker_s3_archive worker_rules worker_soar worker_rlhf; do
     if [ -f "target/x86_64-unknown-linux-musl/release/$bin" ]; then
         cp "target/x86_64-unknown-linux-musl/release/$bin" dist/
         $STRIP_CMD "dist/$bin" 2>/dev/null || true

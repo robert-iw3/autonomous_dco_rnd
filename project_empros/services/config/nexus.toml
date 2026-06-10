@@ -457,7 +457,7 @@ model = "gpt-4o"
 [llm.primary_anthropic]
 api_type = "anthropic"
 api_key_env_var = "ANTHROPIC_API_KEY"
-# TODO: update to mythos model ID once released (currently pinned to opus-4-6)
+# "claude-fable-5" is 2x token generation compared to opus, keep in mind
 model = "claude-opus-4-6"
 
 [llm.internal_ollama]

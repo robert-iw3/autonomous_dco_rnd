@@ -213,7 +213,7 @@ impl SiemAdapter for RlhfAdapter {
 //   • 7-day max_age             -- stale feedback auto-expires
 //   • AckExplicit               -- consumer must explicitly ACK each message
 //
-// The Nexus_RLHF_Records stream (output) gets WorkQueue + 30-day retention
+// The Nexus_RLHF_Training stream (output) gets WorkQueue + 30-day retention
 // so the MLOps pipeline can replay training records if needed.
 
 async fn ensure_rlhf_streams(js: &jetstream::Context) {
@@ -228,7 +228,9 @@ async fn ensure_rlhf_streams(js: &jetstream::Context) {
             max_age_feedback,
         ),
         (
-            "Nexus_RLHF_Records",
+            // C6: must match the stream name created by infrastructure/nats/streams_init.sh
+            // for this subject — two streams cannot share nexus.training.rlhf.records.
+            "Nexus_RLHF_Training",
             vec!["nexus.training.rlhf.records".to_string()],
             jetstream::stream::RetentionPolicy::WorkQueue,
             max_age_records,
@@ -259,7 +261,7 @@ async fn main() {
     let config_path = std::env::var("NEXUS_CONFIG").unwrap_or_default();
 
     // Connect NATS separately so we can pass the client to the adapter for JetStream publishing
-    let nats_client = async_nats::connect(&nats_url)
+    let nats_client = lib_siem_core::nats_connect(&nats_url)
         .await
         .unwrap_or_else(|e| { tracing::error!("NATS connect failed: {}", e); std::process::exit(1); });
 

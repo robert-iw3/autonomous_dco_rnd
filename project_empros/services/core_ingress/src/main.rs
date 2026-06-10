@@ -127,7 +127,18 @@ async fn main() {
 
     let verifier = IntegrityVerifier::new(cfg.integrity_secret.as_bytes(), cfg.ban_threshold);
 
-    let client = match async_nats::connect(&cfg.nats_url).await {
+    // C2: the production NATS server runs default-deny authorization — connect
+    // with the ingress_node credentials from /etc/nexus/ingress.env when set.
+    let nats_user = std::env::var("NATS_USER").unwrap_or_default();
+    let nats_pass = std::env::var("NATS_PASS").unwrap_or_default();
+    let connect_result = if !nats_user.is_empty() && !nats_pass.is_empty() {
+        async_nats::ConnectOptions::with_user_and_password(nats_user, nats_pass)
+            .connect(&cfg.nats_url)
+            .await
+    } else {
+        async_nats::connect(&cfg.nats_url).await
+    };
+    let client = match connect_result {
         Ok(c) => c,
         Err(e) => {
             error!("FATAL: Ingress failed to connect to NATS at {}: {}", cfg.nats_url, e);

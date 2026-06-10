@@ -13,6 +13,9 @@ Volume={{ cert_dir }}:/config/certs:ro,Z
 Volume={{ middleware_state_dir | default('/var/lib/nexus-middleware') }}:/var/lib/nexus-middleware:Z
 Environment=MIDDLEWARE_CONFIG=/config/middleware.toml
 Environment=STATE_DIR=/var/lib/nexus-middleware
+# C2: central NATS runs default-deny authorization — middleware_node credentials
+Environment=NATS_USER=middleware_node
+Environment=NATS_PASS={{ vault_nats_middleware_pass }}
 PublishPort={{ worker_port }}:{{ worker_port }}
 Network=host
 ReadOnly=false

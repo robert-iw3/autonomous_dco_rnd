@@ -597,7 +597,7 @@ async fn main() {
 
     let conf_raw = fs::read_to_string(&config_path).expect("Failed to read nexus.toml");
     let conf: Config = toml::from_str(&conf_raw).expect("Failed to parse nexus.toml");
-    let nats_client = async_nats::connect(&conf.global.nats_url).await.unwrap();
+    let nats_client = lib_siem_core::nats_connect(&conf.global.nats_url).await.unwrap();
     let adapter = QdrantAdapter::initialize(&config_path, Some(nats_client));
 
     let worker_cfg = WorkerConfig {
