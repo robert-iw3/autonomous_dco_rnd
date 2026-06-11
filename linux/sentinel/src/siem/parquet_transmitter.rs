@@ -28,9 +28,9 @@ use parquet::file::properties::WriterProperties;
 
 // Integrity Layer
 #[cfg(feature = "integrity")]
-use nexus_integrity::stamper::LineageStamper;
+use crate::integrity::LineageStamper;
 #[cfg(feature = "integrity")]
-use nexus_integrity::{HDR_BATCH_HMAC, HDR_BATCH_SEQUENCE, HDR_BATCH_TIMESTAMP, HDR_SENSOR_ID};
+use crate::integrity::{HDR_BATCH_HMAC, HDR_BATCH_SEQUENCE, HDR_BATCH_TIMESTAMP, HDR_SENSOR_ID};
 
 pub struct TransmissionLayer {
     db_pool: Pool<Sqlite>,

@@ -17,6 +17,7 @@ jsonwebtoken  = { workspace = true }
 
 # Messaging
 async-nats = { workspace = true }
+futures    = { workspace = true }   # Stream for the agent-task subscriber
 
 # Serialization
 serde      = { workspace = true }

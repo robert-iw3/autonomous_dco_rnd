@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{error, info, warn, Level};
 
+mod agent_task;
+
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
 
@@ -21,7 +23,7 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-// ── Configuration Schemas ────────────────────────────────────────────────────
+// -- Configuration Schemas ----------------------------------------------------
 
 #[derive(Deserialize, Clone)]
 struct ContainmentConfig {
@@ -67,6 +69,9 @@ struct GlobalConfig {
     active_edr: String,
     active_firewall: String,
     #[serde(default)] active_playbook_executor: String,
+    // PREFERRED executor for outbound-only hosts (DC-N11): worker_soar enqueues a
+    // SIGNED task; the on-host agent polls /api/v1/tasks and runs it locally.
+    #[serde(default)] active_agent_executor: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -78,7 +83,11 @@ struct ProviderConfig {
 struct ActionSchema {
     method: String,
     endpoint: String,
+    // ENQUEUE actions (the agent_task_v1 executor) carry no HTTP body/headers --
+    // the on-host agent polls the signed task and runs a bundled playbook locally.
+    #[serde(default)]
     headers: HashMap<String, String>,
+    #[serde(default)]
     body_template: String,
 }
 
@@ -102,7 +111,7 @@ struct SoarConf {
     simulated_auth_token: String,
 }
 
-// ── Payload Schemas ──────────────────────────────────────────────────────────
+// -- Payload Schemas ----------------------------------------------------------
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ContainmentPayload {
@@ -116,6 +125,10 @@ struct ContainmentPayload {
     /// instead of the on-prem EDR/firewall/SSH executor.
     #[serde(default)]
     source_type: String,
+    /// Target OS for the agent-task path (advisory; the agent selects its own
+    /// platform's playbook). Empty when unknown.
+    #[serde(default)]
+    os_family: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -133,7 +146,7 @@ struct ExecutionStep {
     body: Value,
 }
 
-// ── TTL-Based Deduplication ──────────────────────────────────────────────────
+// -- TTL-Based Deduplication --------------------------------------------------
 
 struct TimedDedup {
     entries: HashMap<String, Instant>,
@@ -164,7 +177,7 @@ impl TimedDedup {
     }
 }
 
-// ── Adapter ──────────────────────────────────────────────────────────────────
+// -- Adapter ------------------------------------------------------------------
 
 struct SoarAdapter {
     http_client: Client,
@@ -176,11 +189,14 @@ struct SoarAdapter {
     auth_token: String,
     n8n_webhook_url: String,
     dedup: Arc<RwLock<TimedDedup>>,
+    // NATS publish handle for the agent-task path (DC-N11). The signed task is
+    // published to `nexus.agent.tasks`; core_ingress drains it to the polling host.
+    nats: Option<async_nats::Client>,
 }
 
 #[async_trait]
 impl SiemAdapter for SoarAdapter {
-    fn initialize(config_path: &str, _nats_client: Option<async_nats::Client>) -> Self {
+    fn initialize(config_path: &str, nats_client: Option<async_nats::Client>) -> Self {
         let config_raw =
             std::fs::read_to_string(config_path).expect("FATAL: Config not found");
         let conf: Config = toml::from_str(&config_raw).expect("FATAL: Malformed TOML");
@@ -217,6 +233,7 @@ impl SiemAdapter for SoarAdapter {
             auth_token: conf.soar.simulated_auth_token,
             n8n_webhook_url: n8n_url,
             dedup: Arc::new(RwLock::new(TimedDedup::new(Duration::from_secs(dedup_ttl_secs)))),
+            nats: nats_client,
         }
     }
 
@@ -269,7 +286,7 @@ impl SiemAdapter for SoarAdapter {
                 std::sync::atomic::Ordering::Relaxed,
             );
 
-            // ── 1. Build n8n ExecutionPlan ────────────────────────────────
+            // -- 1. Build n8n ExecutionPlan --------------------------------
             let mut steps = Vec::new();
 
             // Cloud source types bypass on-prem EDR/firewall and route to a
@@ -330,6 +347,52 @@ impl SiemAdapter for SoarAdapter {
                 }
             }
 
+            // -- Agent-task emission (DC-N11) ------------------------------
+            // For outbound-only hosts (non-cloud), the platform cannot reach in.
+            // When an agent executor is configured, enqueue a SIGNED task per host
+            // that the on-host agent polls (/api/v1/tasks) and runs locally. This
+            // is the preferred path; the SSH n8n fallback is legacy.
+            let agent_exec = self.containment_config.global.active_agent_executor.clone();
+            let is_cloud = self
+                .containment_config
+                .cloud_routing
+                .provider_for(&payload.source_type)
+                .is_some();
+            if !is_cloud && !agent_exec.is_empty() && agent_task::is_response_action(&payload.action_type) {
+                match (std::env::var("NEXUS_TASK_SECRET"), &self.nats) {
+                    (Ok(secret), Some(nats)) if !secret.is_empty() => {
+                        let created = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs() as i64)
+                            .unwrap_or(0);
+                        // host == the agent's JWT subject (sensor_id); the orchestrator
+                        // sets targets to the on-host agent identity. core_ingress keys
+                        // its task store by this `host` and drains it on the agent's poll.
+                        for host in &payload.targets {
+                            let task = agent_task::build_signed_task(
+                                &payload.incident_id, host, &payload.os_family,
+                                &payload.action_type, &payload.targets, created, secret.as_bytes(),
+                            );
+                            let body = serde_json::to_vec(&task).unwrap_or_default();
+                            match nats.publish("nexus.agent.tasks".to_string(), Bytes::from(body)).await {
+                                Ok(_) => {
+                                    counter!("nexus_soar_agent_tasks_enqueued_total").increment(1);
+                                    info!(incident = %payload.incident_id, host = %host,
+                                          executor = %agent_exec, "agent task signed + published");
+                                }
+                                Err(e) => {
+                                    error!(error = %e, host = %host, "failed to publish agent task");
+                                    n8n_failures += 1;   // → batch retained for retry
+                                }
+                            }
+                        }
+                    }
+                    (Ok(secret), None) if !secret.is_empty() =>
+                        warn!("active_agent_executor set but no NATS client -- agent task dropped"),
+                    _ => warn!("active_agent_executor set but NEXUS_TASK_SECRET unset -- skipping agent-task emission"),
+                }
+            }
+
             // n8n dispatch -- INSIDE the batch result path (not fire-and-forget)
             if !steps.is_empty() {
                 let plan = ExecutionPlan {
@@ -355,7 +418,7 @@ impl SiemAdapter for SoarAdapter {
                 }
             }
 
-            // ── 2. Native API fallback (parallel per target) ─────────────
+            // -- 2. Native API fallback (parallel per target) -------------
             for target_ip in payload.targets {
                 let client = self.http_client.clone();
                 let edr_url = format!("{}/api/v1/isolate", self.edr_url);
@@ -422,7 +485,7 @@ impl SiemAdapter for SoarAdapter {
     }
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// -- Main ---------------------------------------------------------------------
 
 #[tokio::main]
 async fn main() {
@@ -455,5 +518,16 @@ async fn main() {
 
     info!(subject = "nexus.soar.execute", "worker_soar starting");
 
-    start_durable_worker(SoarAdapter::initialize(&config_path, None), worker_cfg).await;
+    // Dedicated publish connection for the agent-task path (DC-N11). Separate from
+    // the framework's consumer connection; if it fails we still run (API/n8n paths
+    // work, only the outbound agent-task enqueue is unavailable).
+    let publish_client = match lib_siem_core::nats_connect(&conf.global.nats_url).await {
+        Ok(c) => Some(c),
+        Err(e) => {
+            warn!(error = %e, "agent-task NATS publish client unavailable -- agent_task_v1 disabled");
+            None
+        }
+    };
+
+    start_durable_worker(SoarAdapter::initialize(&config_path, publish_client), worker_cfg).await;
 }

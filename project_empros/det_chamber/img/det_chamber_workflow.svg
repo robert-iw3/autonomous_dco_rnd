@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1020" font-family="'JetBrains Mono', 'Fira Code', 'SF Mono', monospace">
+  <defs>
+    <marker id="ao" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#f97316"/></marker>
+    <marker id="ap" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#8b5cf6"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#22c55e"/></marker>
+    <marker id="ay" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#eab308"/></marker>
+    <marker id="ac" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#06b6d4"/></marker>
+    <linearGradient id="swarm-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#312e81"/></linearGradient>
+    <linearGradient id="ep-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c0a09"/><stop offset="100%" stop-color="#1c1917"/></linearGradient>
+    <linearGradient id="ingress-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0e2a2e"/><stop offset="100%" stop-color="#134e4a"/></linearGradient>
+    <linearGradient id="chamber-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a0a0a"/><stop offset="100%" stop-color="#450a0a"/></linearGradient>
+    <linearGradient id="ops-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#052e16"/><stop offset="100%" stop-color="#14532d"/></linearGradient>
+    <filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
+  </defs>
+
+  <rect width="1200" height="1020" fill="#09090b" rx="8"/>
+  <text x="600" y="34" text-anchor="middle" fill="#f8fafc" font-size="16" font-weight="700" letter-spacing="2">SENTINEL NEXUS -- DET CHAMBER · LIVE ACQUISITION &amp; DETONATION</text>
+  <line x1="300" y1="44" x2="900" y2="44" stroke="#334155" stroke-width="1"/>
+  <text x="600" y="58" text-anchor="middle" fill="#64748b" font-size="9">Endpoints are OUTBOUND-only — the platform never reaches in (no inbound SSH/WinRM)</text>
+
+  <!-- BAND 1: SWARM INVESTIGATION -> ACQUISITION TASK -->
+  <rect x="30" y="70" width="1140" height="135" rx="6" fill="url(#swarm-bg)" stroke="#4338ca" stroke-width="1" opacity="0.92"/>
+  <text x="50" y="90" fill="#a5b4fc" font-size="10" font-weight="600" letter-spacing="2">1 -- AGENTIC SWARM (analytics/llm_hunter)</text>
+  <text x="1150" y="90" text-anchor="end" fill="#475569" font-size="9">During the investigation</text>
+
+  <rect x="50" y="105" width="210" height="85" rx="4" fill="#1a1a2e" stroke="#818cf8" stroke-width="1"/>
+  <text x="155" y="125" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">host_expert</text>
+  <text x="60" y="145" fill="#94a3b8" font-size="9">file = TRUE POSITIVE</text>
+  <text x="60" y="160" fill="#94a3b8" font-size="9">path + os_family known</text>
+  <text x="60" y="178" fill="#818cf8" font-size="9" font-weight="600">confidence ≥ NEXUS_ACQUIRE_GATE</text>
+
+  <rect x="300" y="105" width="220" height="85" rx="4" fill="#1a1a2e" stroke="#818cf8" stroke-width="1"/>
+  <text x="410" y="125" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">acquire_and_detonate</text>
+  <text x="310" y="145" fill="#94a3b8" font-size="9">tool: emit validated request</text>
+  <text x="310" y="160" fill="#94a3b8" font-size="9">AcquisitionRequestSchema</text>
+  <text x="310" y="178" fill="#818cf8" font-size="9" font-weight="600">LLM only emits — never executes</text>
+
+  <rect x="560" y="110" width="190" height="75" rx="4" fill="#2e1065" stroke="#8b5cf6" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="655" y="133" text-anchor="middle" fill="#ddd6fe" font-size="11" font-weight="700">NATS (default-deny)</text>
+  <text x="570" y="153" fill="#c4b5fd" font-size="9">nexus.acquire.request</text>
+  <text x="570" y="170" fill="#c4b5fd" font-size="9">authed: swarm_node → detchamber_node</text>
+
+  <rect x="790" y="105" width="350" height="85" rx="4" fill="#1a1a2e" stroke="#818cf8" stroke-width="1"/>
+  <text x="965" y="125" text-anchor="middle" fill="#c7d2fe" font-size="11" font-weight="600">worker_acquire</text>
+  <text x="800" y="145" fill="#94a3b8" font-size="9">vet path (deny-list / traversal / size)</text>
+  <text x="800" y="160" fill="#94a3b8" font-size="9">enqueue_acquisition_task — keyed by host</text>
+  <text x="800" y="178" fill="#818cf8" font-size="9" font-weight="600">task store ← agent polls it (outbound)</text>
+
+  <line x1="262" y1="147" x2="298" y2="147" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="522" y1="147" x2="558" y2="147" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="752" y1="147" x2="788" y2="147" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- BAND 2: ENDPOINT (outbound-only acquisition agent) -->
+  <rect x="30" y="220" width="1140" height="170" rx="6" fill="url(#ep-bg)" stroke="#78716c" stroke-width="1" opacity="0.92"/>
+  <text x="50" y="240" fill="#d6d3d1" font-size="10" font-weight="600" letter-spacing="2">2 -- ENDPOINT (on-host acquisition agent · OUTBOUND HTTPS only)</text>
+  <text x="1150" y="240" text-anchor="end" fill="#475569" font-size="9">like the sensors — phones home</text>
+
+  <rect x="50" y="255" width="620" height="120" rx="4" fill="#1c1917" stroke="#f97316" stroke-width="1.5"/>
+  <text x="360" y="276" text-anchor="middle" fill="#fed7aa" font-size="11" font-weight="700">acquisition_agent  (separate lightweight agent)</text>
+  <text x="64" y="298" fill="#cbd5e1" font-size="9">① POLL  GET /api/v1/tasks  (JWT, outbound)  — pick up the host's task</text>
+  <text x="64" y="316" fill="#cbd5e1" font-size="9">② ACQUIRE  acquire_core: canonicalize + deny-list, read bytes, zip, sha256, manifest</text>
+  <text x="64" y="334" fill="#fca5a5" font-size="9" font-weight="600">     NEVER EXECUTES the sample — copied bytes only</text>
+  <text x="64" y="356" fill="#fdba74" font-size="9" font-weight="600">③ TRANSMIT  POST /api/v1/artifact  (JWT + HMAC + manifest headers)  ▸ outbound HTTPS</text>
+
+  <rect x="700" y="270" width="440" height="55" rx="4" fill="#1c1917" stroke="#a8a29e" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="920" y="289" text-anchor="middle" fill="#d6d3d1" font-size="10" font-weight="600">FALLBACK — managed hosts (EDR live-response / SSH·WinRM)</text>
+  <text x="710" y="312" fill="#94a3b8" font-size="9">operations/playbooks/{linux,windows}/05_acquire_artifact — same acquire+upload</text>
+
+  <rect x="700" y="338" width="440" height="38" rx="4" fill="#1c1917" stroke="#eab308" stroke-width="1"/>
+  <text x="920" y="362" text-anchor="middle" fill="#fef08a" font-size="9" font-weight="600">chain of custody = content-addressed sha256 (the HMAC analog)</text>
+
+  <line x1="655" y1="190" x2="360" y2="253" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#ap)"/>
+
+  <!-- BAND 3: AUTHENTICATED INGRESS -->
+  <rect x="30" y="405" width="1140" height="130" rx="6" fill="url(#ingress-bg)" stroke="#0d9488" stroke-width="1" opacity="0.92"/>
+  <text x="50" y="425" fill="#5eead4" font-size="10" font-weight="600" letter-spacing="2">3 -- AUTHENTICATED INGRESS (services/core_ingress)</text>
+  <text x="1150" y="425" text-anchor="end" fill="#475569" font-size="9">same gateway sensors use</text>
+
+  <rect x="50" y="440" width="620" height="85" rx="4" fill="#0f2c2a" stroke="#2dd4bf" stroke-width="1.5" filter="url(#gl)"/>
+  <text x="360" y="461" text-anchor="middle" fill="#99f6e4" font-size="11" font-weight="700">core_ingress  /api/v1/artifact   +   /api/v1/tasks</text>
+  <text x="64" y="481" fill="#cbd5e1" font-size="9">verify JWT  ·  verify HMAC over body  ·  read manifest headers (sha256, incident, os)</text>
+  <text x="64" y="499" fill="#cbd5e1" font-size="9">ban-on-mismatch (same 3-tier integrity as telemetry)</text>
+  <text x="64" y="517" fill="#5eead4" font-size="9" font-weight="600">relay ▸ nexus.detonation.intake  (manifest in headers, artifact in body)</text>
+
+  <rect x="710" y="448" width="430" height="70" rx="4" fill="#2e1065" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="925" y="470" text-anchor="middle" fill="#ddd6fe" font-size="11" font-weight="700">NATS JetStream</text>
+  <text x="722" y="490" fill="#c4b5fd" font-size="9">Nexus_Detonation_Intake  ·  Nexus_Acquire_Request</text>
+  <text x="722" y="507" fill="#c4b5fd" font-size="9">Nexus_Alerts_Detonation  (least-privilege detchamber_node)</text>
+
+  <line x1="360" y1="376" x2="360" y2="438" stroke="#f97316" stroke-width="1.5" marker-end="url(#ao)"/>
+  <line x1="672" y1="483" x2="708" y2="483" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- BAND 4: DET CHAMBER (isolated, no egress) -->
+  <rect x="30" y="550" width="1140" height="230" rx="6" fill="url(#chamber-bg)" stroke="#b91c1c" stroke-width="1.2" opacity="0.92"/>
+  <text x="50" y="570" fill="#fca5a5" font-size="10" font-weight="600" letter-spacing="2">4 -- DET CHAMBER (project_empros/det_chamber · ISOLATED · NO NETWORK EGRESS)</text>
+  <text x="1150" y="570" text-anchor="end" fill="#7f1d1d" font-size="9">detonated malware cannot propagate</text>
+
+  <rect x="50" y="585" width="300" height="175" rx="4" fill="#1a0a0a" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="200" y="606" text-anchor="middle" fill="#fecaca" font-size="11" font-weight="700">intake_service</text>
+  <text x="62" y="628" fill="#cbd5e1" font-size="9">consume nexus.detonation.intake</text>
+  <text x="62" y="646" fill="#cbd5e1" font-size="9">store artifact → quarantine bucket</text>
+  <text x="62" y="664" fill="#fca5a5" font-size="9" font-weight="600">CHAIN-OF-CUSTODY verify (sha256)</text>
+  <text x="62" y="682" fill="#94a3b8" font-size="9">mismatch ⇒ custody_failed,</text>
+  <text x="62" y="697" fill="#94a3b8" font-size="9">engine NEVER called</text>
+  <text x="62" y="722" fill="#cbd5e1" font-size="9">engine_runner: route by os_family</text>
+  <text x="62" y="740" fill="#fca5a5" font-size="9" font-weight="600">writes to disk — never executes here</text>
+
+  <rect x="370" y="585" width="230" height="175" rx="4" fill="#1c1917" stroke="#eab308" stroke-width="1.5"/>
+  <text x="485" y="606" text-anchor="middle" fill="#fef08a" font-size="11" font-weight="700">🔒 quarantine bucket</text>
+  <text x="382" y="628" fill="#94a3b8" font-size="9">dedicated nexus-quarantine</text>
+  <text x="382" y="645" fill="#94a3b8" font-size="9">(separate from cold-storage)</text>
+  <text x="382" y="666" fill="#fde047" font-size="9" font-weight="600">Object Lock / WORM</text>
+  <text x="382" y="683" fill="#fde047" font-size="9" font-weight="600">own KMS key · versioned</text>
+  <text x="382" y="700" fill="#fde047" font-size="9" font-weight="600">lifecycle expiry · public-block</text>
+  <text x="382" y="717" fill="#fde047" font-size="9" font-weight="600">TLS-only</text>
+  <text x="382" y="740" fill="#94a3b8" font-size="9">deny all principals except</text>
+  <text x="382" y="754" fill="#94a3b8" font-size="9">the det_chamber roles</text>
+
+  <rect x="620" y="600" width="250" height="145" rx="4" fill="#1a0a0a" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="745" y="621" text-anchor="middle" fill="#a5f3fc" font-size="11" font-weight="700">windows_engine</text>
+  <text x="632" y="643" fill="#94a3b8" font-size="9">Hyper-V/VMware VM pool</text>
+  <text x="632" y="660" fill="#67e8f9" font-size="9" font-weight="600">PRIVATE switch — no NAT/internet</text>
+  <text x="632" y="681" fill="#94a3b8" font-size="9">static: PE / CAPA / YARA</text>
+  <text x="632" y="698" fill="#94a3b8" font-size="9">dynamic: Procmon / INetSim /</text>
+  <text x="632" y="713" fill="#94a3b8" font-size="9">Magnet|Cuckoo / Volatility</text>
+  <text x="632" y="734" fill="#67e8f9" font-size="9" font-weight="600">→ summary.json</text>
+
+  <rect x="890" y="600" width="250" height="145" rx="4" fill="#1a0a0a" stroke="#06b6d4" stroke-width="1.5"/>
+  <text x="1015" y="621" text-anchor="middle" fill="#a5f3fc" font-size="11" font-weight="700">linux_sandbox</text>
+  <text x="902" y="643" fill="#94a3b8" font-size="9">KVM/libvirt micro-VM</text>
+  <text x="902" y="660" fill="#67e8f9" font-size="9" font-weight="600">isolated net (mode=none)</text>
+  <text x="902" y="681" fill="#94a3b8" font-size="9">static: ELF / CAPA / YARA</text>
+  <text x="902" y="698" fill="#94a3b8" font-size="9">dynamic: strace / tcpdump /</text>
+  <text x="902" y="713" fill="#94a3b8" font-size="9">INetSim / Volatility3</text>
+  <text x="1015" y="734" fill="#67e8f9" font-size="9" font-weight="600">→ same summary.json envelope</text>
+
+  <line x1="360" y1="518" x2="200" y2="583" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="350" y1="650" x2="368" y2="650" stroke="#eab308" stroke-width="1.5" marker-end="url(#ay)"/>
+  <line x1="350" y1="690" x2="618" y2="670" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#ac)"/>
+  <line x1="870" y1="672" x2="888" y2="672" stroke="#06b6d4" stroke-width="1.2" marker-end="url(#ac)"/>
+
+  <!-- BAND 5: VERDICT -> OPERATIONS -->
+  <rect x="30" y="795" width="1140" height="195" rx="6" fill="url(#ops-bg)" stroke="#15803d" stroke-width="1" opacity="0.92"/>
+  <text x="50" y="815" fill="#86efac" font-size="10" font-weight="600" letter-spacing="2">5 -- VERDICT → OPERATIONS STACK (swarm enrichment drives action)</text>
+  <text x="1150" y="815" text-anchor="end" fill="#475569" font-size="9">operator sees it live</text>
+
+  <rect x="50" y="830" width="200" height="80" rx="4" fill="#0c1f14" stroke="#22c55e" stroke-width="1.2"/>
+  <text x="150" y="851" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="700">nexus.alerts.detonation</text>
+  <text x="60" y="871" fill="#94a3b8" font-size="9">verdict envelope → swarm</text>
+  <text x="60" y="889" fill="#86efac" font-size="9" font-weight="600">orchestrator enrichment listener</text>
+
+  <rect x="280" y="830" width="220" height="80" rx="4" fill="#0c1f14" stroke="#22c55e" stroke-width="1.2"/>
+  <text x="390" y="851" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="700">detonation_enrichment</text>
+  <text x="290" y="871" fill="#94a3b8" font-size="9">malicious → isolate_host</text>
+  <text x="290" y="889" fill="#94a3b8" font-size="9">benign (FP) → restore  ·  RAG immunity</text>
+
+  <rect x="530" y="830" width="170" height="80" rx="4" fill="#2e1065" stroke="#8b5cf6" stroke-width="1.2"/>
+  <text x="615" y="851" text-anchor="middle" fill="#ddd6fe" font-size="10" font-weight="700">SOAR</text>
+  <text x="540" y="871" fill="#c4b5fd" font-size="9">nexus.soar.execute</text>
+  <text x="540" y="889" fill="#c4b5fd" font-size="9">worker_soar → executor</text>
+
+  <rect x="730" y="824" width="250" height="92" rx="4" fill="#0c1f14" stroke="#4ade80" stroke-width="1.2"/>
+  <text x="855" y="844" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="700">operations/playbooks</text>
+  <text x="742" y="864" fill="#94a3b8" font-size="9">contain: 01_isolate · 02_eradicate ·</text>
+  <text x="742" y="879" fill="#94a3b8" font-size="9">04_block_c2  (rollback journal)</text>
+  <text x="742" y="897" fill="#4ade80" font-size="9" font-weight="600">restore (FP): 06_restore — sha-verified</text>
+
+  <rect x="1000" y="824" width="140" height="92" rx="4" fill="#0c1f14" stroke="#4ade80" stroke-width="1.2"/>
+  <text x="1070" y="844" text-anchor="middle" fill="#bbf7d0" font-size="10" font-weight="700">operator</text>
+  <text x="1010" y="864" fill="#94a3b8" font-size="9">webui detonation</text>
+  <text x="1010" y="879" fill="#94a3b8" font-size="9">panel + n8n</text>
+  <text x="1010" y="897" fill="#4ade80" font-size="9" font-weight="600">acquire→detonate→verdict</text>
+
+  <text x="600" y="945" text-anchor="middle" fill="#64748b" font-size="9">Prometheus scrapes intake /metrics · all NATS subjects authed (default-deny) · IaC isolation validated in the dockerized lab</text>
+
+  <line x1="745" y1="745" x2="500" y2="828" stroke="#22c55e" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="200" y1="760" x2="150" y2="828" stroke="#22c55e" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="250" y1="870" x2="278" y2="870" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ag)"/>
+  <line x1="500" y1="870" x2="528" y2="870" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="700" y1="870" x2="728" y2="870" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ag)"/>
+</svg>

@@ -55,19 +55,13 @@ parquet = "53"
 sqlx = { version = "0.8.2", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "sqlite"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "rustls-native-certs"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
-# nexus_integrity: path dep pointing at the shared stamper crate in windows_xdr_dev.
-# The stamper was fixed to use the canonical HMAC field order matching core_ingress:
-#   HMAC( parquet || seq_BE || sensor_id || ts_BE )
-# Previously: seq_LE ‖ ts_LE ‖ sensor_id ‖ parquet -- every batch rejected.
-# IMPORTANT: rebuild with --features integrity to enable HMAC stamping.
-# Without this feature, parquet_transmitter.rs sends batches without HMAC headers
-# and the middleware/ingress rejects them with 400 (missing X-Batch-HMAC).
-nexus_integrity = { path = "../../windows/windows_xdr_dev/nexus_integrity", optional = true }
-hmac = { version = "0.12", optional = true }
+hmac = "0.12"
 
 [features]
 default = ["integrity"]
-integrity = ["dep:nexus_integrity", "dep:hmac"]
+# Toggles the batch HMAC stamping path in parquet_transmitter.rs. With it off the
+# gateway rejects batches (400, missing X-Batch-HMAC) -- on by default for that reason.
+integrity = []
 
 [dev-dependencies]
 hmac    = "0.12"

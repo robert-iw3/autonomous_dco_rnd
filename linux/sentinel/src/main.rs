@@ -31,6 +31,9 @@ use mimalloc::MiMalloc;
 // Module Registration
 mod api { pub mod server; }
 mod config;
+#[cfg(feature = "integrity")]
+mod integrity;
+mod response;
 mod engine {
     pub mod ebpf;
     pub mod honeypot;
@@ -162,6 +165,28 @@ async fn main() -> Result<()> {
         let lock = config.read().unwrap_or_else(|e| e.into_inner());
         lock.clone()
     };
+
+    // -- SOAR response poller (DC-N11) ----------------------------------------
+    // Outbound-only: pull Nexus-signed response tasks from the ingress, verify,
+    // run the matching bundled playbook locally, report the outcome. Enabled only
+    // when an integrity secret is configured (same secret as the batch HMAC).
+    if let Some(secret) = initial_config.siem.integrity_secret.clone() {
+        let gateway = initial_config.siem.middleware_gateway_url.clone();
+        let token = initial_config.siem.auth_token.clone();
+        let ca = initial_config.siem.tls_ca_cert.clone();
+        let playbooks_dir = std::env::var("NEXUS_PLAYBOOKS_DIR")
+            .unwrap_or_else(|_| "/opt/linux-sentinel/playbooks/linux".into());
+        async_tasks.push(tokio::spawn(async move {
+            crate::response::run_poller(
+                gateway, token, secret.into_bytes(), playbooks_dir.into(), ca,
+                std::time::Duration::from_secs(15),
+            )
+            .await;
+        }));
+        info!("SOAR response poller spawned");
+    } else {
+        warn!("siem.integrity_secret unset -- SOAR response poller disabled");
+    }
 
     if initial_config.storage.enable_parquet {
         let parquet_dir = initial_config.storage.parquet_directory.clone();

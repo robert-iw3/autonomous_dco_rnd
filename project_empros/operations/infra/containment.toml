@@ -11,9 +11,14 @@ retry_backoff_base_ms = 1000
 retry_backoff_max_ms = 10000
 active_edr = "custom_edr_v1"
 active_firewall = "custom_fw_v1"
-# SSH/WinRM playbook executor -- used when the endpoint has no EDR agent.
-# worker_soar routes isolate_host here when active_edr is unreachable or
-# when source_type indicates a host without a registered sensor.
+# Agent-task executor (PREFERRED for outbound-only endpoints that run the Nexus
+# sensor agent, no inbound reach): worker_soar enqueues a SIGNED response task keyed
+# by host (operations/agent/task_dispatch.py); the on-host agent polls
+# core_ingress GET /api/v1/tasks, verifies it, and runs the fixed 0X_* playbook
+# locally -- nothing reaches into the host. See DC-N11.
+active_agent_executor = "agent_task_v1"
+# SSH/WinRM playbook executor -- LEGACY fallback for hosts the platform can reach
+# inbound (managed jump-host); deprecated for outbound-only endpoints.
 active_playbook_executor = "ssh_playbook_v1"
 
 # ── Cloud Provider Routing ─────────────────────────────────────────────────────
@@ -236,6 +241,42 @@ body_template = """
 [providers.ssh_playbook_v1.actions.restore.validation]
 required_fields = ["target", "incident_id"]
 target_format = "any"
+
+# ==============================================================================
+# Agent-task executor (outbound-only endpoints running the Nexus sensor agent).
+# worker_soar does NOT push to the host; it enqueues a SIGNED response task keyed
+# by host (operations/agent/task_dispatch.py). The on-host agent polls it from
+# core_ingress GET /api/v1/tasks, verifies the signature, and runs the matching
+# fixed operations/playbooks/<os>/0X_* locally. Reaches outbound-only endpoints
+# the SSH/WinRM path cannot. The "endpoint" below is the enqueue sink, not a host.
+# ==============================================================================
+[providers.agent_task_v1.actions.isolate_host]
+method = "ENQUEUE"
+endpoint = "taskstore://nexus.agent.tasks"
+delivery = "agent_poll"
+retryable = true
+[providers.agent_task_v1.actions.isolate_host.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.agent_task_v1.actions.block_ip]
+method = "ENQUEUE"
+endpoint = "taskstore://nexus.agent.tasks"
+delivery = "agent_poll"
+retryable = true
+[providers.agent_task_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.agent_task_v1.actions.restore]
+method = "ENQUEUE"
+endpoint = "taskstore://nexus.agent.tasks"
+delivery = "agent_poll"
+retryable = true
+[providers.agent_task_v1.actions.restore.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
 # ==============================================================================
 # Cloud Provider: AWS
 # Lambda Function URLs provisioned by operations/infra/terraform/containment/aws.tf

@@ -15,11 +15,6 @@ RUN rustup component add rustfmt
 
 WORKDIR /app
 
-COPY windows/windows_xdr_dev/Cargo.toml /app/windows/windows_xdr_dev/Cargo.toml
-COPY windows/windows_xdr_dev/nexus_integrity /app/windows/windows_xdr_dev/nexus_integrity
-COPY windows/windows_xdr_dev/ml_ueba /app/windows/windows_xdr_dev/ml_ueba
-COPY windows/windows_xdr_dev/transmission /app/windows/windows_xdr_dev/transmission
-
 COPY linux/sentinel /app/linux/sentinel
 
 COPY project_empros/middleware/config/sensor_profiles /app/project_empros/middleware/config/sensor_profiles
@@ -28,4 +23,7 @@ WORKDIR /app/linux/sentinel
 
 ENV CARGO_TERM_COLOR=always
 
-CMD ["sh", "-c", "cargo check --features integrity && cargo test --features integrity --test test_sensor_pipeline -- --nocapture"]
+# Run the WHOLE suite (lib + binary unit tests + integration), not just one target,
+# so the response/integrity/agent-task module #[cfg(test)] golden-vector tests --
+# which recompute the HMAC and fail on any canonical/signing drift -- actually run.
+CMD ["sh", "-c", "cargo check --features integrity && cargo test --features integrity -- --nocapture"]

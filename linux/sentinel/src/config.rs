@@ -129,7 +129,6 @@ pub struct SiemConfig {
     pub tls_ca_cert: Option<String>,
     pub auth_token: String,
     pub batch_size: usize,
-    #[allow(dead_code)] // Future: nexus_integrity stamper
     pub integrity_secret: Option<String>,
     #[serde(default = "default_batch_size")]
     pub parquet_batch_size: usize,

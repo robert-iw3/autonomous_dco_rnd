@@ -1,9 +1,9 @@
 """
 Lab det_chamber -- endpoint outbound transmission (Phase 8).
 
-Acquisition rides the same OUTBOUND HTTPS channel sensors already use: 
-a separate lightweight acquisition agent polls ingress for tasks, 
-acquires the file locally, and transmits it to core_ingress 
+Acquisition rides the same OUTBOUND HTTPS channel sensors already use:
+a separate lightweight acquisition agent polls ingress for tasks,
+acquires the file locally, and transmits it to core_ingress
 /api/v1/artifact with JWT + HMAC + the chain-of-custody manifest.
 
 This covers the det_chamber-side pieces (agent transmission + worker enqueue);

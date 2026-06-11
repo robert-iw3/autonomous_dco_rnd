@@ -54,6 +54,10 @@ struct AppState {
     /// schema, so parsing once eliminates ~2ms of Parquet footer decode per request.
     schema_cache: DashMap<String, Vec<String>>,
     max_payload_bytes: usize,
+    /// Pending SOAR response tasks (DC-N11), keyed by host == the agent's JWT
+    /// subject. worker_soar publishes signed tasks to `nexus.agent.tasks`; the
+    /// subscriber files them here; GET /api/v1/tasks drains them on the agent poll.
+    task_store: Arc<DashMap<String, Vec<serde_json::Value>>>,
 }
 
 struct NatsHeaderInjector<'a>(&'a mut HeaderMap);
@@ -148,6 +152,39 @@ async fn main() {
         }
     };
 
+    // -- Agent-task subscriber (DC-N11) ---------------------------------------
+    // worker_soar publishes signed response tasks to `nexus.agent.tasks`. File each
+    // by its `host` field; GET /api/v1/tasks drains them for the polling agent. The
+    // signature is verified ON THE HOST (the agent owns the secret); the ingress
+    // only routes -- it never executes.
+    let task_store: Arc<DashMap<String, Vec<serde_json::Value>>> = Arc::new(DashMap::new());
+    {
+        use futures::StreamExt;
+        let sub_client = client.clone();
+        let store = task_store.clone();
+        tokio::spawn(async move {
+            match sub_client.subscribe("nexus.agent.tasks".to_string()).await {
+                Ok(mut sub) => {
+                    info!("agent-task subscriber listening on nexus.agent.tasks");
+                    while let Some(msg) = sub.next().await {
+                        match serde_json::from_slice::<serde_json::Value>(&msg.payload) {
+                            Ok(task) => match task.get("host").and_then(|v| v.as_str()) {
+                                Some(host) => {
+                                    store.entry(host.to_string()).or_default().push(task);
+                                    counter!("nexus_ingress_agent_tasks_queued_total").increment(1);
+                                }
+                                None => warn!("agent task missing host field -- dropped"),
+                            },
+                            Err(e) => warn!(error = %e, "dropping malformed agent task"),
+                        }
+                    }
+                    error!("agent-task subscription ended");
+                }
+                Err(e) => error!(error = %e, "failed to subscribe to nexus.agent.tasks"),
+            }
+        });
+    }
+
     let js = async_nats::jetstream::new(client);
 
     let state = Arc::new(AppState {
@@ -157,6 +194,7 @@ async fn main() {
         verifier,
         schema_cache: DashMap::new(),
         max_payload_bytes: cfg.max_payload_bytes,
+        task_store,
     });
 
     let app = Router::new()
@@ -450,19 +488,29 @@ async fn handle_artifact_upload(
     }
 }
 
-/// GET /api/v1/tasks -- the on-host agent polls (outbound) for pending acquisition
-/// tasks. JWT-gated. worker_acquire enqueues tasks keyed by host; wiring the shared
-/// task store (Redis/JetStream KV) into this handler is the Phase 8 follow-up.
+/// GET /api/v1/tasks -- the on-host agent polls (outbound) for pending SOAR
+/// response / acquisition tasks. JWT-gated; drains the agent's queue keyed by its
+/// JWT subject (== host). worker_soar fills the queue via `nexus.agent.tasks`.
 async fn handle_task_poll(
     State(state): State<Arc<AppState>>,
     headers: header::HeaderMap,
 ) -> impl IntoResponse {
-    if validate_token(&headers, &state.jwt_secret).is_err() {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "tasks": [] })));
+    let claims = match validate_token(&headers, &state.jwt_secret) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "tasks": [] }))),
+    };
+    // Drain this agent's queued tasks. At-least-once: the agent confirms completion
+    // out of band (nexus.soar.callback); the signature is verified on the host.
+    let tasks = state
+        .task_store
+        .remove(&claims.sub)
+        .map(|(_, v)| v)
+        .unwrap_or_default();
+    if !tasks.is_empty() {
+        counter!("nexus_ingress_agent_tasks_polled_total").increment(tasks.len() as u64);
+        info!(sensor = %claims.sub, n = tasks.len(), "delivered pending agent tasks");
     }
-    // TODO(Phase 8 follow-up): read pending acquisition tasks for this sensor_id
-    // from the shared task store that worker_acquire writes to.
-    (StatusCode::OK, Json(serde_json::json!({ "tasks": [] })))
+    (StatusCode::OK, Json(serde_json::json!({ "tasks": tasks })))
 }
 
 // -- Violation Logging --------------------------------------------------------
