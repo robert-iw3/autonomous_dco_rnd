@@ -50,4 +50,16 @@ done
 
 cp services/config/nexus.toml dist/
 
+# -- Det Chamber intake-service image (Phase 6) --------------------------------
+# The intake service is Python (not a static Rust binary), so it ships as a
+# container image. Build it when Docker/Podman is available; the orchestration
+# deploy stage (07b-deploy-detchamber.sh) pushes/runs it.
+if command -v docker >/dev/null 2>&1 || command -v podman >/dev/null 2>&1; then
+    CRI=$(command -v docker || command -v podman)
+    echo -e "${C_CYAN}[*] Building det_chamber intake image...${C_RESET}"
+    "$CRI" build -f det_chamber/deploy/Dockerfile.intake -t detchamber-intake:latest det_chamber \
+        && echo -e "${C_GREEN}[+] detchamber-intake image built.${C_RESET}" \
+        || echo -e "${C_YELLOW:-}[!] det_chamber intake image build skipped/failed (non-fatal).${C_RESET:-}"
+fi
+
 echo -e "${C_GREEN}[+] Build complete. Zero-dependency static artifacts staged in ./dist/${C_RESET}"

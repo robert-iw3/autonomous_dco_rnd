@@ -119,7 +119,9 @@ class TestMasterCIYAML:
 
     def test_stage_count(self):
         stages = _ci().get("stages", [])
-        assert len(stages) == 7, f"Expected 7 CI stages, found {len(stages)}"
+        # 8 stages: configure, provision, harden, deploy_core, deploy_middleware,
+        # deploy_detchamber (Phase 6), mlops_train, mlops_deploy.
+        assert len(stages) == 8, f"Expected 8 CI stages, found {len(stages)}"
 
     def test_configure_is_first_stage(self):
         stages = _ci().get("stages", [])

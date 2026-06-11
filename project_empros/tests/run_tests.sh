@@ -45,6 +45,7 @@ SECTIONS=(
     "analytics|Dockerfile.analytics|Analytics hunter, agentic swarm, redteam bypass"
     "services|Dockerfile.services|Worker + infra source-contract tests (pure source reads)"
     "pipeline|Dockerfile.pipeline|Phase1/2/3 pipeline, guardrails, mlops_serving, mlops_train"
+    "detchamber|Dockerfile.detchamber|Det Chamber engine + acquisition + intake/detonation lifecycle"
 )
 
 # -- Change → section trigger map ---------------------------------------------
@@ -57,6 +58,7 @@ TRIGGERS=(
     "mlops/data/:mlops"
     "analytics/llm_hunter/:analytics services"
     "analytics/:analytics"
+    "det_chamber/:detchamber"
     "services/worker_ti_ingest/:mlops"
     "services/config/nexus:sensors"
     "services/:services"
@@ -73,6 +75,7 @@ TRIGGERS=(
     "tests/test_phase:pipeline"
     "tests/test_worker_contracts|tests/lab_worker_rules|tests/lab_infra|tests/lab_operations|tests/lab_orchestration:services"
     "tests/lab_analytics_hunter|tests/lab_agentic_swarm|tests/lab_redteam:analytics"
+    "tests/lab_det_chamber:detchamber"
     "tests/lab_mlops_serving|tests/lab_mlops_train:pipeline"
     "tests/sensors/:sensors"
 )

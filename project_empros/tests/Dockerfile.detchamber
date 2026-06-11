@@ -1,0 +1,56 @@
+# SECTION: detchamber
+# Tests:   lab_det_chamber/   (engine config + single-file mode now; acquisition,
+#          intake, detonation, swarm enrichment as later phases land)
+# Deps:    pytest + the cross-platform subset of the engine runtime (pefile/psutil/
+#          requests). The Windows-only bits (pywin32/Procmon/Magnet/Volatility) are
+#          imported lazily by the engine and stubbed in tests, so the image is a
+#          faithful Linux stand-in for the deployed engine runtime.
+#   docker build -f project_empros/tests/Dockerfile.detchamber -t nexus-test-detchamber .
+FROM docker.io/python:3.12-slim
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN pip install --no-cache-dir \
+    "pytest>=7.4.0" \
+    "pefile>=2023.2.7" \
+    "psutil>=5.9.0" \
+    "requests>=2.31.0" \
+    "PyYAML>=6.0" \
+    "yamllint>=1.35.0" \
+    "ansible-lint>=24.0.0" \
+    "pydantic>=2.7.1"
+
+# Swarm-side modules used by the Phase 7 capstone E2E (state schemas, acquire tool,
+# enrichment). langchain_core is stubbed in the test; importing the heavy tools
+# package is avoided -- the capstone imports the specific modules directly.
+COPY project_empros/analytics/llm_hunter/   /repo/project_empros/analytics/llm_hunter/
+
+# Offline IaC validators so the lab proves the infrastructure will actually deploy
+# (terraform fmt needs no provider downloads -- works in the isolated lab).
+ARG TERRAFORM_VERSION=1.9.8
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+    && curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/tf.zip \
+    && unzip /tmp/tf.zip -d /usr/local/bin && rm /tmp/tf.zip \
+    && apt-get purge -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+# IaC lives in infrastructure/; the lab validates it too (isolation + deployability).
+COPY project_empros/det_chamber/            /repo/project_empros/det_chamber/
+COPY project_empros/infrastructure/terraform/det_chamber/        /repo/project_empros/infrastructure/terraform/det_chamber/
+COPY project_empros/infrastructure/det_chamber/                  /repo/project_empros/infrastructure/det_chamber/
+COPY project_empros/infrastructure/ansible/roles/det_chamber_sandbox/ /repo/project_empros/infrastructure/ansible/roles/det_chamber_sandbox/
+COPY project_empros/infrastructure/ansible/roles/det_chamber_linux/   /repo/project_empros/infrastructure/ansible/roles/det_chamber_linux/
+# Operations playbooks (acquisition 05 + restore 06 + eradication 02 journal) and
+# the ssh_playbook_v1 provider config -- the lab validates these contracts too.
+COPY project_empros/operations/playbooks/   /repo/project_empros/operations/playbooks/
+COPY project_empros/operations/infra/containment.toml /repo/project_empros/operations/infra/containment.toml
+COPY project_empros/tests/lab_det_chamber/  /repo/project_empros/tests/lab_det_chamber/
+COPY project_empros/tests/pytest.ini        /repo/project_empros/tests/
+
+ENV PYTHONPATH=/repo/project_empros/det_chamber/engine:/repo/project_empros
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/lab_det_chamber/", \
+     "-v", "--tb=short", "--junit-xml=/reports/detchamber.xml"]

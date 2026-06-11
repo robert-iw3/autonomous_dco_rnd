@@ -5,8 +5,8 @@ use axum::{
     extract::State,
     http::{header, StatusCode},
     response::IntoResponse,
-    routing::post,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use dashmap::DashMap;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
@@ -47,6 +47,8 @@ struct Claims {
 struct AppState {
     js: async_nats::jetstream::Context,
     jwt_secret: String,
+    /// Shared HMAC secret -- verifies the artifact-upload body (Det Chamber).
+    integrity_secret: String,
     verifier: IntegrityVerifier,
     /// Cache Parquet column names per sensor_id. Sensors always send the same
     /// schema, so parsing once eliminates ~2ms of Parquet footer decode per request.
@@ -151,6 +153,7 @@ async fn main() {
     let state = Arc::new(AppState {
         js,
         jwt_secret: cfg.jwt_secret,
+        integrity_secret: cfg.integrity_secret,
         verifier,
         schema_cache: DashMap::new(),
         max_payload_bytes: cfg.max_payload_bytes,
@@ -158,7 +161,12 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/v1/telemetry", post(handle_binary_telemetry))
-        .route("/healthz", axum::routing::get(|| async { StatusCode::OK }))
+        // Det Chamber: outbound endpoint acquisition (no inbound SSH/WinRM). The
+        // on-host agent polls /api/v1/tasks and transmits the acquired file to
+        // /api/v1/artifact over HTTPS with JWT + HMAC.
+        .route("/api/v1/artifact", post(handle_artifact_upload))
+        .route("/api/v1/tasks", get(handle_task_poll))
+        .route("/healthz", get(|| async { StatusCode::OK }))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
@@ -362,6 +370,99 @@ async fn handle_binary_telemetry(
             StatusCode::SERVICE_UNAVAILABLE
         }
     }
+}
+
+// -- Det Chamber: endpoint artifact acquisition (outbound HTTPS) --------------
+
+const HDR_ARTIFACT_HMAC: &str = "X-Artifact-HMAC";
+const HDR_ARTIFACT_SHA256: &str = "X-Artifact-SHA256";
+
+/// Verify the HMAC-SHA256 over the artifact body with the shared integrity secret.
+/// Same primitive the sensor telemetry path uses, applied to the whole upload.
+fn verify_artifact_hmac(secret: &str, body: &[u8], provided_hex: &str) -> bool {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let mut mac = match Hmac::<Sha256>::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(body);
+    match hex::decode(provided_hex) {
+        Ok(expected) => mac.verify_slice(&expected).is_ok(),
+        Err(_) => false,
+    }
+}
+
+/// POST /api/v1/artifact -- the on-host acquisition agent transmits a zipped,
+/// confirmed-TP file OUTBOUND over HTTPS. JWT-gated + HMAC-verified, then relayed
+/// to intake_service over NATS, which persists it to the locked-down quarantine
+/// bucket and detonates. The chain-of-custody sha256 (X-Artifact-SHA256) is
+/// re-verified at intake after unzip.
+async fn handle_artifact_upload(
+    State(state): State<Arc<AppState>>,
+    headers: header::HeaderMap,
+    body: Bytes,
+) -> impl IntoResponse {
+    if validate_token(&headers, &state.jwt_secret).is_err() {
+        counter!("nexus_ingress_auth_failures_total").increment(1);
+        return StatusCode::UNAUTHORIZED;
+    }
+    let incident_id = hdr_str(&headers, "X-Incident-Id").unwrap_or("");
+    let sha256 = hdr_str(&headers, HDR_ARTIFACT_SHA256).unwrap_or("");
+    let provided_hmac = match hdr_str(&headers, HDR_ARTIFACT_HMAC) {
+        Some(h) => h,
+        None => return StatusCode::BAD_REQUEST,
+    };
+    if incident_id.is_empty() || sha256.is_empty() {
+        return StatusCode::BAD_REQUEST;
+    }
+    if !verify_artifact_hmac(&state.integrity_secret, &body, provided_hmac) {
+        counter!("nexus_ingress_hmac_failures_total").increment(1);
+        error!(incident_id, "Artifact HMAC verification failed -- rejecting upload");
+        return StatusCode::FORBIDDEN;
+    }
+    counter!("nexus_ingress_artifact_verified_total").increment(1);
+
+    // Forward the manifest as headers; the artifact rides the message body.
+    let mut nats_headers = HeaderMap::new();
+    for key in [
+        "X-Incident-Id", "X-Sensor-Id", "X-Os-Family", "X-Artifact-Filename",
+        HDR_ARTIFACT_SHA256, "X-Artifact-Size", "X-Src-Path",
+    ] {
+        if let Some(v) = hdr_str(&headers, key) {
+            nats_headers.insert(key, v);
+        }
+    }
+    match state
+        .js
+        .publish_with_headers("nexus.detonation.intake".into(), nats_headers, body.into())
+        .await
+    {
+        Ok(_) => {
+            counter!("nexus_ingress_artifacts_accepted_total").increment(1);
+            info!(incident_id, "Artifact verified → detonation intake");
+            StatusCode::ACCEPTED
+        }
+        Err(e) => {
+            error!(error = %e, "Artifact intake publish rejected");
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+    }
+}
+
+/// GET /api/v1/tasks -- the on-host agent polls (outbound) for pending acquisition
+/// tasks. JWT-gated. worker_acquire enqueues tasks keyed by host; wiring the shared
+/// task store (Redis/JetStream KV) into this handler is the Phase 8 follow-up.
+async fn handle_task_poll(
+    State(state): State<Arc<AppState>>,
+    headers: header::HeaderMap,
+) -> impl IntoResponse {
+    if validate_token(&headers, &state.jwt_secret).is_err() {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "tasks": [] })));
+    }
+    // TODO(Phase 8 follow-up): read pending acquisition tasks for this sensor_id
+    // from the shared task store that worker_acquire writes to.
+    (StatusCode::OK, Json(serde_json::json!({ "tasks": [] })))
 }
 
 // -- Violation Logging --------------------------------------------------------

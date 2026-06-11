@@ -25,3 +25,10 @@ OPENAI_API_BASE_URLS: "${OPENAI_API_BASE_URLS}"
 DEFAULT_MODELS: ""
 DEFAULT_USER_ROLE: "pending"
 ENABLE_COMMUNITY_SHARING: "false"
+
+# -- Incident Workspace Panels --
+# The per-incident operator workspace surfaces the Det Chamber lifecycle so the
+# analyst sees acquire -> detonate -> verdict live during an investigation. The
+# Detonation n8n workflow POSTs status rows to /api/incidents/<id>/detonation.
+NEXUS_DETONATION_PANEL_ENABLED: "true"
+NEXUS_DETONATION_STATUS_ENDPOINT: "/api/incidents/{incident_id}/detonation"

@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "description": "Det Chamber external analysis assets that must be pre-staged for an AIR-GAPPED build. The engine Dockerfile (deploy/Dockerfile.windows-engine) and download_tools.ps1 otherwise fetch these from the internet at build time, which fails offline. Fetch these on the online prep machine, drop them into the bundle, and point the offline build at the local copies.",
+  "yara_rules": [
+    {
+      "name": "reversinglabs-yara-rules",
+      "repo": "https://github.com/reversinglabs/reversinglabs-yara-rules",
+      "save_as": "yara/reversinglabs-yara-rules.tar.gz",
+      "notes": "Cloned into E:/YARA/Rules/reversinglabs; compiled by compile_yara_rules.py"
+    },
+    {
+      "name": "elastic-protections-artifacts",
+      "repo": "https://github.com/elastic/protections-artifacts",
+      "save_as": "yara/protections-artifacts.tar.gz",
+      "notes": "Cloned into E:/YARA/Rules/elastic; filtered to windows_x64 by filter_yara_rules.ps1"
+    }
+  ],
+  "windows_tools": [
+    {
+      "name": "procmon",
+      "url": "https://download.sysinternals.com/files/ProcessMonitor.zip",
+      "save_as": "tools/windows/Procmon.exe",
+      "notes": "Sysinternals Process Monitor (process/registry/file telemetry)"
+    },
+    {
+      "name": "etl2pcapng",
+      "url": "https://github.com/microsoft/etl2pcapng/releases/latest",
+      "save_as": "tools/windows/etl2pcapng.exe",
+      "notes": "ETL -> pcapng conversion for captured network traffic"
+    },
+    {
+      "name": "volatility3",
+      "url": "https://github.com/volatilityfoundation/volatility3/releases/latest",
+      "save_as": "tools/windows/vol.exe",
+      "notes": "Memory forensics (windows.pslist, windows.netscan)"
+    },
+    {
+      "name": "capa",
+      "url": "https://github.com/mandiant/capa/releases/latest",
+      "save_as": "tools/windows/capa.exe",
+      "notes": "Capability detection (also pip flare-capa in python_requirements.txt)"
+    },
+    {
+      "name": "yara",
+      "url": "https://github.com/VirusTotal/yara/releases/latest",
+      "save_as": "tools/windows/yara64.exe",
+      "notes": "YARA scanner CLI used by the engine against the compiled ruleset"
+    },
+    {
+      "name": "inetsim",
+      "url": "https://www.inetsim.org/downloads.html",
+      "save_as": "tools/windows/inetsim/",
+      "notes": "Internet services simulation for isolated dynamic detonation"
+    }
+  ],
+  "licensed_manual": [
+    {
+      "name": "MagnetRESPONSE",
+      "save_as": "tools/windows/MagnetRESPONSE.exe",
+      "notes": "Licensed evidence-collection tool. Operator must supply manually (not downloadable)."
+    },
+    {
+      "name": "procmon-config",
+      "save_as": "tools/windows/malw.pmc",
+      "notes": "Procmon filter config. Supply alongside the toolset."
+    }
+  ],
+  "linux_sandbox_packages": [
+    {
+      "name": "linux-analysis-toolset",
+      "packages": ["strace", "tcpdump", "yara", "capa", "volatility3", "inetsim"],
+      "notes": "Installed on the KVM Linux sandbox by the det_chamber_linux ansible role; stage the distro packages / pip wheels in the offline mirror."
+    }
+  ]
+}

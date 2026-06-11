@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: det-chamber
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: det-chamber-sa
+  namespace: det-chamber
+---
+# ── ISOLATION: default-deny all ingress AND egress for every pod in the namespace.
+# This is the primary anti-propagation control -- detonated malware cannot reach
+# the network, other pods, or the internet. The in-pod Prometheus exporter still
+# works (loopback is exempt from NetworkPolicy). Nothing here is ever relaxed to
+# allow egress from the sandbox pod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: det-chamber-default-deny
+  namespace: det-chamber
+spec:
+  podSelector: {}            # every pod in the namespace
+  policyTypes:
+  - Ingress
+  - Egress
+  # No ingress/egress rules => deny all.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: det-chamber-role
+  namespace: det-chamber
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: det-chamber-rolebinding
+  namespace: det-chamber
+subjects:
+- kind: ServiceAccount
+  name: det-chamber-sa
+  namespace: det-chamber
+roleRef:
+  kind: Role
+  name: det-chamber-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: det-chamber
+  namespace: det-chamber
+  labels:
+    app: det-chamber
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: det-chamber
+  template:
+    metadata:
+      labels:
+        app: det-chamber
+      namespace: det-chamber
+    spec:
+      serviceAccountName: det-chamber-sa
+      # ISOLATION: never share the host network stack; deny the pod a route off-box.
+      hostNetwork: false
+      automountServiceAccountToken: false
+      containers:
+      - name: det-chamber
+        image: detchamber-engine:latest
+        # Paths/tunables resolve from the baked/mounted detchamber.toml (config-driven).
+        command: ["python", "malware_sandbox.py", "--config", "detchamber.toml", "--parallel", "4", "--simulate-network"]
+        env:
+        - name: EVIDENCE_TOOL
+          value: "magnet"
+        - name: CUCKOO_URL
+          value: "http://192.168.56.10:8090"
+        startupProbe:
+          exec:
+            command: ["powershell", "-Command", "Test-Path -Path /Collections/*summary.json"]
+          initialDelaySeconds: 300 # Wait 5 minutes before checking
+          periodSeconds: 60
+          failureThreshold: 30     # Allow up to 30 minutes total
+        readinessProbe:
+          exec:
+            command: ["powershell", "-Command", "Select-String -Path /Logs/malware_sandbox.log -Pattern 'Malware Sandbox initialized'"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+        - mountPath: /Malware
+          name: malware-volume
+        - mountPath: /Collections
+          name: collections-volume
+        - mountPath: /Logs
+          name: logs-volume
+      - name: prometheus-exporter
+        image: prom/prometheus:latest
+        args: ["--config.file=/etc/prometheus/prometheus.yml"]
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - mountPath: /etc/prometheus
+          name: prometheus-config
+        - mountPath: /Logs
+          name: logs-volume
+      volumes:
+      - name: malware-volume
+        hostPath:
+          path: C:/Malware
+      - name: collections-volume
+        hostPath:
+          path: C:/Collections
+      - name: logs-volume
+        hostPath:
+          path: C:/Logs
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      nodeSelector:
+        kubernetes.io/os: windows
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: det-chamber
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+    - job_name: 'det-chamber'
+      static_configs:
+      - targets: ['localhost:9090']
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: det-chamber-psp
+  namespace: det-chamber
+spec:
+  privileged: false
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  volumes:
+  - 'hostPath'
+  - 'configMap'
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: det-chamber-hpa
+  namespace: det-chamber
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: det-chamber
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

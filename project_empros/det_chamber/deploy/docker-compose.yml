@@ -1,0 +1,31 @@
+---
+# Det Chamber -- Windows detonation-engine runtime (isolated, no egress).
+services:
+  sandbox:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.windows-engine
+    image: detchamber-engine:latest
+    container_name: detchamber-engine
+    privileged: true
+    isolation: hyperv
+    volumes:
+      - ../config/detchamber.toml:/app/detchamber.toml:ro
+      - ./Malware:/Malware
+      - ./Collections:/Collections
+      - ./Logs:/Logs
+    environment:
+      # Override the baked config for this deployment without a rebuild.
+      - DETCHAMBER_MALWARE_DIR=/Malware
+      - DETCHAMBER_COLLECTION_DIR=/Collections
+      - DETCHAMBER_LOG_DIR=/Logs
+    # --config drives all paths/tunables; the intake service adds --malware <file>
+    # to detonate a single acquired artifact instead of scanning the whole dir.
+    command: ["--config", "/app/detchamber.toml", "--parallel", "4", "--simulate-network"]
+    networks:
+      - isolated-net
+
+networks:
+  isolated-net:
+    driver: bridge
+    internal: true

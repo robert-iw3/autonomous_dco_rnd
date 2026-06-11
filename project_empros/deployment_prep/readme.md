@@ -247,3 +247,23 @@ Check: `grep 'qdrant-client' Cargo.lock | head -1`
 2. Add a corresponding entry to `scan/scan_config.json`
    - Local (Phase 2 built) images: add `"local": true`
 3. Re-run `make pull` (or `make build`) + `make scan` + `make hash` + `make package`
+
+## Det Chamber (live acquisition & detonation)
+
+The Det Chamber has prerequisites beyond the standard wheels/collections/images:
+
+- **Python wheels** — `python_requirements.txt` stages the engine + intake deps
+  (`pefile`, `yara-python`, `pywin32`, `volatility3`, `flare-capa`, `prometheus-client`).
+  `pywin32` is Windows-only; download its `win_amd64` wheel for the engine image.
+- **Ansible collections** — `ansible_requirements.yml` stages `ansible.windows` /
+  `community.windows` (WinRM sandbox role) and `community.libvirt` (KVM Linux sandbox).
+- **Images** — `image_manifest.json`: the `servercore` engine base (`build_base_images`)
+  and the `detchamber-engine` / `detchamber-intake` `custom_images`.
+- **External analysis assets** — `detchamber_assets.json` lists what the engine
+  Dockerfile/`download_tools.ps1` otherwise pull from the internet at build time (the
+  ReversingLabs + Elastic **YARA rule repos** and the **Windows toolset**: Procmon,
+  CAPA, YARA, Volatility, INetSim, etl2pcapng; plus the licensed Magnet RESPONSE +
+  `malw.pmc` supplied manually). Pre-fetch these on the online prep machine and point
+  the offline build at the local copies so the air-gapped engine build does not call out.
+
+Validated by `tests/test_detchamber_prereqs.py`.

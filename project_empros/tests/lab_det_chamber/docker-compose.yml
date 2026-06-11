@@ -1,0 +1,64 @@
+---
+# ==============================================================================
+# Lab Det Chamber -- dockerized environment that mocks the real deployment.
+#
+# Run from project_empros/tests/lab_det_chamber/:
+#   docker compose up --build --abort-on-container-exit lab-runner
+#
+# `lab-runner` runs the cumulative pytest suite -- including the Phase 7 capstone
+# (test_acquire_detonate_lifecycle.py) which walks the WHOLE lifecycle end to end
+# (trigger -> acquire -> custody -> os-routed detonation -> verdict) with the real
+# modules and mocked I/O boundaries. nats/minio/intake provide the live substrate
+# for the intake service; the endpoint (SSH/WinRM acquisition) and swarm-stub
+# boundaries are mocked inside the capstone rather than run as separate containers.
+#
+#   lab-runner ............ cumulative suite incl. the full-lifecycle capstone
+#   nats, minio, intake ... live message bus + quarantine bucket + intake service
+# ==============================================================================
+
+services:
+  # -- Phase 1: cumulative test runner (the deployable engine image, Linux stand-in) --
+  lab-runner:
+    build:
+      context: ../../../
+      dockerfile: project_empros/tests/Dockerfile.detchamber
+    volumes:
+      - ../reports:/reports
+    # Phase 1 suite needs no live substrate. Later phases add depends_on: [nats, minio, ...].
+    command: ["python3", "-m", "pytest", "tests/lab_det_chamber/", "-v", "--tb=short",
+              "--junit-xml=/reports/detchamber.xml"]
+
+  # -- Phase 2: message bus for the acquisition/detonation lifecycle --
+  nats:
+    image: docker.io/library/nats:2.10-alpine
+    command: ["-js"]
+    ports: ["4224:4222", "8224:8222"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- Phase 2: quarantine bucket (S3 substrate the acquisition agent uploads to) --
+  minio:
+    image: docker.io/minio/minio:latest
+    command: ["server", "/data"]
+    environment:
+      - MINIO_ROOT_USER=labkey
+      - MINIO_ROOT_PASSWORD=labsecret
+    ports: ["9100:9000"]
+
+  # -- Phase 2: intake_service -- pulls artifact, verifies sha256==manifest, runs engine --
+  intake:
+    build:
+      context: ../../det_chamber
+      dockerfile: deploy/Dockerfile.intake
+    environment:
+      - NATS_URL=nats://nats:4222
+      - QUARANTINE_S3_ENDPOINT=http://minio:9000
+      - DETCHAMBER_ENGINE_MOCK=1     # mock the Windows-only subprocess detonation in CI
+    depends_on:
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_started

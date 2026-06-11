@@ -186,6 +186,45 @@ def extract_column_refs(where_clause: str) -> list[str]:
             if c.upper() not in _SQL_KW and not c.isdigit() and len(c) > 1]
 
 
+def extract_aggregation_refs(where_clause: str) -> list[str]:
+    """
+    Extract column references from the GROUP BY and HAVING segments.
+
+    extract_column_refs() deliberately strips these (they were aggregation
+    context, not WHERE filters) -- but the live engine still binds every column
+    named there. A bad column inside `GROUP BY` or `HAVING COUNT(DISTINCT x)`
+    raises the same DuckDB binder error and silently zeroes the Track 6 mine,
+    yet the WHERE-only extractor never saw it (this is exactly how the
+    ADPasswordSprayLDAP `query_name` and NTLMRelayLateral `timestamp` bugs hid).
+
+    Function names are dropped (any identifier immediately followed by `(`), so
+    COUNT/AVG/MAX/MIN/SUM don't false-positive while the column *inside* them is
+    still captured.
+    """
+    clean = re.sub(r"'[^']*'", "''", where_clause)
+    refs: set[str] = set()
+
+    # GROUP BY <cols> [HAVING ...] -- bare grouping columns
+    gb = re.search(r"\bGROUP\s+BY\b(.*?)(?:\bHAVING\b|$)", clean,
+                   re.IGNORECASE | re.DOTALL)
+    if gb:
+        for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", gb.group(1)):
+            refs.add(tok)
+
+    # HAVING <expr> -- columns live inside aggregates / comparisons
+    hv = re.search(r"\bHAVING\b(.*)$", clean, re.IGNORECASE | re.DOTALL)
+    if hv:
+        # An identifier followed by '(' is a function call -> skip the name,
+        # keep whatever identifiers sit inside it on the next iterations.
+        for m in re.finditer(r"([A-Za-z_][A-Za-z0-9_]*)\s*(\()?", hv.group(1)):
+            if m.group(2):  # immediately followed by '(' => function name
+                continue
+            refs.add(m.group(1))
+
+    return [c for c in refs
+            if c.upper() not in _SQL_KW and not c.isdigit() and len(c) > 1]
+
+
 # ── Test generation ───────────────────────────────────────────────────────────
 
 def _collect_broken_queries() -> list[tuple]:
@@ -211,12 +250,12 @@ def _collect_broken_queries() -> list[tuple]:
             if not where or sensor not in SENSOR_COLUMNS:
                 continue
             known    = SENSOR_COLUMNS[sensor]
-            cols     = extract_column_refs(where)
+            cols     = extract_column_refs(where) + extract_aggregation_refs(where)
             # Case-insensitive comparison (DuckDB column names are case-insensitive)
             known_ci = {c.lower() for c in known}
             missing  = [c for c in cols if c.lower() not in known_ci]
             if missing:
-                broken.append((idx_file.name, cls, sensor, missing, where[:120]))
+                broken.append((idx_file.name, cls, sensor, sorted(set(missing)), where[:120]))
     return broken
 
 
@@ -239,7 +278,7 @@ def _collect_valid_queries() -> list[tuple]:
             if not where or sensor not in SENSOR_COLUMNS:
                 continue
             known    = SENSOR_COLUMNS[sensor]
-            cols     = extract_column_refs(where)
+            cols     = extract_column_refs(where) + extract_aggregation_refs(where)
             known_ci = {c.lower() for c in known}
             missing  = [c for c in cols if c.lower() not in known_ci]
             if not missing:

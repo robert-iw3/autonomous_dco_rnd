@@ -60,3 +60,15 @@ openai>=1.30
 qdrant-client>=1.9
 redis>=5.0
 boto3>=1.34
+
+# -- Det Chamber (detonation engine + intake service) --------------------------
+# Engine static analysis (runs on the Windows/Linux analysis VMs). pywin32 is
+# Windows-only -- stage its win_amd64 wheel for the engine image.
+pefile>=2023.2.7
+yara-python>=4.5
+pywin32>=306
+psutil>=5.9
+python-logging-handlers
+flare-capa>=7.0
+volatility3>=2.5
+prometheus-client>=0.20

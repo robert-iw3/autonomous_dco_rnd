@@ -1,0 +1,45 @@
+{
+  "name": "Detonation Lifecycle",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "detonation-status",
+        "options": {}
+      },
+      "name": "Detonation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "detonation-status"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize a Det Chamber lifecycle event (acquire -> detonate -> verdict)\n// into a row for the incident operator workspace.\nconst e = items[0].json;\nreturn [{ json: {\n  incident_id: e.incident_id,\n  host: e.host,\n  phase: e.status || 'detonation',\n  verdict: (e.summary && e.summary.verdict) || 'pending',\n  sha256: e.sha256,\n  analyzer: e.analyzer\n}}];"
+      },
+      "name": "Shape Detonation Row",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://webui:8080/api/incidents/{{$json[\"incident_id\"]}}/detonation",
+        "options": {},
+        "sendBody": true,
+        "jsonParameters": true
+      },
+      "name": "Push To Operator Workspace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Detonation Webhook": { "main": [[{ "node": "Shape Detonation Row", "type": "main", "index": 0 }]] },
+    "Shape Detonation Row": { "main": [[{ "node": "Push To Operator Workspace", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["det-chamber", "detonation"]
+}

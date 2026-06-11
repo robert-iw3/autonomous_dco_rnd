@@ -185,6 +185,57 @@ body_template = """
 [providers.ssh_playbook_v1.actions.block_ip.validation]
 required_fields = ["target", "incident_id"]
 target_format = "any"
+
+# Det Chamber artifact acquisition: delivers 05_acquire_artifact.{sh,ps1} to the
+# endpoint (SSH/WinRM) to grab a confirmed-TP file for detonation. The agent never
+# executes the sample; it hashes + zips + manifests it and uploads to the
+# quarantine bucket. worker_acquire then emits nexus.detonation.intake.
+[providers.ssh_playbook_v1.actions.acquire_artifact]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/fallback-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 600
+retryable = false
+success_codes = [200]
+body_template = """
+{
+    "incident_id": "{{incident_id}}",
+    "target":      "{{target}}",
+    "file_path":   "{{file_path}}",
+    "os_family":   "{{os_family}}",
+    "action":      "acquire_artifact",
+    "action_type": "acquire_artifact",
+    "reason":      "{{reason}}"
+}
+"""
+
+[providers.ssh_playbook_v1.actions.acquire_artifact.validation]
+required_fields = ["target", "incident_id", "file_path", "os_family"]
+target_format = "any"
+
+# False-positive restore: runs 06_restore.{sh,Restore-Host.ps1} on the endpoint to
+# reverse containment/eradication (restore the firewall backup + sha256-verified
+# quarantined files) when the swarm's verdict flips to FALSE POSITIVE.
+[providers.ssh_playbook_v1.actions.restore]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/fallback-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 600
+retryable = true
+success_codes = [200]
+body_template = """
+{
+    "incident_id": "{{incident_id}}",
+    "target":      "{{target}}",
+    "action":      "restore",
+    "action_type": "restore",
+    "reason":      "{{reason}}"
+}
+"""
+
+[providers.ssh_playbook_v1.actions.restore.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
 # ==============================================================================
 # Cloud Provider: AWS
 # Lambda Function URLs provisioned by operations/infra/terraform/containment/aws.tf

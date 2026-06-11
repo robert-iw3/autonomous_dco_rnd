@@ -108,7 +108,13 @@ class SoarExecutionSchema(BaseModel):
     actual ATLAS AML.T0016 control -- is retained.
     """
     incident_id: str
-    action_type: Literal["isolate_host", "block_ip", "monitor_subnet", "manual_review_required"] = Field(
+    action_type: Literal[
+        "isolate_host", "block_ip", "monitor_subnet", "manual_review_required",
+        # "restore" reverses containment/eradication when a detonation flips the
+        # verdict to benign (false positive) -- routes to the ssh_playbook_v1
+        # `restore` action (06_restore.{sh,ps1}).
+        "restore",
+    ] = Field(
         description="The exact functional capability requested."
     )
     target_sensor: str = Field(description="Primary sensor/host the action targets.")
@@ -124,6 +130,29 @@ class SoarExecutionSchema(BaseModel):
     @classmethod
     def _strip_blanks(cls, v: List[str]) -> List[str]:
         return [t for t in v if t and str(t).strip()]
+
+# ─── Live Acquisition Request (host_expert → Det Chamber) ──────────
+class AcquisitionRequestSchema(BaseModel):
+    """The validated request the host_expert's acquire_and_detonate tool emits on
+    nexus.acquire.request. First-line path safety lives here (the deterministic
+    worker_acquire re-validates with the full OS-critical deny-list before it
+    ever reaches an endpoint). OWASP LLM07/08: the LLM only emits this schema."""
+    incident_id: str
+    host: str
+    file_path: str
+    os_family: Literal["windows", "linux"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    reason: constr(max_length=200)
+
+    @field_validator("file_path")
+    @classmethod
+    def _safe_path(cls, v: str) -> str:
+        import re
+        if not v or any(c in v for c in "*?"):
+            raise ValueError("file_path is empty or contains a wildcard")
+        if ".." in re.split(r"[\\/]+", v):
+            raise ValueError("file_path contains path traversal")
+        return v
 
 # ─── RAG Immunity Signature ────────────────────────────────────────
 def build_memory_signature(sensor_id: str, source_type: str, vector_name: str) -> str:
@@ -143,7 +172,9 @@ def build_memory_signature(sensor_id: str, source_type: str, vector_name: str) -
 
 # ─── Entity State Machine ──────────────────────────────────────────
 class EntityTracking(BaseModel):
-    type: Literal["ip", "domain", "pid", "hash", "user"]
+    # "file" tracks a confirmed-TP artifact (path in notes) the host_expert can
+    # hand to the Det Chamber for live acquisition + detonation.
+    type: Literal["ip", "domain", "pid", "hash", "user", "file"]
     status: Literal["pending", "investigating", "cleared", "malicious"] = "pending"
     notes: str = ""
 

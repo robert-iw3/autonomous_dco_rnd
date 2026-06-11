@@ -7,161 +7,207 @@
       "name": "traefik",
       "repo": "docker.io/library/traefik:v3.0",
       "save_as": "traefik_v3.0.tar.gz",
-      "used_by": ["operations/infra"],
+      "used_by": [
+        "operations/infra"
+      ],
       "notes": "Edge proxy -- internet-facing and internal routing"
     },
     {
       "name": "postgres",
       "repo": "docker.io/library/postgres:16-alpine",
       "save_as": "postgres_16-alpine.tar.gz",
-      "used_by": ["operations/infra"],
+      "used_by": [
+        "operations/infra"
+      ],
       "notes": "Authentik SSO database (ephemeral tmpfs in production)"
     },
     {
       "name": "redis-sso",
       "repo": "docker.io/library/redis:alpine",
       "save_as": "redis_alpine.tar.gz",
-      "used_by": ["operations/infra"],
+      "used_by": [
+        "operations/infra"
+      ],
       "notes": "Authentik SSO cache"
     },
     {
       "name": "redis-core",
       "repo": "docker.io/library/redis:7.2-alpine",
       "save_as": "redis_7.2-alpine.tar.gz",
-      "used_by": ["tests"],
+      "used_by": [
+        "tests"
+      ],
       "notes": "Dev cluster Redis"
     },
     {
       "name": "redis-opencti",
       "repo": "docker.io/library/redis:8.2.2",
       "save_as": "redis_8.2.2.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI platform cache (dedicated instance)"
     },
     {
       "name": "authentik",
       "repo": "ghcr.io/goauthentik/server:latest",
       "save_as": "authentik_latest.tar.gz",
-      "used_by": ["operations/infra"],
+      "used_by": [
+        "operations/infra"
+      ],
       "notes": "Zero-trust SSO/IdP. Pin digest before air-gap bundle."
     },
     {
       "name": "open-webui",
       "repo": "ghcr.io/open-webui/open-webui:main",
       "save_as": "open-webui_main.tar.gz",
-      "used_by": ["operations/webui"],
+      "used_by": [
+        "operations/webui"
+      ],
       "notes": "Sovereign operator intelligence terminal"
     },
     {
       "name": "haproxy-ops",
       "repo": "docker.io/library/haproxy:3.3-alpine",
       "save_as": "haproxy_3.3-alpine.tar.gz",
-      "used_by": ["operations/infra tests"],
+      "used_by": [
+        "operations/infra tests"
+      ],
       "notes": "L4 load balancer (runtime)"
     },
     {
       "name": "nats",
       "repo": "docker.io/library/nats:2-alpine",
       "save_as": "nats_2-alpine.tar.gz",
-      "used_by": ["tests"],
+      "used_by": [
+        "tests"
+      ],
       "notes": "JetStream message bus (dev cluster)"
     },
     {
       "name": "minio-tests",
       "repo": "docker.io/minio/minio:latest",
       "save_as": "minio_latest.tar.gz",
-      "used_by": ["tests"],
+      "used_by": [
+        "tests"
+      ],
       "notes": "Dev cluster object storage. Pin digest before air-gap bundle."
     },
     {
       "name": "minio-opencti",
       "repo": "docker.io/minio/minio:RELEASE.2025-06-13T22-29-07Z",
       "save_as": "minio_2025-06-13.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI file storage (dedicated pinned release)"
     },
     {
       "name": "prometheus",
       "repo": "docker.io/prom/prometheus:latest",
       "save_as": "prometheus_latest.tar.gz",
-      "used_by": ["tests"],
+      "used_by": [
+        "tests"
+      ],
       "notes": "Metrics collection. Pin digest before air-gap bundle."
     },
     {
       "name": "grafana",
       "repo": "docker.io/grafana/grafana:latest",
       "save_as": "grafana_latest.tar.gz",
-      "used_by": ["tests"],
+      "used_by": [
+        "tests"
+      ],
       "notes": "Metrics visualization. Pin digest before air-gap bundle."
     },
     {
       "name": "elasticsearch",
       "repo": "docker.io/elastic/elasticsearch:8.19.2",
       "save_as": "elasticsearch_8.19.2.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI full-text indicator index"
     },
     {
       "name": "rabbitmq",
       "repo": "docker.io/library/rabbitmq:4.1-management",
       "save_as": "rabbitmq_4.1-management.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI connector message broker"
     },
     {
       "name": "opencti-platform",
       "repo": "docker.io/opencti/platform:6.8.10",
       "save_as": "opencti_platform_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "Air-gapped STIX/CTI platform"
     },
     {
       "name": "opencti-worker",
       "repo": "docker.io/opencti/worker:6.8.10",
       "save_as": "opencti_worker_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI background job processor (3 replicas)"
     },
     {
       "name": "opencti-connector-import-stix",
       "repo": "docker.io/opencti/connector-import-file-stix:6.8.10",
       "save_as": "opencti_connector_import_stix_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "STIX 2.x bundle ingest -- primary offline TI import path"
     },
     {
       "name": "opencti-connector-export-stix",
       "repo": "docker.io/opencti/connector-export-file-stix:6.8.10",
       "save_as": "opencti_connector_export_stix_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "STIX 2.x bundle export"
     },
     {
       "name": "opencti-connector-export-csv",
       "repo": "docker.io/opencti/connector-export-file-csv:6.8.10",
       "save_as": "opencti_connector_export_csv_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "CSV export connector"
     },
     {
       "name": "opencti-connector-analysis",
       "repo": "docker.io/opencti/connector-import-document:6.8.10",
       "save_as": "opencti_connector_analysis_6.8.10.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
-      "notes": "PDF/HTML/TXT threat report → observable extraction"
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
+      "notes": "PDF/HTML/TXT threat report \u2192 observable extraction"
     },
     {
       "name": "xtm-composer",
       "repo": "docker.io/xtmcorporation/xtm-composer:1.0.0",
       "save_as": "xtm_composer_1.0.0.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "OpenCTI connector lifecycle manager"
     },
     {
       "name": "alpine-edge",
       "repo": "docker.io/library/alpine:edge",
       "save_as": "alpine_edge.tar.gz",
-      "used_by": ["infrastructure/ansible/roles/opencti_node"],
+      "used_by": [
+        "infrastructure/ansible/roles/opencti_node"
+      ],
       "notes": "RSA key generator one-shot init container"
     }
   ],
@@ -231,6 +277,12 @@
       "repo": "docker.io/library/alpine:latest",
       "save_as": "alpine_latest.tar.gz",
       "notes": "Base for Anchore scanner build (syft + grype)"
+    },
+    {
+      "name": "detchamber-engine-base",
+      "repo": "mcr.microsoft.com/windows/servercore:ltsc2022",
+      "save_as": "servercore_ltsc2022.tar.gz",
+      "notes": "Det Chamber Windows detonation-engine base. Large; requires a Windows host to save/load. Pair with detchamber_assets.json for the analysis toolset + YARA rules."
     }
   ],
   "custom_images": [
@@ -252,7 +304,7 @@
       "build_context": ".",
       "dockerfile": "services/worker_qdrant/Dockerfile",
       "save_as": "nexus_worker_qdrant_local.tar.gz",
-      "notes": "Telemetry → vector space mapper (Layer 1 Math Tripwires)"
+      "notes": "Telemetry \u2192 vector space mapper (Layer 1 Math Tripwires)"
     },
     {
       "name": "nexus-worker-rules",
@@ -289,7 +341,9 @@
       "name": "nexus-hunter",
       "build_context": "analytics/llm_hunter",
       "dockerfile": "Dockerfile",
-      "build_args": {"NEXUS_EMBED_MODEL": "all-MiniLM-L6-v2"},
+      "build_args": {
+        "NEXUS_EMBED_MODEL": "all-MiniLM-L6-v2"
+      },
       "save_as": "nexus_hunter_local.tar.gz",
       "notes": "LLM Hunter agentic swarm orchestrator. NEXUS_EMBED_MODEL baked at build time for air-gap."
     },
@@ -331,7 +385,9 @@
       "name": "nexus-qdrant",
       "build_context": "infrastructure/qdrant",
       "dockerfile": "Dockerfile",
-      "build_args": {"QDRANT_VERSION": "v1.13.6"},
+      "build_args": {
+        "QDRANT_VERSION": "v1.13.6"
+      },
       "save_as": "nexus_qdrant_local.tar.gz",
       "notes": "Qdrant vector DB compiled from source with jemalloc. QDRANT_VERSION ARG pins the git tag for reproducibility. Must be compatible with qdrant-client crate version in Cargo.lock."
     },
@@ -348,6 +404,20 @@
       "dockerfile": "Dockerfile",
       "save_as": "nexus_redis_local.tar.gz",
       "notes": "Redis extracted from debian:bookworm-slim and repackaged on distroless/base. jemalloc + TLS libs included."
+    },
+    {
+      "name": "detchamber-engine",
+      "build_context": "det_chamber",
+      "dockerfile": "deploy/Dockerfile.windows-engine",
+      "save_as": "detchamber_engine_local.tar.gz",
+      "notes": "Windows detonation engine (servercore). Build consumes detchamber_assets.json (tools + YARA rules) for an offline build."
+    },
+    {
+      "name": "detchamber-intake",
+      "build_context": "det_chamber",
+      "dockerfile": "deploy/Dockerfile.intake",
+      "save_as": "detchamber_intake_local.tar.gz",
+      "notes": "Linux intake service: NATS consumer, chain-of-custody verify, os-routed detonation, Prometheus /metrics."
     }
   ]
 }

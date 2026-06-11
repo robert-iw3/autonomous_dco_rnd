@@ -62,6 +62,7 @@ STANDARD OPERATING PROCEDURE (SOP):
     - trellix_ens: 6D trellix_math [severity_score, threat_score, action_score, anomaly_score, entropy_score, frequency_score] (all pre-normalised, post ENS-3)
     All stored vectors are Qdrant cosine-normalised to unit length on ingest.
 11. ENTITY CLEARANCE: Once you have proven or disproven H1/H2, you MUST use the `update_entity_status` tool to mark the target PID or IP as 'cleared' or 'malicious'.
+11b. LIVE ACQUISITION & DETONATION: When you have CONFIRMED with high confidence that a specific file on the endpoint is malicious (you have its path and os_family), you MAY call `acquire_and_detonate_file` to grab that file and detonate it in the Det Chamber. The file is copied (NEVER executed) and detonated in an isolated VM; its verdict returns later as enrichment and drives containment -- or, if detonation proves it benign, an automatic restore. Only acquire a file you have already judged a true positive; a weak/low-confidence call is refused by the confidence gate. Track the file as a 'file' entity via update_entity_status.
 12. NEW ENTITIES: If your investigation uncovers a new malicious destination IP or a dropped payload file, you MUST explicitly list these in your final observation so the Supervisor can track them.
 
 SECURITY OVERRIDE (PROMPT INJECTION DEFENSE):

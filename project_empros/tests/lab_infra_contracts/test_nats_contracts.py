@@ -170,3 +170,42 @@ class TestMiddlewareGatewayChain:
         raw = self.TOML.read_text()
         nexus_sect = raw[raw.find("[nexus]"): raw.find("[splunk]")]
         assert "groups['ingress']" in nexus_sect
+
+
+# ── Det Chamber transmission authentication (live acquisition & detonation) ──
+class TestDetChamberNatsAuth:
+    """The Det Chamber subjects must be in the default-deny allowlists, have
+    JetStream streams, and the new det_chamber services must authenticate."""
+
+    DETCHAMBER_ENV = (PROJECT_ROOT / "infrastructure/ansible/roles/det_chamber_linux"
+                      / "templates/detchamber.env.j2")
+
+    def test_swarm_publishes_acquire_request(self):
+        sect = _user_section(_conf(), "swarm_node")
+        assert "nexus.acquire.request" in sect, \
+            "host_expert tool publishes nexus.acquire.request -- swarm_node must be allowed"
+
+    def test_detchamber_node_exists_with_perms(self):
+        sect = _user_section(_conf(), "detchamber_node")
+        # publishes the intake + result subjects
+        assert "nexus.detonation.intake" in sect and "nexus.alerts.detonation" in sect
+        # subscribes the acquire request
+        assert "nexus.acquire.request" in sect
+        # JetStream consumer access
+        assert "$JS.API." in sect
+
+    def test_detchamber_streams_defined(self):
+        init = STREAMS_INIT.read_text()
+        for subj in ("nexus.acquire.request", "nexus.detonation.intake",
+                     "nexus.alerts.detonation"):
+            assert subj in init, f"streams_init.sh must create a stream covering {subj}"
+
+    def test_detchamber_env_provisions_credentials(self):
+        assert self.DETCHAMBER_ENV.exists(), "det_chamber NATS env template must exist"
+        env = self.DETCHAMBER_ENV.read_text()
+        assert "NATS_USER=detchamber_node" in env
+        assert "NATS_PASS" in env
+
+    def test_detchamber_node_has_vault_password(self):
+        assert "vault_nats_detchamber_pass" in _conf(), \
+            "detchamber_node password must come from vault, not a hardcoded secret"

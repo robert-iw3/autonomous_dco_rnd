@@ -1,0 +1,26 @@
+# ==============================================================================
+# Det Chamber -- detonation engine configuration
+# Resolved as: built-in defaults < this file < DETCHAMBER_* environment variables.
+# Loaded by det_chamber/engine/sandbox_config.py::load_config().
+# Paths below are the Windows analysis-VM defaults; override per environment via
+# env (e.g. DETCHAMBER_COLLECTION_DIR) or by editing this file.
+# ==============================================================================
+
+[detchamber]
+# -- Paths on the analysis VM --
+tools_dir      = "E:\\Tools\\Windows"
+malware_dir    = "C:\\Malware"
+detonation_dir = "C:\\Users\\Public\\Desktop"
+collection_dir = "C:\\Collections"
+log_dir        = "C:\\Logs"
+inetsim_dir    = "E:\\Tools\\Windows\\inetsim"
+yara_rules     = "E:\\YARA\\windows_x64_rules.compiled"
+procmon_config = "E:\\Tools\\Windows\\malw.pmc"
+
+# -- Detonation tunables --
+pcap_time          = 180
+parallel           = 4
+simulate_network   = false
+evidence_tool      = "magnet"                 # "magnet" | "cuckoo"
+cuckoo_url         = "http://192.168.56.10:8090"
+volatility_plugins = ["windows.pslist", "windows.netscan"]

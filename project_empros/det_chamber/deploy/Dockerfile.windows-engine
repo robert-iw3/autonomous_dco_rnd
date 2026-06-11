@@ -1,0 +1,47 @@
+#FROM mcr.microsoft.com/windows/servercore:ltsc2019
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+#FROM mcr.microsoft.com/windows/servercore:ltsc2025
+
+WORKDIR /app
+
+RUN powershell -Command \
+    Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe -OutFile python-installer.exe; \
+    Start-Process -Wait -FilePath python-installer.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=1'; \
+    Remove-Item python-installer.exe
+
+RUN pip install psutil python-logging-handlers pywin32 yara-python pefile requests
+
+RUN powershell -Command \
+    Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.33.0.windows.2/Git-2.33.0.2-64-bit.exe -OutFile git-installer.exe; \
+    Start-Process -Wait -FilePath git-installer.exe -ArgumentList '/VERYSILENT /NORESTART /COMPONENTS="icons,ext,ext\shellhere,ext\guihere"'; \
+    Remove-Item git-installer.exe
+
+COPY engine/malware_sandbox.py .
+COPY engine/sandbox_config.py .
+COPY engine/targets.py .
+COPY engine/compile_yara_rules.py .
+COPY engine/filter_yara_rules.ps1 .
+COPY engine/download_tools.ps1 .
+COPY config/detchamber.toml ./detchamber.toml
+
+RUN powershell -Command \
+    New-Item -ItemType Directory -Path E:\Tools\Windows -Force; \
+    New-Item -ItemType Directory -Path E:\Tools\Windows\inetsim -Force; \
+    New-Item -ItemType Directory -Path E:\Malware -Force; \
+    New-Item -ItemType Directory -Path E:\Collections -Force; \
+    New-Item -ItemType Directory -Path C:\Logs -Force; \
+    New-Item -ItemType Directory -Path E:\YARA\Rules -Force
+
+RUN powershell -Command \
+    git clone https://github.com/reversinglabs/reversinglabs-yara-rules E:\YARA\Rules\reversinglabs; \
+    git clone https://github.com/elastic/protections-artifacts E:\YARA\Rules\elastic; \
+    if ($LASTEXITCODE -ne 0) { Write-Output 'Failed to clone YARA rules' | Out-File C:\Logs\download_tools.log -Append; exit 1 }
+
+RUN powershell -File download_tools.ps1
+
+RUN powershell -Command \
+    python compile_yara_rules.py --source-dir E:\YARA\Rules --output-file E:\YARA\windows_x64_rules.yar --ps-script E:\app\filter_yara_rules.ps1; \
+    if ($LASTEXITCODE -ne 0) { Write-Output 'Failed to compile YARA rules' | Out-File C:\Logs\yara_compile.log -Append; exit 1 }
+
+ENTRYPOINT ["python", "malware_sandbox.py"]
+CMD ["--config", "detchamber.toml"]

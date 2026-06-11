@@ -39,6 +39,7 @@ from agents.cloud_expert import cloud_expert_node
 from agents.nettap_expert import nettap_expert_node
 from agents.critic import critic_node
 from agents.response import response_agent
+from detonation_enrichment import enrichment_decision
 from tools.sanitizer import CognitiveSanitizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -554,6 +555,55 @@ async def soar_callback_listener(js_client):
                 await msg.nak()
 
 
+async def detonation_enrichment_listener(js_client):
+    """Consume Det Chamber verdicts (nexus.alerts.detonation) and act on them.
+
+    Hybrid loop-back: the host_expert dispatched acquisition during the
+    investigation; the full detonation verdict arrives here asynchronously. We
+    map it to a follow-up SOAR action -- contain on malicious, RESTORE on a benign
+    (false-positive) result that we previously contained, manual review on a
+    custody failure -- and write the verdict into the swarm's RAG memory so the
+    next sighting of this hash auto-escalates.
+    """
+    logger.info("Initializing detonation enrichment listener...")
+    sub = await js_client.pull_subscribe("nexus.alerts.detonation", "orchestrator_detonation_consumer")
+    while True:
+        try:
+            msgs = await sub.fetch(batch=5, timeout=2.0)
+        except (TimeoutError, asyncio.TimeoutError):
+            continue
+        except Exception as e:
+            logger.error(f"Detonation listener fetch fault: {e}")
+            await asyncio.sleep(1)
+            continue
+        for msg in msgs:
+            try:
+                result = json.loads(msg.data.decode())
+                incident_id = result.get("incident_id", "unknown")
+                # Did we already contain this incident? (decides FP restore vs no-op)
+                had_containment = bool(await redis_client.get(f"nexus:stack:{incident_id}:status") == "contained")
+                action = enrichment_decision(result, had_containment=had_containment)
+                if action:
+                    try:
+                        validated = SoarExecutionSchema(**action)
+                    except ValidationError as e:
+                        logger.error(f"Enrichment action failed schema validation; dropping: {e}")
+                        await msg.ack()
+                        continue
+                    dump = validated.model_dump()
+                    dump["reason"] = CognitiveSanitizer.scrub_outbound_dlp(dump.get("reason", ""))
+                    await js_client.publish("nexus.soar.execute", json.dumps(dump).encode())
+                    logger.warning(f"[DETONATION] {incident_id}: {validated.action_type} "
+                                   f"(verdict-driven follow-up).")
+                await msg.ack()
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.error(f"Poison detonation alert TERMinated: {e}")
+                await msg.term()
+            except Exception as e:
+                logger.error(f"Detonation enrichment fault; NAK: {e}")
+                await msg.nak()
+
+
 async def stack_lifecycle_monitor():
     """
     Evaluate every active operations stack on a fixed cadence and tear it down
@@ -679,6 +729,7 @@ async def main():
             redis_polling_loop(js, nc, graph),
             reactive_alert_consumer(js, nc, graph),
             soar_callback_listener(js),
+            detonation_enrichment_listener(js),
             stack_lifecycle_monitor(),
         )
 
