@@ -1,46 +1,20 @@
-# sysmon_sensor Test Workbench
+# sysmon_sensor test workbench
 
-Validates the sensor's own collect → normalise → transform-to-Parquet →
-sign-and-transmit pipeline end to end, using synthetic Sysmon events and an
-in-process mock ingress server. (The central `project_empros/tests/sensors/
-test_sensor_sysmon.py` suite validates the *Nexus* side -- schema mappings,
-worker_qdrant registration, nexus.toml alignment -- this workbench validates
-the sensor side.)
+Tests the Sysmon sensor's collect → normalise → Parquet → sign-and-transmit
+pipeline (plus its SOAR response). Pure-Python agent, so everything is **tier0**
+(no cargo stage).
 
-- **Tier 0** (`tier0/`, pytest, no containers) -- the whole workbench.
-  `sysmon_sensor` is a pure-Python endpoint agent with no Rust crate, so there
-  is no Tier 1 cargo-check stage.
+- `test_algorithms.py` — the real `schema.py` feature math
+  (entropy, parent/child, integrity, grant-access, driver-trust, `compute_features`),
+  incl. LOLBin pairs and the 6D `windows_math` vector order.
+- `test_data_contracts.py` — drives `SysmonSensor._normalise()` across Event IDs
+  (1/3/6/10/22) → `ParquetShipper._to_parquet()` and validates the Parquet schema
+  against `[schema_mappings.sysmon_sensor]`.
+- `test_transmission.py` — `_compute_hmac()` vs the independent core_ingress HMAC
+  formula, the header/content-type/`SENSOR_TYPE` contract, gateway URL alignment,
+  and an E2E `_ship()` against a mock ingress (incl. tamper detection).
+- `test_response_channel.py` — the SOAR response channel (DC-N11): verify a
+  Nexus-signed task, fixed `0X_*.ps1` by action (never a task path), `NEXUS_*` env,
+  gateway-URL derivation, and an E2E from a platform-signed task to outcome.
 
-  - `test_algorithms.py` -- drives the real `schema.py` feature-computation
-    functions (`compute_command_entropy`, `compute_parent_child_score`,
-    `compute_integrity_score`, `compute_grant_access_score`,
-    `compute_driver_trust_score`, `compute_features`) with synthetic field
-    values, including the documented LOLBin parent→child pairs and the
-    6D `windows_math` vector ordering.
-
-  - `test_data_contracts.py` -- drives the real `SysmonSensor._normalise()`
-    with synthetic raw Sysmon `EventData` dicts across multiple Event IDs
-    (1 process-create, 3 network-connection, 6 driver-load, 10 process-access,
-    22 DNS query), feeds the normalised records into the real
-    `ParquetShipper._to_parquet()`, and validates the resulting Parquet bytes
-    -- column set, computed feature vector, `payload_raw` forensic copy --
-    against `[schema_mappings.sysmon_sensor]` in the central
-    `project_empros/services/config/nexus.toml`.
-
-  - `test_transmission.py` -- transmission-layer conformance: the real
-    `ParquetShipper._compute_hmac()` cross-checked against an independent
-    re-derivation of the `core_ingress::compute_hmac` formula
-    (`HMAC-SHA256(payload || BE64(seq) || sensor_id_utf8 || BE64(ts))`);
-    the literal header/`Content-Type`/`SENSOR_TYPE` contract in `_ship()`;
-    middleware URL path alignment across the shipper default, the
-    `sysmon_sensor.toml` sensor profile, and `middleware.toml`'s
-    `gateway_url`; and an end-to-end run of the real `_ship()` against an
-    in-process `ThreadingHTTPServer` mock ingress that captures the POST,
-    confirms all required headers/HMAC are self-consistent, and proves a
-    tampered payload no longer matches its stamped HMAC.
-
-## Running
-
-```bash
-./test/run.sh
-```
+Run: `./test/run.sh`

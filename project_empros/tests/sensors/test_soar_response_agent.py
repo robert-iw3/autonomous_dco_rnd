@@ -25,7 +25,10 @@ WIN_DEFENSE = ROOT / "windows" / "windows_xdr_dev" / "agent" / "ActiveDefenseMod
 WIN_INTEGRITY = ROOT / "windows" / "windows_xdr_dev" / "nexus_integrity" / "src" / "lib.rs"
 WIN_FORWARDER = ROOT / "windows" / "windows_xdr_dev" / "agent" / "NexusForwarder.cs"
 WIN_RESPONSE = ROOT / "windows" / "windows_xdr_dev" / "agent" / "ResponseChannel.cs"
+WIN_PROTOCOL = ROOT / "windows" / "windows_xdr_dev" / "agent" / "ResponseProtocol.cs"
+WIN_DOTNET_TEST = ROOT / "windows" / "windows_xdr_dev" / "tests" / "dotnet" / "ResponseProtocolTests.cs"
 WIN_PROGRAM = ROOT / "windows" / "windows_xdr_dev" / "agent" / "Program.cs"
+SYSMON_RESPONSE = ROOT / "windows" / "sysmon_sensor" / "response_channel.py"
 LINUX_TX = ROOT / "linux" / "sentinel" / "src" / "siem" / "parquet_transmitter.rs"
 PLAYBOOKS = REPO / "operations" / "playbooks"
 
@@ -50,24 +53,50 @@ def test_windows_agent_transmits_outbound():
     assert WIN_FORWARDER.exists()
 
 
-def test_windows_response_channel_implements_contract():
-    # DC-N11: the Nexus task channel (was the known gap). Same contract as
-    # operations/agent/response_executor.py: verify a signed task (HMAC), fixed
-    # playbook by action (no task path), NEXUS_* env, outbound poll, report.
-    assert WIN_RESPONSE.exists(), "DC-N11: windows must have agent/ResponseChannel.cs"
-    t = WIN_RESPONSE.read_text()
+def test_windows_response_protocol_implements_contract():
+    # DC-N11: the pure protocol (HMAC verify, fixed playbook, NEXUS_* env). This is
+    # the part the xunit test actually EXECUTES (cross-platform), so it isn't just a
+    # grep guard -- behaviour is proven by tests/dotnet, this only pins structure.
+    assert WIN_PROTOCOL.exists(), "DC-N11: windows must have agent/ResponseProtocol.cs"
+    t = WIN_PROTOCOL.read_text()
     assert "HMACSHA256" in t and "FixedTimeEquals" in t, "constant-time HMAC verify"
     assert "WinPlaybook" in t and "01_Contain-Host.ps1" in t, "fixed playbook allowlist"
-    assert "SelectPlaybook" in t, "action → fixed playbook (never a task path)"
-    assert "NEXUS_INCIDENT_ID" in t and "BuildEnv" in t, "NEXUS_* env contract"
+    assert "NEXUS_INCIDENT_ID" in t, "NEXUS_* env contract"
+    assert "GoldenSig" in t and "GoldenCanonical" in t, "carries the golden vector"
+
+
+def test_windows_response_protocol_has_executed_test():
+    # The gap is CLOSED: a real xunit test compiles ResponseProtocol.cs on Linux and
+    # runs the golden-vector assertion (tier2 `dotnet test`). Not a grep proxy.
+    assert WIN_DOTNET_TEST.exists(), "ResponseProtocol must have an executed xunit test"
+    t = WIN_DOTNET_TEST.read_text()
+    assert "Verify_accepts_python_signature" in t, "must assert C# accepts a Python signature"
+    assert "[Fact]" in t or "[Theory]" in t, "must be runnable xunit tests"
+
+
+def test_windows_response_channel_is_transport_only():
+    # ResponseChannel is the BackgroundService transport; it delegates the protocol.
+    t = WIN_RESPONSE.read_text()
     assert "/api/v1/tasks" in t and "Bearer" in t, "outbound poll (no inbound reach)"
-    # golden cross-language vector pins C#↔Python signing parity (runs in CI)
-    assert "GoldenSig" in t and "Canonical" in t, "must carry the golden-vector parity contract"
+    assert "ResponseProtocol." in t, "must delegate to the tested protocol class"
 
 
 def test_windows_response_channel_wired_into_program():
     assert "ResponseChannel" in WIN_PROGRAM.read_text(), \
         "ResponseChannel must be registered as a hosted service"
+
+
+def test_sysmon_sensor_has_response_channel():
+    # A Sysmon-only endpoint still gets a response mechanism (behaviour proven in
+    # windows/sysmon_sensor/test/tier0/test_response_channel.py, which signs with
+    # the real platform signer). This pins the wiring.
+    assert SYSMON_RESPONSE.exists(), "sysmon sensor must have response_channel.py"
+    t = SYSMON_RESPONSE.read_text()
+    assert "def verify_task" in t and "hmac" in t, "verifies the Nexus HMAC"
+    assert "WIN_PLAYBOOK" in t and "01_Contain-Host.ps1" in t, "fixed windows playbooks"
+    assert "/api/v1/tasks" in t, "outbound poll"
+    assert "NEXUS_ENABLE_RESPONSE" in (ROOT / "windows" / "sysmon_sensor" / "SysmonSensor.py").read_text(), \
+        "the sensor must opt-in start the response channel"
 
 
 # -- Linux sentinel: outbound transport + auth exist (poller will reuse them) --

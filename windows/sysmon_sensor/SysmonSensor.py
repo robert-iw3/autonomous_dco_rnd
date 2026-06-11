@@ -244,6 +244,15 @@ class SysmonSensor:
         self.shipper  = ParquetShipper()
         self._running = True
 
+        # SOAR response channel (DC-N11): a Sysmon-only endpoint still needs a way
+        # to act on a Nexus verdict. Opt-in; outbound poll of /api/v1/tasks.
+        self.response = None
+        if os.environ.get("NEXUS_ENABLE_RESPONSE", "false").lower() == "true":
+            from response_channel import ResponseChannel
+            self.response = ResponseChannel()
+            self.response.start()
+            logger.info("SOAR response channel enabled")
+
     def run(self) -> None:
         if not WINDOWS:
             logger.error("SysmonSensor requires Windows with pywin32 installed.")
@@ -334,6 +343,8 @@ class SysmonSensor:
 
     def stop(self) -> None:
         self._running = False
+        if self.response:
+            self.response.stop()
         self.shipper.shutdown()
 
 

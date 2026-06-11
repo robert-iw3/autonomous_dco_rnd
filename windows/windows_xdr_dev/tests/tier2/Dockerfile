@@ -62,6 +62,14 @@ RUN \
         echo ""; \
     fi
 
+# Step 2b: EXECUTE the response-protocol golden-vector test (DC-N11). Unlike the
+# agent (net10.0-windows, cross-compile only), ResponseProtocol.cs is pure
+# (System.Text.Json + crypto), so its xunit test runs on Linux for real and fails
+# on any C#<->Python HMAC/canonical drift.
+RUN \
+    echo "=== [Tier2] dotnet test (ResponseProtocol golden parity) ===" && \
+    dotnet test tests/dotnet/ResponseProtocol.Tests.csproj --verbosity normal 2>&1
+
 # Step 3: produce win-x64 publish layout (no-self-contained to avoid linker)
 RUN \
     echo "=== [Tier2] dotnet publish layout check ===" && \
