@@ -1,5 +1,50 @@
 # Changelog -- Arkime Network Defense Stack: Network Baseline Pipeline
 
+## Gateway resilience + throughput + end-to-end data-flow stress lab
+
+**Goal: survive a core-switch firehose without silent failure or data loss, and
+prove it under escalating load.** Driven by the scalability/error-handling review.
+
+### ML gateway (Rust) -- auto-recovery + throughput
+
+| Change | Rationale |
+|---|---|
+| New `supervisor.rs`: `supervise()` restarts a faulting task (ingest/transmit) with capped exponential backoff and, once it exhausts its budget, returns `Err` so `main` exits non-zero for a clean orchestrator restart. `main.rs` wires both pipelines through it + a fatal flag. | A returned `Err` used to just log "halted" and leave the gateway "up" with a dead pipeline -- a **silent data blackhole**. Tasks now self-heal or fail loudly. Unit-tested (restart-until-healthy, give-up-after-budget, cancel-before-start). |
+| `spool_db.rs`: per-row `INSERT` loop → **chunked multi-row `INSERT`** (`QueryBuilder`, 400 rows/stmt). | ~400× fewer statement round-trips per batch -- the SQLite write was the inline throughput chokepoint. Round-trip + chunking unit-tested against a real temp DB. |
+| `spool_db.rs`: UTF-8-safe `truncate_utf8()` replaces `&s[..n]`. | The old slice **panicked** when the 4096-byte cap landed mid-codepoint on a non-ASCII URI / UA / cert CN -- a real crash-the-task bug. |
+| `redis_lookup.rs` + `main.rs`: Redis is now a **soft** dependency -- `supervisor::retry` on connect, then the writer drains+drops and reconnects every 30s. Boot never blocks on Redis. | Redis is a non-critical enrichment cache; a Redis outage must not prevent the gateway from booting or stall the ingest hot path. |
+| `redpanda.rs`: `auto.offset.reset` `latest` → **`earliest`**. | `latest` silently skips a backlog already queued in the broker on a cold start / new group -- a data-loss footgun. Committed offsets still win on normal restarts. |
+| `redpanda.rs`: `gateway_consumer_heartbeat_seconds` gauge each loop iteration; the compose healthcheck now requires it present + non-zero (was just "/metrics responds"). | The old healthcheck **passed while the consumer was dead/blocked**. Liveness now reflects the pipeline, not just the process. (Prometheus should additionally alert on heartbeat staleness.) |
+
+Verified: `cargo test` in the tier1 image — **11/11 pass** (supervisor 5, spool 4, features 2), compiles clean.
+
+### Data-flow stress lab (`test/lab/`)
+
+A Podman mini-lab mirroring `img/network_defense_stack_data_flow.svg`: a **mock
+Gigamon tap** (`loadgen`) dual-writes synthetic Arkime SPI to Redpanda (ML path)
+and OpenSearch (forensic path), through the **real gateway** to a `mock-ingress`
+(counts Parquet rows). The driver runs escalating tiers (low 1k → medium 20k →
+high 100k → very-high 500k), **logs a per-component ledger**, and asserts
+conservation on both paths (`opensearch == produced`; `received == produced`,
+`accepted == produced − noise`, `spooled == accepted`, `transmitted == accepted`,
+`mock rows == accepted`). Any inter-stage leak fails the tier with exact counts.
+
+---
+
+## PCAP retention + SPI durability + infra/deploy test workbench
+
+**Storage model made explicit: metadata is the durable product, packets are transient.**
+
+| Change | Rationale |
+|---|---|
+| New `infrastructure/sensor_node/pcap_retention.sh` -- purges `/data/pcap` files older than `PCAP_RETENTION_HOURS` (default 72) on a rolling window; dry-run support and a guard that refuses a `0`-hour window (which would wipe everything). | PCAPs grow ~10 TB/day at 1 Gbps. The sensor's value is the extracted SPI metadata, not the raw packets, so captures are a short-term retro-hunt buffer, not durable storage. |
+| `startarkime.sh` now spawns an hourly retention loop (initial pass immediate) and tears it down on shutdown; `Dockerfile` ships the script. | Retention runs in-container alongside capture; no external cron needed. |
+| `config.ini`: added `freeSpaceG=25%` + `maxFileSizeG=12`. | Size-based safety net so a traffic spike can't fill the disk between hourly purges; granular files keep rotation/retention precise. |
+| `opensearch_index.json` (ISM): **removed the `delete` state** (was deleting session indices at 21d). Hot → warm (read-only) → archive (S3 snapshot) is now terminal. | SPI metadata must be RETAINED for historical analysis. Only on-sensor PCAP files are aged out (72h); the searchable session metadata is kept (and S3-archived as the durable historical copy). |
+| New `test/` workbench (tier0, pure Python, 45 tests): **security** (mTLS end to end, drop-privileges, loopback-bound management, default-deny firewall, no committed secrets), **performance** (host/NIC tuning, AF_PACKET + NUMA, broker/cluster sizing, gateway batching), **interoperability** (Arkime↔Redpanda topic, gateway↔Nexus 48-col contract, OpenSearch index/ISM alignment), **retention** (executes the real `pcap_retention.sh` against synthetic captures; pins SPI-retained / pcap-72h split). | The infrastructure + deployment is now tested end to end, not just the gateway crate. |
+
+---
+
 ## Goal
 
 Optimize the ML Gateway's Parquet output for downstream LSTM-AE training and DuckDB query performance. Add derived ML features that the network baseline model and nettap expert need. Close the missing `max_spool_bytes` safety gap.

@@ -67,7 +67,7 @@ Disk throughput target: sustained 500 MB/s write for bulk indexing, burst 1 GB/s
 
 ### 3. Arkime Sensor (Packet Capture)
 
-Captures raw packets from a hardware tap or SPAN port at line rate, writes PCAPs to local storage, and emits SPI JSON to Redpanda via the Kafka plugin. The most hardware-sensitive role -- packet drops at the NIC or kernel level mean permanent data loss.
+Captures raw packets from a hardware tap or SPAN port at line rate, emits SPI JSON to Redpanda via the Kafka plugin (the durable product), and writes PCAPs to local storage as a **transient 72-hour buffer** for short-term retro-hunt. The most hardware-sensitive role -- packet drops at the NIC or kernel level mean permanent data loss.
 
 | Resource  | Minimum          | Recommended        |
 |-----------|------------------|--------------------|
@@ -84,7 +84,7 @@ Bare metal: Capture NIC IRQs pinned to the same NUMA node where Arkime runs (the
 VMware (10G only): PCI passthrough for the capture NIC, reserve all memory, pin vCPUs to a single NUMA node. Performance mode in BIOS (no C-states).
 KVM (10G only): PCI passthrough via VFIO, host-passthrough CPU, hugepages, CPU pinning with `cset shield`.
 
-PCAP retention calculation: At 1 Gbps average utilization, Arkime writes ~10 TB/day of PCAPs. At 10 Gbps average, ~100 TB/day. Size storage for your target retention window.
+PCAP disk sizing: At 1 Gbps average utilization Arkime writes ~10 TB/day of PCAPs; at 10 Gbps, ~100 TB/day. Because PCAPs are a **transient 72-hour buffer** (`pcap_retention.sh` purges files older than `PCAP_RETENTION_HOURS`, default 72, hourly; Arkime `freeSpaceG=25%` is the size-based safety net), size the PCAP disk for ~3× the daily write rate plus headroom — not for an open-ended retention window. The durable record is the SPI metadata in OpenSearch, which is retained for historical analysis (sized under the OpenSearch data-node roles above), not the packets.
 
 
 ### 4. Redpanda Broker
@@ -106,7 +106,7 @@ KVM: 4 vCPU (pinned, no overcommit), 16 GB hugepages, virtio-blk with io_uring o
 
 ### 5. ML Gateway + Redis (Co-located)
 
-Rust binary consuming from Redpanda, extracting 42-field flow records, spooling to SQLite WAL, and transmitting Zstd Parquet payloads to the upstream Axum gateway. Redis provides a short-TTL session→IP cache.
+Rust binary consuming from Redpanda, extracting the 48-column flow record, spooling to SQLite WAL, and transmitting Zstd Parquet payloads to the upstream Axum gateway. Redis provides a short-TTL session→IP cache.
 
 | Resource  | Minimum          | Recommended        |
 |-----------|------------------|--------------------|
@@ -116,6 +116,24 @@ Rust binary consuming from Redpanda, extracting 42-field flow records, spooling 
 | Network   | 1 Gbps           | 10 Gbps            |
 
 Redis is configured with `maxmemory 2gb` and LRU eviction, no persistence. The SQLite WAL spool needs enough disk to buffer records during extended Axum gateway outages (at 50K sessions/sec × 2 KB/row average, 72 hours of buffering = ~25 TB, which exceeds reasonable disk). In practice, set `max_spool_bytes` in config to cap the spool at the available disk.
+
+**Resilience & throughput (auto-recovery).** The ingest and transmit loops are each
+run under a supervisor that restarts them with capped backoff; a loop that exhausts
+its restart budget makes the process exit non-zero so the orchestrator restarts it
+clean (no silent dead-pipeline state). Redis is a *soft* dependency — the gateway
+boots and runs without it (degraded enrichment, background reconnect). The Kafka
+consumer uses `auto.offset.reset=earliest` so a cold start never skips a queued
+backlog, and commits offsets only after a successful spool write (at-least-once).
+The spool uses chunked multi-row inserts; a `gateway_consumer_heartbeat_seconds`
+gauge backs a real liveness healthcheck (and should drive a Prometheus
+staleness alert).
+
+**Scalability ceiling (known).** A single gateway is one process with one SQLite
+writer consuming one consumer-group share. To scale horizontally: create the
+`arkime-spi-raw` topic with N partitions (RF≥3) and run one gateway replica per
+partition share (same `group.id`), **each with its own spool file**. The
+single-node design keeps up at moderate rates; partitioning is the precondition for
+core-switch peak. The data-flow lab (`test/lab/`) measures where a given node tops out.
 
 VMware: 4 vCPU, 16 GB, standard VMDK.
 KVM: 4 vCPU, 16 GB, virtio-blk.

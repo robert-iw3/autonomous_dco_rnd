@@ -1,0 +1,113 @@
+{
+  "tier": "high",
+  "produced": 100000,
+  "noise": 14286,
+  "expected_accepted": 85714,
+  "tracker": [
+    {
+      "hop": "1_tap_sent",
+      "component": "Gigamon tap / Arkime (mock)",
+      "count": 100000,
+      "pct_of_sent": 100.0
+    },
+    {
+      "hop": "2_forensic_os",
+      "component": "OpenSearch (forensic path)",
+      "count": 100000,
+      "pct_of_sent": 100.0
+    },
+    {
+      "hop": "3_broker_gateway",
+      "component": "Redpanda \u2192 gateway (received)",
+      "count": 100000,
+      "pct_of_sent": 100.0
+    },
+    {
+      "hop": "4_filter_accepted",
+      "component": "gateway filter (non-noise)",
+      "count": 85714,
+      "pct_of_sent": 85.714,
+      "pct_of_accepted": 100.0
+    },
+    {
+      "hop": "5_spool_sqlite",
+      "component": "SQLite WAL spool",
+      "count": 85714,
+      "pct_of_accepted": 100.0
+    },
+    {
+      "hop": "6_transmit_parquet",
+      "component": "Parquet \u2192 HTTPS",
+      "count": 85714,
+      "pct_of_accepted": 100.0
+    },
+    {
+      "hop": "7_ml_sink",
+      "component": "Nexus/Axum ingress (ML sink)",
+      "count": 85714,
+      "pct_of_accepted": 100.0
+    }
+  ],
+  "traversal_pct": {
+    "forensic_path_pct": 100.0,
+    "ml_path_pct": 100.0,
+    "ml_sink_delivered_pct": 100.0,
+    "noise_filtered_pct": 14.286
+  },
+  "evidence": {
+    "tap_gigamon (loadgen)": [
+      "{\"produced\": 100000, \"noise\": 14286, \"expected_accepted\": 85714, \"to_opensearch\": 100000, \"elapsed_sec\": 5.48}"
+    ],
+    "broker (redpanda)": [
+      "INFO  2026-06-12 00:59:25,477 [shard 1:main] tx - [{kafka/arkime-spi-raw/0}] - rm_stm.cc:117 - Setting bootstrap committed offset to: 0",
+      "INFO  2026-06-12 00:59:25,477 [shard 1:rs  ] raft - [group_id:4, {kafka/arkime-spi-raw/0}] vote_stm.cc:443 - became the leader term: 1"
+    ],
+    "gateway spool (SQLite WAL)": [
+      "{\"timestamp\":\"2026-06-12T00:59:30.614080Z\",\"level\":\"INFO\",\"fields\":{\"message\":\"spooled batch to SQLite WAL\",\"rows\":5000}}",
+      "{\"timestamp\":\"2026-06-12T00:59:31.636513Z\",\"level\":\"INFO\",\"fields\":{\"message\":\"spooled batch to SQLite WAL (time flush)\",\"rows\":713}}"
+    ],
+    "gateway transmit (Parquet\u2192HTTPS)": [
+      "{\"timestamp\":\"2026-06-12T00:59:31.466943Z\",\"level\":\"INFO\",\"fields\":{\"message\":\"transmitted Parquet batch to Nexus\",\"rows\":10000,\"seq\":9}}",
+      "{\"timestamp\":\"2026-06-12T00:59:31.908272Z\",\"level\":\"INFO\",\"fields\":{\"message\":\"transmitted Parquet batch to Nexus\",\"rows\":713,\"seq\":10}}"
+    ],
+    "ML sink (mock nexus ingress)": [
+      "[mock-ingress] batch #8 seq=8: 10000 rows (188868 B) -- running total 75001 rows",
+      "[mock-ingress] batch #9 seq=9: 10000 rows (188229 B) -- running total 85001 rows",
+      "[mock-ingress] batch #10 seq=10: 713 rows (27109 B) -- running total 85714 rows"
+    ],
+    "forensic (opensearch)": [
+      "index arkime_sessions3-lab: 100000 docs (verified via _count API)"
+    ]
+  },
+  "components": {
+    "tap_gigamon": {
+      "produced": 100000,
+      "noise": 14286
+    },
+    "forensic_opensearch": {
+      "docs": 100000
+    },
+    "broker_redpanda": {
+      "consumed_by_gateway": 100000
+    },
+    "gateway": {
+      "received": 100000,
+      "filtered": 14286,
+      "accepted": 85714,
+      "spooled": 85714,
+      "transmitted": 85714,
+      "parse_errors": 0
+    },
+    "ml_sink_mock_ingress": {
+      "rows": 85714
+    }
+  },
+  "data_loss": {
+    "forensic_path": 0,
+    "ml_path": 0
+  },
+  "drained": true,
+  "elapsed_sec": 8.0,
+  "throughput_sessions_per_sec": 12529,
+  "verdict": "PASS"
+}

@@ -3,7 +3,7 @@ use crate::models::ArkimeSpi;
 use crate::pipeline::{features, filters};
 use crate::storage::{redis_lookup::RedisEntry, spool_db::SpoolDb};
 use anyhow::Result;
-use metrics::counter;
+use metrics::{counter, gauge};
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use rdkafka::ClientConfig;
 use rdkafka::Message;
@@ -24,7 +24,10 @@ pub async fn consume_loop(
         .set("bootstrap.servers", &cfg.redpanda.brokers)
         .set("group.id", &cfg.redpanda.group_id)
         .set("enable.auto.commit", "false")
-        .set("auto.offset.reset", "latest")
+        // earliest, not latest: a cold start / new group must NOT skip a backlog
+        // already queued in the broker (data-loss footgun). Committed offsets still
+        // take precedence on normal restarts.
+        .set("auto.offset.reset", "earliest")
         .set("fetch.min.bytes", "65536")
         .set("fetch.wait.max.ms", "100");
 
@@ -52,6 +55,16 @@ pub async fn consume_loop(
     let mut last_flush = tokio::time::Instant::now();
 
     loop {
+        // Liveness heartbeat -- the container healthcheck fails if this stops
+        // advancing (loop dead or blocked), distinct from a process that is merely
+        // "up". A halted/blocked consumer is otherwise a silent data blackhole.
+        gauge!("gateway_consumer_heartbeat_seconds").set(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0),
+        );
+
         if cancel_token.is_cancelled() {
             info!("Ingest loop shutting down -- flushing {} buffered records", batch.len());
             if !batch.is_empty() {
@@ -68,6 +81,7 @@ pub async fn consume_loop(
         if !batch.is_empty() && last_flush.elapsed() >= flush_interval {
             match spool.insert_batch(&batch).await {
                 Ok(()) => {
+                    info!(rows = batch.len(), "spooled batch to SQLite WAL (time flush)");
                     if let Err(e) = consumer.commit_consumer_state(CommitMode::Async) {
                         warn!("Kafka offset commit failed after time flush: {}", e);
                     }
@@ -115,6 +129,7 @@ pub async fn consume_loop(
                             if batch.len() >= batch_size {
                                 match spool.insert_batch(&batch).await {
                                     Ok(()) => {
+                                        info!(rows = batch.len(), "spooled batch to SQLite WAL");
                                         if let Err(e) = consumer.commit_consumer_state(CommitMode::Async) {
                                             warn!("Kafka offset commit failed: {}", e);
                                         }

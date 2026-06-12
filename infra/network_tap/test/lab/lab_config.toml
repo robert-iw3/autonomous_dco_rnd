@@ -1,0 +1,47 @@
+# ML gateway config for the data-flow stress lab. Points at the lab services and
+# the mock Nexus ingress (self-signed TLS the gateway is told to trust). NOT for
+# production -- secrets are lab placeholders.
+
+[global]
+sensor_name = "lab-network-tap"
+sensor_type = "network_tap"
+log_level   = "info"
+
+[redpanda]
+brokers  = "redpanda:9092"
+topic    = "arkime-spi-raw"
+group_id = "ml-gateway-lab"
+
+[redis]
+url = "redis://redis:6379"
+
+[extraction]
+small_packet_bytes = 128
+large_packet_bytes = 1400
+
+[storage]
+spool_db_path      = "/data/spool/gateway.db"
+batch_size         = 5000
+flush_interval_sec = 1
+max_spool_bytes    = 2147483648
+
+[nexus]
+gateway_url        = "https://mock-ingress:8443/api/v1/telemetry"
+auth_token         = "lab-token"
+integrity_secret   = "lab-integrity-secret-rotate-me-0123456789"
+transmit_batch_size   = 10000
+poll_interval_sec     = 1
+max_backoff_sec       = 10
+cache_retention_sec   = 259200
+parquet_row_group_size     = 50000
+transmit_sort_by_timestamp = true
+
+[nexus.tls]
+enabled = true
+ca_path = "/data/config/certs/mock-cert.pem"
+
+[metrics]
+port = 9090
+
+[runtime]
+tokio_worker_threads = 4

@@ -557,6 +557,11 @@ pub async fn transmit_loop(
                             current_backoff = base_interval;
                             counter!("gateway.nexus_rows_transmitted").increment(row_count as u64);
                             counter!("gateway.nexus_payloads_sent").increment(1);
+                            info!(
+                                rows = row_count,
+                                seq  = stamp.sequence,
+                                "transmitted Parquet batch to Nexus"
+                            );
 
                             // Mark transmitted using max rowid -- avoids building a
                             // dynamic IN clause on every cycle

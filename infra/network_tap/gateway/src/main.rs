@@ -1,8 +1,10 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, Level};
+use tracing::{error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[cfg(not(target_env = "msvc"))]
@@ -18,6 +20,7 @@ mod ingest;
 mod models;
 mod pipeline;
 mod storage;
+mod supervisor;
 mod transmit;
 
 fn main() -> anyhow::Result<()> {
@@ -54,19 +57,7 @@ fn main() -> anyhow::Result<()> {
             .expect("Failed to start Prometheus metrics endpoint");
         info!(port = cfg.metrics.port, "Prometheus metrics endpoint started");
 
-        // --- Redis connection ---
-        let redis_client = match storage::redis_lookup::connect(&cfg.redis.url).await {
-            Ok(c) => {
-                info!(url = %cfg.redis.url, "Connected to Redis");
-                c
-            }
-            Err(e) => {
-                error!("Failed to connect to Redis: {}", e);
-                return;
-            }
-        };
-
-        // --- SQLite WAL spool ---
+        // --- SQLite WAL spool (the durable core -- a hard dependency) ---
         let spool = match storage::spool_db::SpoolDb::new(
             &cfg.storage.spool_db_path,
             cfg.storage.max_spool_bytes,
@@ -82,37 +73,83 @@ fn main() -> anyhow::Result<()> {
 
         let cancel_token = CancellationToken::new();
 
-        // --- Redis background writer ---
+        // --- Redis (NON-critical enrichment) -- retry, then degrade, never block boot ---
+        let redis_client = supervisor::retry(3, Duration::from_secs(2), || {
+            storage::redis_lookup::connect(&cfg.redis.url)
+        })
+        .await;
+        if redis_client.is_some() {
+            info!(url = %cfg.redis.url, "Connected to Redis");
+        } else {
+            warn!("Redis unavailable at startup -- continuing WITHOUT session enrichment (will retry)");
+        }
         let session_tx = storage::redis_lookup::start_writer(
             redis_client,
+            cfg.redis.url.clone(),
             cancel_token.clone(),
         );
 
-        // --- Nexus transmitter (SQLite → Parquet → Axum gateway) ---
-        let transmit_pool  = spool.pool();
-        let transmit_cfg   = cfg.clone();
-        let transmit_token = cancel_token.clone();
-        let transmit_handle = tokio::spawn(async move {
-            if let Err(e) = transmit::nexus::transmit_loop(
-                transmit_pool, transmit_cfg, transmit_token,
-            ).await {
-                error!("Nexus transmitter halted: {}", e);
-            }
-        });
+        // A pipeline that exhausts its restart budget is fatal: flag it, trip the
+        // cancel token so main wakes, and exit non-zero so the orchestrator restarts.
+        let fatal = Arc::new(AtomicBool::new(false));
 
-        // --- Redpanda consumer (Kafka → filter → extract → SQLite) ---
-        let ingest_cfg    = cfg.clone();
-        let ingest_spool  = spool.clone();
-        let ingest_token  = cancel_token.clone();
-        let ingest_handle = tokio::spawn(async move {
-            if let Err(e) = ingest::redpanda::consume_loop(
-                ingest_cfg, session_tx, ingest_spool, ingest_token,
-            ).await {
-                error!("Redpanda ingestion loop halted: {}", e);
-            }
-        });
+        // --- Nexus transmitter (SQLite → Parquet → Axum gateway), supervised ---
+        let transmit_handle = {
+            let pool = spool.pool();
+            let cfg = cfg.clone();
+            let token = cancel_token.clone();
+            let fatal = fatal.clone();
+            let trip = cancel_token.clone();
+            tokio::spawn(async move {
+                let r = supervisor::supervise(
+                    "transmit", token.clone(), 10,
+                    Duration::from_secs(60), Duration::from_secs(1), Duration::from_secs(30),
+                    move || {
+                        let pool = pool.clone();
+                        let cfg = cfg.clone();
+                        let tok = token.clone();
+                        async move { transmit::nexus::transmit_loop(pool, cfg, tok).await }
+                    },
+                )
+                .await;
+                if r.is_err() {
+                    error!("transmit pipeline gave up: {:?}", r);
+                    fatal.store(true, Ordering::SeqCst);
+                    trip.cancel();
+                }
+            })
+        };
 
-        // --- Await SIGINT or SIGTERM ---
+        // --- Redpanda consumer (Kafka → filter → extract → SQLite), supervised ---
+        let ingest_handle = {
+            let cfg = cfg.clone();
+            let spool = spool.clone();
+            let token = cancel_token.clone();
+            let tx = session_tx.clone();
+            let fatal = fatal.clone();
+            let trip = cancel_token.clone();
+            tokio::spawn(async move {
+                let r = supervisor::supervise(
+                    "ingest", token.clone(), 10,
+                    Duration::from_secs(60), Duration::from_secs(1), Duration::from_secs(30),
+                    move || {
+                        let cfg = cfg.clone();
+                        let spool = spool.clone();
+                        let tx = tx.clone();
+                        let tok = token.clone();
+                        async move { ingest::redpanda::consume_loop(cfg, tx, spool, tok).await }
+                    },
+                )
+                .await;
+                if r.is_err() {
+                    error!("ingest pipeline gave up: {:?}", r);
+                    fatal.store(true, Ordering::SeqCst);
+                    trip.cancel();
+                }
+            })
+        };
+
+        // --- Await SIGINT / SIGTERM, or a supervisor giving up ---
         let mut sigterm = match signal::unix::signal(SignalKind::terminate()) {
             Ok(s) => s,
             Err(e) => {
@@ -128,15 +165,21 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             _ = sigterm.recv() => {}
+            _ = cancel_token.cancelled() => {
+                error!("A pipeline exhausted its restart budget -- shutting down for a clean restart");
+            }
         }
 
         info!("Shutdown signal received -- draining pipelines...");
         cancel_token.cancel();
 
-        // Ingest flushes its current batch on cancellation before exiting
         let _ = ingest_handle.await;
-        // Transmit completes its current batch or honours the cancellation check
         let _ = transmit_handle.await;
+
+        if fatal.load(Ordering::SeqCst) {
+            error!("Exiting non-zero after an unrecoverable pipeline failure (orchestrator will restart).");
+            std::process::exit(1);
+        }
 
         info!("Gateway shutdown complete.");
     });

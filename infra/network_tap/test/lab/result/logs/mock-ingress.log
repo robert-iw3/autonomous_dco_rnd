@@ -1,0 +1,52 @@
+[mock-ingress] HTTPS ingress listening on :8443
+[mock-ingress] batch #1 seq=1: 10000 rows (189970 B) -- running total 10000 rows
+[mock-ingress] batch #2 seq=2: 10000 rows (186999 B) -- running total 20000 rows
+[mock-ingress] batch #3 seq=3: 10000 rows (188715 B) -- running total 30000 rows
+[mock-ingress] batch #4 seq=4: 10000 rows (188731 B) -- running total 40000 rows
+[mock-ingress] batch #5 seq=5: 1 rows (13768 B) -- running total 40001 rows
+[mock-ingress] batch #6 seq=6: 10000 rows (188507 B) -- running total 50001 rows
+[mock-ingress] batch #7 seq=7: 10000 rows (190998 B) -- running total 60001 rows
+[mock-ingress] batch #8 seq=8: 10000 rows (188170 B) -- running total 70001 rows
+[mock-ingress] batch #9 seq=9: 5000 rows (106285 B) -- running total 75001 rows
+[mock-ingress] batch #10 seq=10: 10000 rows (188229 B) -- running total 85001 rows
+[mock-ingress] batch #11 seq=11: 10000 rows (187429 B) -- running total 95001 rows
+[mock-ingress] batch #12 seq=12: 10000 rows (189590 B) -- running total 105001 rows
+[mock-ingress] batch #13 seq=13: 10000 rows (191028 B) -- running total 115001 rows
+[mock-ingress] batch #14 seq=14: 10000 rows (189088 B) -- running total 125001 rows
+[mock-ingress] batch #15 seq=15: 10000 rows (189012 B) -- running total 135001 rows
+[mock-ingress] batch #16 seq=16: 10000 rows (188578 B) -- running total 145001 rows
+[mock-ingress] batch #17 seq=17: 5000 rows (108046 B) -- running total 150001 rows
+[mock-ingress] batch #18 seq=18: 10000 rows (190214 B) -- running total 160001 rows
+[mock-ingress] batch #19 seq=19: 10000 rows (190156 B) -- running total 170001 rows
+[mock-ingress] batch #20 seq=20: 10000 rows (189492 B) -- running total 180001 rows
+[mock-ingress] batch #21 seq=21: 10000 rows (190314 B) -- running total 190001 rows
+[mock-ingress] batch #22 seq=22: 10000 rows (187088 B) -- running total 200001 rows
+[mock-ingress] batch #23 seq=23: 10000 rows (188181 B) -- running total 210001 rows
+[mock-ingress] batch #24 seq=24: 10000 rows (188483 B) -- running total 220001 rows
+[mock-ingress] batch #25 seq=25: 5000 rows (109646 B) -- running total 225001 rows
+[mock-ingress] batch #26 seq=26: 10000 rows (188087 B) -- running total 235001 rows
+[mock-ingress] batch #27 seq=27: 10000 rows (188743 B) -- running total 245001 rows
+[mock-ingress] batch #28 seq=28: 10000 rows (187735 B) -- running total 255001 rows
+[mock-ingress] batch #29 seq=29: 10000 rows (188811 B) -- running total 265001 rows
+[mock-ingress] batch #30 seq=30: 10000 rows (189281 B) -- running total 275001 rows
+[mock-ingress] batch #31 seq=31: 10000 rows (190135 B) -- running total 285001 rows
+[mock-ingress] batch #32 seq=32: 5000 rows (106770 B) -- running total 290001 rows
+[mock-ingress] batch #33 seq=33: 10000 rows (189973 B) -- running total 300001 rows
+[mock-ingress] batch #34 seq=34: 10000 rows (188354 B) -- running total 310001 rows
+[mock-ingress] batch #35 seq=35: 10000 rows (186931 B) -- running total 320001 rows
+[mock-ingress] batch #36 seq=36: 5000 rows (106755 B) -- running total 325001 rows
+[mock-ingress] batch #37 seq=37: 10000 rows (190837 B) -- running total 335001 rows
+[mock-ingress] batch #38 seq=38: 10000 rows (189734 B) -- running total 345001 rows
+[mock-ingress] batch #39 seq=39: 10000 rows (188604 B) -- running total 355001 rows
+[mock-ingress] batch #40 seq=40: 10000 rows (187667 B) -- running total 365001 rows
+[mock-ingress] batch #41 seq=41: 10000 rows (187218 B) -- running total 375001 rows
+[mock-ingress] batch #42 seq=42: 10000 rows (188155 B) -- running total 385001 rows
+[mock-ingress] batch #43 seq=43: 5000 rows (109842 B) -- running total 390001 rows
+[mock-ingress] batch #44 seq=44: 10000 rows (189221 B) -- running total 400001 rows
+[mock-ingress] batch #45 seq=45: 10000 rows (189680 B) -- running total 410001 rows
+[mock-ingress] batch #46 seq=46: 10000 rows (187834 B) -- running total 420001 rows
+[mock-ingress] batch #47 seq=47: 5000 rows (108194 B) -- running total 425001 rows
+[mock-ingress] batch #48 seq=48: 3570 rows (80846 B) -- running total 428571 rows
+[4m>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[0m

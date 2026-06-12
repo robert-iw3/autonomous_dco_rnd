@@ -106,7 +106,7 @@ pub struct ArkimeSpi<'a> {
 // NetworkFlowRecord -- the rich output sent to the Axum gateway / LLM stack
 // =============================================================================
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NetworkFlowRecord {
     // --- Identity ---
     pub session_id:    String,
