@@ -47,6 +47,7 @@ COPY project_empros/operations/playbooks/   /repo/project_empros/operations/play
 COPY project_empros/operations/infra/containment.toml /repo/project_empros/operations/infra/containment.toml
 COPY project_empros/tests/lab_det_chamber/  /repo/project_empros/tests/lab_det_chamber/
 COPY project_empros/tests/pytest.ini        /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py        /repo/project_empros/tests/
 
 ENV PYTHONPATH=/repo/project_empros/det_chamber/engine:/repo/project_empros
 WORKDIR /repo/project_empros

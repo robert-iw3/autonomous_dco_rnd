@@ -18,253 +18,29 @@ AI is both the master key and the unpickable lock; the winner is simply whoever 
 ### Directory Structure:
 ```bash
 PROJECT_EMPROS/
-├── analytics/                             # Advanced data analysis and correlation engines
-│   ├── llm_hunter/                        # Layer 3: Agentic AI Swarm (Python-based DAG for attack graph building)
-├── orchestration/
-│   ├── templates/
-│   │   ├── global.env.j2                  # Master env-var template -- rendered to orchestration/rendered/global.env
-│   │   ├── backend.tf.j2                  # Terraform remote state: S3 (aws-ec2/eks) or local (vmware), infra-target-aware
-│   │   └── inventory.yml.j2               # Reference template only -- authoritative inventory built by 02b-build-inventory.py
-│   ├── pipelines/
-│   │   └── master-ci.yml                  # GitLab CI/CD: 7 stages -- configure→provision→harden→deploy_core→deploy_middleware→mlops_train→mlops_deploy
-│   ├── scripts/
-│   │   ├── 01-render-templates.sh         # Renders global.env.j2 + backend.tf.j2 from env YAML (skips inventory.yml.j2)
-│   │   ├── 02-provision-infra.sh          # Terraform init/apply → captures output JSON → calls 02b-build-inventory.py
-│   │   ├── 02b-build-inventory.py         # Bridge: terraform output -json + env YAML → orchestration/rendered/inventory.yml (includes inference_nodes group)
-│   │   ├── 03-harden-os.sh                # Runs site.yml --tags hardening (common_hardening role, Layer 0)
-│   │   ├── 04-deploy-core.sh              # Runs site.yml --skip-tags hardening (NATS/Redis/Qdrant/Workers/TI/LLM, Layer 1)
-│   │   ├── 05-deploy-middleware.sh        # Runs middleware/deploy/ansible/main.yml (ETL fanout layer, Layer 1.5)
-│   │   ├── 06-trigger-mlops.sh            # Runs on analytics node: data spool → train-all → eval gates → OCI artifact push
-│   │   └── 07-deploy-inference.sh         # Runs from CI runner: Ansible → inference_nodes (Model A→analytics, B/C/D→GPU cluster)
-│   └── environments/
-│       ├── dev.yaml                       # Dev: vmware, cluster_size=1, log_only, GPU inference disabled (mlops_deploy_model_b/d=false)
-│       └── production.yaml                # Prod: aws-ec2, cluster_size=3, isolate_and_quarantine, full 4-model GPU inference cluster
-├── infrastructure/                        # Core infrastructure definitions and configuration management (Non-Public)
-│   ├── ansible/                           # Automated provisioning and deployment playbooks
-│   │   ├── group_vars/                    # Environment-specific variables, tuning parameters, and encrypted secrets
-│   │   │   ├── all/vault.yml              # Ansible Vault: NATS NKey, AWS keys, JWT secret, OpenAI key, MinIO root/worker secrets
-│   │   │   └── ti/vault.yml               # Ansible Vault: OpenCTI admin/agent tokens, Elasticsearch heap, connector UUIDs
-│   │   ├── inventory/
-│   │   │   └── hosts.yml                  # Static inventory: ingress(10.0.10.x), nats(10.0.20.x), redis(10.0.30.x),
-│   │   │                                  #   qdrant(10.0.50.x), workers(10.0.60.x), storage(10.0.70.x), ti(10.0.90.x)
-│   │   │                                  #   analytics/management/inference_nodes defined in orchestration/rendered/inventory.yml
-│   │   ├── roles/                         # Modular Ansible roles for specific infrastructure components
-│   │   │   ├── common_hardening/          # Full OS hardening pipeline: packages → kernel → sysctl-tuning → SSH → users → firewall → audit → services → THP → node_exporter → CA trust
-│   │   │   ├── haproxy_node/              # L4 Load Balancer provisioning for edge routing and DDoS shielding
-│   │   │   ├── internal_networking/       # VPC, internal firewall, and subnet routing configurations
-│   │   │   ├── minio_node/                # On-prem S3-compatible object storage: binary install, systemd, TLS, bucket lifecycle, service accounts
-│   │   │   ├── nats_node/                 # Deployment of the JetStream high-velocity persistent binary bus
-│   │   │   ├── nexus_hunter/              # Swarm orchestration daemon: Python agent environment + all agents (supervisor, host/net/cloud/nettap expert, review_board, response) + tool registry
-│   │   │   ├── observability_node/        # Setup for Prometheus exporters, Grafana, and system metrics scraping
-│   │   │   ├── opencti_node/              # Air-gapped OpenCTI 6.8 TI stack: docker-compose, .env template, MITRE ATT&CK import, agent token propagation
-│   │   │   ├── podman_setup/              # Installation and daemonless configuration of the Podman container engine
-│   │   │   ├── qdrant_node/               # Provisioning of the vector database for mathematical anomaly hunting
-│   │   │   ├── redis_node/                # Deployment of the in-memory key-value store for deduplication and rule triggers
-│   │   │   ├── rust_ingress/              # Setup for the Axum Zero-Trust Gateway
-│   │   │   └── rust_podman_worker/        # systemd Quadlet generation with JetStream auto-scaler for isolated Rust containers
-│   │   └── site.yml                       # Master playbook: hardening → ingress → NATS/Redis → Qdrant (readiness gate + init) →
-│   │                                      #   MinIO → workers → LLM swarm → baseline detector → TI stack (opencti) → observability
-│   ├── certs/                             # Nexus Root CA (generated by operations/scripts/cert-gen.sh -- gitignored, never committed)
-│   ├── haproxy/                           # Specific HAProxy configuration definitions (e.g., haproxy.cfg)
-│   ├── nats/                              # Specific NATS JetStream server configurations and storage limits
-│   ├── prometheus/
-│   │   └── prometheus.yml                 # Static scrape config (dev docker-compose + TI stack at 10.0.90.x); production rendered by Ansible
-│   ├── qdrant/
-│   │   └── qdrant_init.sh                 # Collection creation with named vectors + KEYWORD indexes on endpoint_id, source_type, vector_name
-│   └── terraform/
-│       ├── main.tf                        # AWS EKS cluster, VPC, node groups (stateless + stateful NVMe), S3 data lake, IRSA for archive worker
-│       ├── iam.tf                         # IAM roles with prefix-scoped S3 policies (telemetry/*, models/*, training/*)
-│       ├── aws/
-│       │   └── main.tf                    # AWS EC2 fleet: ingress, NATS, Redis, Qdrant, workers, analytics (r6i.2xlarge), management (t3.large) + all outputs
-│       └── vmware/
-│           └── main.tf                    # vSphere VM fleet: ingress, NATS, Redis, Qdrant, workers, MinIO (10.0.70.x), TI (10.0.90.x), analytics (10.0.80.10) + all outputs
-├── specs.md                               # System specifications, constraints, and rigid engineering requirements
-├── todos.md                               # Backlog of pending tasks, technical debt, and planned enhancements
-├── libs/                                  # Shared libraries and dependencies
-│   └── lib_siem_core/                     # Common Rust library ensuring binary schema neutrality and shared structs
-│       └── src/
-│           ├── lib.rs                     # Crate root
-│           └── models.rs                  # DynamicUebaVector with source_type field and regex validation
-├── planning_docs/                         # Strategic roadmaps, design documents, and structural outlines
-├── services/                              # Layer 1 & Layer 2 High-Speed Rust Services
-│   ├── config/
-│   │   └── nexus.toml                     # Local dev config for cargo run fallback and build.sh staging -- production config is Ansible-templated
-│   ├── core_ingress/                      # Axum Zero-Trust Gateway handling TLS termination, JWT, and 3-tier integrity verification
-│   │   └── src/
-│   │       ├── main.rs                    # Axum router with HMAC/temporal/sequence/cross-OS validation
-│   │       └── integrity.rs               # LineageStamper verification: HMAC-SHA256, drift ±30s, monotonic sequence, collision detection
-│   ├── worker_qdrant/                     # Rust worker mapping telemetry to vector space (Layer 1 Math Tripwires)
-│   │   └── src/
-│   │       └── main.rs                    # Parquet→Arrow→Qdrant with flat payload schema, per-field indexing, source_type routing
-│   ├── worker_rules/                      # Rust worker executing deterministic Sigma string matches (Layer 2)
-│   ├── worker_s3_archive/                 # Rust worker spooling Parquet to cold storage with Hive-partitioned paths
-│   │   └── src/
-│   │       └── main.rs                    # NATS consumer → Hive paths (dt=YYYY-MM-DD/hour=HH/) with partition hint headers, backpressure semaphore, DLQ
-│   ├── worker_soar/                       # Rust worker executing SOAR containment actions via n8n webhooks
-│   └── worker_rlhf/                       # Rust worker spooling gold-label Parquet for DPO training feedback
-├── mlops/                                 # Sovereign Multi-Model Training & Inference Pipeline (Non-Public -- the secret sauce)
-│   ├── Makefile                           # Full pipeline: data-all→train-all→eval-critic-full→deploy; targets for every TTP corpus, model, and eval stage
-│   ├── PIPELINE.md                        # MLOps workflow documentation: data flow, training sequence, eval gates, roadmap
-│   ├── model_config.toml                  # Central model selection: base model IDs, adapter paths, display names, projector hidden_dim
-│   ├── corpus_config.toml                 # Model B corpus staging config: PCAP dirs, Suricata rule dirs, MITRE source, enrichment options
-│   ├── data/
-│   │   ├── pcaps/                                   # PCAP intake -- recursive subdirectories define campaign labels
-│   │   ├── suricata_rules/                          # Suricata rule intake (et_open/, custom/, local/)
-│   │   ├── staging/                                 # Intermediate artifacts: per-TTP JSONL corpora + query indices
-│   │   │   ├── recon_behavioral_v1.jsonl                 # 1_Recon: 20 cls, 240 recs
-│   │   │   ├── persistence_behavioral_v1.jsonl           # 2_Persistence: 27 cls, 312 recs
-│   │   │   ├── c2_behavioral_v1.jsonl                    # 3_C2: 27 cls, 312 recs
-│   │   │   ├── bypass_behavioral_v1.jsonl                # 4_Bypass: 31 cls, 348 recs (incl. CrossOsSchemaInjection)
-│   │   │   ├── lateral_movement_behavioral_v1.jsonl      # 5_Lateral_Movement: 24 cls, 288 recs
-│   │   │   ├── exfiltration_behavioral_v1.jsonl          # 7_Exfiltration: 20 cls, 240 recs
-│   │   │   ├── active_directory_behavioral_v1.jsonl      # Active-Directory: 20 cls, 240 recs
-│   │   │   ├── tools_supplemental_v1.jsonl               # tools/: 15 cls, 180 recs
-│   │   │   ├── malware_behavioral_v1.jsonl               # 6_Malware_Tradecraft: 14 cls, 168 recs
-│   │   │   ├── windows_exploitation_behavioral_v1.jsonl  # Windows_Exploitation: 20 cls, 240 recs
-│   │   │   ├── linux_exploitation_behavioral_v1.jsonl    # Linux_Exploitation: 13 cls, 156 recs
-│   │   │   ├── lotl_behavioral_v1.jsonl                  # 6_LOTL/LOLBAS: 24 cls, 288 recs
-│   │   │   ├── cross_source_temporal_v1.jsonl            # Cross-source temporal: 3 cls, 36 recs (multi-sensor kill chains)
-│   │   │   └── *_query_index.json                        # S3 behavioral query indices (Track 6 in 01_spool_datasets.py)
-│   │   ├── training/                                # Final training datasets
-│   │   │   ├── spatial_telemetry_train.jsonl        # Track 1: Qdrant vectors + context across all source types
-│   │   │   ├── spatial_tensors_v1.safetensors       # Track 1: Tensor registry keyed by {vector_name}_{event_id}
-│   │   │   ├── network_adversarial_v1.jsonl         # Track 2: C2 flow stats + MITRE labels (Model B)
-│   │   │   ├── nettap_spi_v1.jsonl                  # Track 4: 42-field L7 session windows (Model B)
-│   │   │   ├── rlhf_preferences_v1.jsonl            # Track 3: DPO preference pairs (Model D)
-│   │   │   ├── hard_negatives_sft_v1.jsonl          # CoT-format SFT hard negatives
-│   │   │   ├── hard_negatives_operator_v1.jsonl     # Track 5: RLHF-sourced operator-dismissed FPs
-│   │   │   ├── synthetic_hard_negatives_v1.jsonl    # Claude-API-generated hard negatives
-│   │   │   ├── baseline_train_windows.safetensors   # Model A: Sliding windows [N x 64 x 8]
-│   │   │   └── baseline_normalization.safetensors   # Model A: Per-feature min/max/range
-│   │   └── evals/
-│   │       ├── spatial_telemetry_eval.jsonl        # Track 1 held-out eval (temporal split, 15%)
-│   │       ├── network_adversarial_eval.jsonl      # Track 2 held-out eval
-│   │       ├── adversarial_edge_cases.jsonl        # 5 adversarial eval cases
-│   │       └── critic_judge_eval.jsonl             # Phase 3 eval export for LLM-as-judge
-│   ├── models/
-│   │   ├── base_model/                             # Downloaded base model weights
-│   │   ├── adapters/                               # LoRA checkpoints, merged weights, atomic production symlinks
-│   │   └── baseline/                               # Model A: LSTM-AE weights + threshold + normalization + SHA-384 manifest
-│   ├── scripts/
-│   │   ├── validate_pipeline.py                      # End-to-end pipeline interoperability validator (34 checks: syntax, schema, indices, configs, containers)
-│   │   ├── generate_golden_datasets.py               # Synthetic seed data generator: all sensor types with Chain-of-Thought
-│   │   ├── stage_pcap_corpus.py                      # PCAP → tshark session windows (requires --pcap-dir)
-│   │   ├── stage_suricata_rules.py                   # Suricata .rules → structured records (requires --rules-dir)
-│   │   ├── stage_mitre_attack.py                     # MITRE ATT&CK STIX 2.1 ingestion (downloads enterprise-attack.json)
-│   │   ├── stage_recon_behavioral.py                 # 1_Recon TTP corpus: 20 classes, 240 records (offline)
-│   │   ├── stage_persistence_behavioral.py           # 2_Persistence TTP corpus: 27 classes, 312 records
-│   │   ├── stage_c2_behavioral.py                    # 3_C2 TTP corpus: 27 classes, 312 records
-│   │   ├── stage_bypass_behavioral.py                # 4_Bypass_Detection TTP corpus: 31 classes, 348 records
-│   │   ├── stage_lateral_movement_behavioral.py      # 5_Lateral_Movement TTP corpus: 24 classes, 288 records
-│   │   ├── stage_exfiltration_behavioral.py          # 7_Exfiltration TTP corpus: 20 classes, 240 records
-│   │   ├── stage_active_directory_behavioral.py      # Active-Directory TTP corpus: 20 classes, 240 records
-│   │   ├── stage_tools_supplemental.py               # Tools supplemental corpus: 15 classes, 180 records
-│   │   ├── stage_malware_behavioral.py               # 6_Malware_Tradecraft corpus: 14 classes, 168 records
-│   │   ├── stage_windows_exploitation_behavioral.py  # Windows_Exploitation corpus: 20 classes, 240 records
-│   │   ├── stage_linux_exploitation_behavioral.py    # Linux_Exploitation corpus: 13 classes, 156 records
-│   │   ├── stage_lotl_behavioral.py                  # 6_LOTL/LOLBAS corpus: 24 classes, 288 records
-│   │   ├── build_model_b_corpus.py                   # Combines PCAP + Suricata + MITRE into Track 2/4 training JSONL
-│   │   ├── build_baseline_windows.py                 # Model A data prep: DuckDB → sliding windows → safetensors
-│   │   ├── 01_spool_datasets.py                      # 7-track dataset spooler: spatial(T1), network(T2), critic(T3), nettap(T4), hard-neg(T5), TTP behavioral(T6), sysmon(T7)
-│   │   ├── model_config.py                # Central model loader: env var → model_config.toml → fallback
-│   │   ├── projector.py                   # Multi-head SpatialProjector MLP: per-vector-space heads → MODEL_C_HIDDEN_DIM
-│   │   ├── 02_train_qlora.py              # Model C: QLoRA 4-bit SFT, vector_name routing, per-head gradient tracking, SHA-384 integrity
-│   │   ├── 02_train_sft_cot.py            # Model C CoT SFT: response masking, spatial + hard_negatives + all 9 TTP corpora + sysmon live
-│   │   ├── 02_train_network.py            # Model B: QLoRA on Mistral-Small-3.1-24B, dual-track curriculum (Track 2 + Track 4)
-│   │   ├── 02_train_dpo_critic.py         # Model D: DPO/IPO alignment -- governance + hard negatives + compute_reward_score()
-│   │   ├── train_lstm_ae.py               # Model A: BiLSTM-AE training, μ+3σ threshold calibration, normalization export
-│   │   ├── 03_eval_model.py               # Model C: Regression -- hallucination, schema, injection, spatial math, cross-vector
-│   │   ├── 03_eval_network.py             # Model B: Track 2 ≥98% + Track 4 ≥95% independent gates
-│   │   ├── 03_eval_critic.py              # Model D: 4-phase eval -- DPO + governance + P/R/F1 + 5-fold k-fold
-│   │   ├── 04_merge_weights.py            # Fuses LoRA adapters to base weights; atomic OUTPUT_DIR swap
-│   │   ├── 04_reward_model.py             # Bradley-Terry reward model + LLM-as-judge ensemble; publishes to NATS
-│   │   ├── 05_serve_sovereign.py          # Model C: HF Transformers inference (port 8000), spatial vector splice
-│   │   ├── 05_serve_network.py            # Model B: vLLM AsyncEngine (port 8001), 128k context, GPUs 0-1
-│   │   ├── 05_serve_critic.py             # Model D: vLLM inference (port 8002), fails CLOSED, 3-token decision space
-│   │   ├── 05_synthetic_data_gen.py       # Claude-API synthetic hard negative generator (requires ANTHROPIC_API_KEY)
-│   │   └── serve_baseline.py              # Model A: NATS consumer, CPU-only, nexus.alerts.baseline
-│   ├── corpus_templates/                  # Training corpus source templates (one directory per TTP phase)
-│   │   ├── 1_Recon/                       # manifest.md + stage_recon_behavioral.py (with inline model-teaching annotations)
-│   │   ├── 2_Persistence/                 # manifest.md + stage_persistence_behavioral.py
-│   │   ├── 3_C2/                          # manifest.md + stage_c2_behavioral.py
-│   │   ├── 4_Bypass_Detection/            # manifest.md + stage_bypass_behavioral.py
-│   │   ├── 5_Lateral_Movement/            # manifest.md + stage_lateral_movement_behavioral.py
-│   │   ├── 7_Exfiltration/                # manifest.md + stage_exfiltration_behavioral.py
-│   │   ├── Active-Directory/              # manifest.md + stage_active_directory_behavioral.py
-│   │   ├── tools/                         # manifest.md + stage_tools_supplemental.py
-│   │   ├── 6_Malware_Tradecraft/          # manifest.md + stage_malware_behavioral.py (10 malware family behaviors)
-│   │   ├── corpus_utils.py                # Shared prompt formatters for all sensor types (canonical: mlops/scripts/corpus_utils.py)
-│   │   ├── cross_source_temporal.py       # Cross-source temporal corpus generator (mirrors mlops/scripts/stage_cross_source_temporal.py)
-│   │   └── readme.md                      # How to add a new TTP corpus stage
-│   ├── adversarial_edge_cases.jsonl       # Static adversarial training data injected by 01_spool_datasets.py
-│   ├── deployment/
-│   │   ├── vllm-inference.container       # Podman Quadlet -- Model C (GPUs 2-3, HF Transformers, port 8000)
-│   │   ├── vllm-network.container         # Podman Quadlet -- Model B (GPUs 0-1, vLLM 128k, port 8001)
-│   │   ├── vllm-critic.container          # Podman Quadlet -- Model D (GPUs 2-3 shared, vLLM, port 8002)
-│   │   ├── baseline-detector.container    # Podman Quadlet -- Model A (CPU-only, NATS consumer, analytics node)
-│   │   └── ansible-deployment.yml         # Multi-host Ansible playbook: OCI pull → SHA-384 verify → atomic swap → ordered restart
-│   ├── serve_vllm.sh                      # Unified launcher: dispatches to correct Python server by MODEL_TYPE env var
-│   └── requirements.txt                   # Torch, vLLM, Transformers, PEFT, TRL, BitsAndBytes, FastAPI, flash-attn, DuckDB, nats.py, safetensors
-├── operations/                            # Layer 4: Event-Driven Command & Control (C&C) Interface
-│   ├── nexus.conf                         # Central config: domains, network CIDR, TLS paths, limits, TTLs, SSH settings
-│   ├── Makefile                           # Full lifecycle: init, deploy, teardown, redeploy, test-lint/containment/env/tls, status, logs
-│   ├── operators.md                       # Architecture reference: lifecycle diagram, inference matrix, SOAR routing, RLHF loop
-│   ├── img/
-│   │   └── nexus_operations_lifecycle.svg # SVG lifecycle diagram (detection → containment → teardown)
-│   ├── infra/                             # Ephemeral core infrastructure (Traefik edge proxy + Authentik IdP)
-│   │   ├── docker-compose.yml             # Traefik + Authentik on deepnet: health checks, resource limits, tmpfs RAM DBs
-│   │   ├── authentik-blueprint.yaml       # Zero-touch IdP provisioning: OAuth2 app, OIDC providers, ForwardAuth outpost, keys
-│   │   ├── containment.toml               # Capability schema: EDR/FW HTTP contracts, Jinja templates, retry policies, validation rules
-│   │   └── traefik/                       # Edge proxy configuration (traefik.yaml, tls.yaml, middlewares.yaml)
-│   ├── n8n/                               # Ephemeral SOAR execution engine
-│   │   ├── Dockerfile                     # Extends n8n: adds openssh-client + python3 for playbook delivery
-│   │   ├── docker-compose.yml             # n8n deployment: health check, resource limits, execution pruning, volume mounts
-│   │   └── workflows/
-│   │       ├── Master_Containment.json    # Primary workflow: parse → HTTP execute → error branch → aggregate → callback
-│   │       └── Fallback_Containment.json  # SSH/WinRM fallback: enriched IOCs → run_containment.sh per target
-│   ├── playbooks/                         # Out-of-band containment scripts (delivered via SSH/WinRM by Fallback workflow)
-│   │   ├── linux/                         # 00_collect_forensics → 04_block_c2 (iptables isolation, process eradication)
-│   │   └── windows/                       # 00_Collect-Forensics → 04_Block-C2 (PowerShell, WinRM)
-│   ├── webui/                             # Sovereign operator intelligence terminal (Open WebUI)
-│   │   └── config/config.yml              # Multi-model routing: sovereign vLLM endpoint + frontier models, OIDC, RBAC
-│   └── scripts/                           # Lifecycle automation: env-gen.sh, cert-gen.sh, trigger-incident.sh, teardown-incident.sh
-├── tests/                                 # 550+ tests: offline contract suites, docker lab harnesses, simulation playbooks
-│   ├── docker-compose.yml                 # Full local cluster: HAProxy, ingress, NATS, Redis, Qdrant, MinIO, workers, LLM hunter, Prometheus, Grafana
-│   ├── test_worker_contracts.py           # P3 hardening + infra contracts: NATS auth, RLHF stream, DR snapshot, Terraform S3 (51 tests, offline)
-│   ├── test_s3_query_alignment.py         # Lab 1: Track 6 staging query column alignment gate (10 tests, offline)
-│   ├── test_track6_dryrun.py              # Lab 2: Track 6 TTP corpora dry-run against synthetic Parquet (160+ tests)
-│   ├── test_e2e_sensor_pipeline.py        # Sensor schema + schema evolution guard (offline)
-│   ├── test_model_regression.py           # Live inference regression (requires vLLM endpoint)
-│   ├── test_windows_xdr_sensor.py         # Windows XDR sensor schema contracts
-│   ├── test_data_flow.py                  # Data flow end-to-end smoke test
-│   ├── lab_nats_ingress/                  # Lab 3: Sensor → NATS integrity pipeline (27 tests, requires NATS)
-│   ├── lab_qdrant_pipeline/               # Lab 4: Qdrant vector worker pipeline (22 tests, requires NATS+Qdrant)
-│   ├── lab_middleware/                    # Lab 5: Middleware ETL fanout correctness (25 tests)
-│   ├── lab_sensor_transmission/           # Lab 6: HMAC canonical protocol + sensor schema (22 tests, offline)
-│   ├── lab_mlops_train/                   # Lab 7: QLoRA + SpatialProjector smoke test (28 tests, requires GPU)
-│   ├── lab_worker_rules/                  # Lab 9: worker_rules dual-layer rule engine contracts (54 tests, offline)
-│   ├── lab_analytics_hunter/              # Lab 10: LLM hunter schemas + sanitizer + security invariants (71 tests, offline)
-│   ├── lab_operations_contracts/          # Lab 11: containment.toml capability schema + 9 NATS stream contracts (39 tests, offline)
-│   ├── lab_infra_contracts/               # Lab 12: Ansible hardening roles + cluster quorum invariants (37 tests, offline)
-│   ├── lab_mlops_serving/                 # Lab 13: model_config.toml + pipeline scripts + air-gap compliance (40 tests, offline)
-│   ├── lab_orchestration/                 # Lab 14: CI/CD stage ordering + TRIGGER_MLOPS gate (42 tests, offline)
-│   ├── mlops_eval_minilab/                # Corpus quality gate: DuckDB + Qdrant + LLM-as-judge eval pipeline
-│   ├── simulation/                        # Adversarial red-team playbooks (require live stack)
-│   │   ├── Detonate-MathTripwire.py          # Math tripwire trigger + anomaly alert validation
-│   │   ├── Execute-CognitiveBypass.sh        # Cognitive sanitizer bypass attempt
-│   │   ├── Inject-BenignBaselineFlood.py     # Baseline noise flood for FP rate calibration
-│   │   ├── Invoke-CrossPollinationStress.py  # Swarm agent cross-contamination stress test
-│   │   ├── Invoke-NexusC2Simulation.ps1      # Windows C2 beacon simulation
-│   │   ├── Invoke-SoarLatencyRace.ps1        # SOAR dispatch latency measurement
-│   │   ├── Simulate-NamespaceEscape.sh       # Container namespace escape detection
-│   │   ├── Test-SovereignAirGap.py           # Air-gap compliance: verifies zero outbound calls at runtime
-│   │   └── Validate-ActiveDefenseHUD.ps1     # Active defense HUD telemetry validation
-│   └── integration/                          # Rust NATS JetStream integration tests (requires NATS + cargo)
-│       ├── Cargo.toml
-│       └── test_durable_consumer.rs       # Durable JetStream consumer correctness + redelivery semantics
-├── deploy.sh                              # Single-shot deployment entrypoint: chains stages 1-7 with SSH/NATS/Qdrant/middleware/inference health gates
-├── build.sh                               # Optimized glibc compilation script for the Rust toolchain
-└── Cargo.toml                             # Workspace manifest: 14 Rust crates, 35 pinned dependencies (RUSTSEC-pinned)
+├── analytics/                  # Layer 3 agentic AI swarm
+│   └── llm_hunter/             # LangGraph DAG: supervisor + host/net/cloud/nettap experts + review board + response; tools, controls, RAG memory
+├── services/                   # Layer 1 & 2 high-speed Rust services
+│                               #   core_ingress (Zero-Trust gateway) + workers: qdrant (math tripwires), rules (Sigma), s3_archive, soar, rlhf; shared nexus.toml
+├── middleware/                 # Layer 1.5 Rust ETL fanout (own Cargo workspace, config, deploy, certs)
+├── libs/                       # Shared Rust libraries (lib_siem_core: schema-neutral structs, NATS/integrity helpers)
+├── det_chamber/                # Live acquisition + detonation: engine (Win/Linux sandbox), intake service, agents, config, deploy (isolated IaC)
+├── mlops/                      # Sovereign multi-model training & inference pipeline
+│                               #   data/ (pcaps, suricata_rules, staging, training, evals) · models/ (base, adapters, baseline) ·
+│                               #   scripts/ (stage_* corpora, 0N_* train/eval/serve) · corpus_templates/ (per-TTP) · deployment/ (vLLM quadlets)
+├── detection_training/         # SIEM detection content exports: sigma + datadog, elastic-security, google-secops, kql, sentinel_one, splunk, suricata
+├── orchestration/              # Top-level deploy driver: templates, pipelines (GitLab CI), scripts (01–07 stages), environments (dev/prod)
+├── infrastructure/             # IaC + config mgmt: ansible (roles, group_vars vault, inventory), terraform (aws/vmware), certs, haproxy, nats, prometheus, qdrant
+├── hardening/                  # Reusable OS-hardening Ansible role (defaults, handlers, tasks, templates)
+├── operations/                 # Layer 4 event-driven C&C: ephemeral infra (Traefik+Authentik), n8n SOAR, playbooks (linux/windows), webui, scripts
+├── deployment_prep/            # Air-gap bundle builder: image manifests, scan, scripts, requirements (Docker + Podman)
+├── tests/                      # 550+ tests: offline contract suites, docker lab harnesses (lab_*), simulation red-team playbooks, Rust integration
+├── docs/                       # Reference docs & living trackers: infrastructure_specifications, security_controls,
+│                               #   nist_ai_600_1_control_tracker, mlops_pipeline, mlops_maturation_plan
+├── planning_docs/              # Consolidated BACKLOG.md (open items) + plan docs (Det Chamber, performance, test labs, ADDON) + archive/
+├── change_logs/                # Detailed codebase changelogs (changelog_DDMONYY.md)
+├── img/                        # Architecture/flow diagrams (SVG + planning_diagrams)
+└── data/                       # Runtime data scratch (gitignored)
 ```
 
 ---

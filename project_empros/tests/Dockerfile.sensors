@@ -17,17 +17,21 @@ RUN pip3 install --no-cache-dir \
     "numpy>=2.0.0" \
     "pyarrow>=16.0.0" \
     "pandas>=2.2.0" \
-    "pydantic>=2.7.1"
+    "pydantic>=2.7.1" \
+    "requests>=2.31.0"
 
 # project_empros source
-COPY project_empros/mlops/scripts/           /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/config/            /repo/project_empros/mlops/config/
-COPY project_empros/services/config/         /repo/project_empros/services/config/
-COPY project_empros/services/worker_qdrant/  /repo/project_empros/services/worker_qdrant/
-COPY project_empros/tests/config/            /repo/project_empros/tests/config/
-COPY project_empros/tests/deploy/            /repo/project_empros/tests/deploy/
-COPY project_empros/tests/sensors/           /repo/project_empros/tests/sensors/
-COPY project_empros/tests/pytest.ini         /repo/project_empros/tests/
+COPY project_empros/mlops/scripts/                      /repo/project_empros/mlops/scripts/
+COPY project_empros/mlops/config/                       /repo/project_empros/mlops/config/
+COPY project_empros/services/config/                    /repo/project_empros/services/config/
+COPY project_empros/services/worker_qdrant/             /repo/project_empros/services/worker_qdrant/
+COPY project_empros/tests/config/                       /repo/project_empros/tests/config/
+COPY project_empros/tests/deploy/                       /repo/project_empros/tests/deploy/
+COPY project_empros/tests/sensors/                      /repo/project_empros/tests/sensors/
+COPY project_empros/tests/lab_sensor_transmission/      /repo/project_empros/tests/lab_sensor_transmission/
+COPY project_empros/tests/test_e2e_sensor_pipeline.py   /repo/project_empros/tests/
+COPY project_empros/tests/pytest.ini                    /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py                   /repo/project_empros/tests/
 
 # Repo-root sensor sources (linux/c2_sensor, linux/sentinel, linux/suricata,
 # infra/aws, infra/azure, infra/gcp, infra/network_tap, windows/).
@@ -40,4 +44,8 @@ COPY windows/   /repo/windows/
 ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
 WORKDIR /repo/project_empros
 
-CMD ["python3", "-m", "pytest", "tests/sensors/", "-v", "--tb=short", "--junit-xml=/reports/sensors.xml"]
+CMD ["python3", "-m", "pytest", \
+     "tests/sensors/", \
+     "tests/lab_sensor_transmission/", \
+     "tests/test_e2e_sensor_pipeline.py", \
+     "-v", "--tb=short", "--junit-xml=/reports/sensors.xml"]

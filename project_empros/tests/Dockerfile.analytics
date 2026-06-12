@@ -24,6 +24,7 @@ COPY project_empros/tests/lab_agentic_swarm/    /repo/project_empros/tests/lab_a
 COPY project_empros/tests/lab_redteam/          /repo/project_empros/tests/lab_redteam/
 COPY project_empros/tests/simulation/           /repo/project_empros/tests/simulation/
 COPY project_empros/tests/pytest.ini            /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py            /repo/project_empros/tests/
 
 ENV PYTHONPATH=/repo/project_empros/analytics/llm_hunter:/repo/project_empros/analytics:/repo/project_empros
 WORKDIR /repo/project_empros

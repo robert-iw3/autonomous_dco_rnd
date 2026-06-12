@@ -18,6 +18,7 @@ COPY project_empros/mlops/data/                              /repo/project_empro
 COPY project_empros/tests/test_turbovec_mlops.py             /repo/project_empros/tests/
 COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py   /repo/project_empros/tests/lab_mlops_train/
 COPY project_empros/tests/pytest.ini                         /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py                         /repo/project_empros/tests/
 
 ENV PYTHONPATH=/repo/project_empros/mlops/scripts
 WORKDIR /repo/project_empros

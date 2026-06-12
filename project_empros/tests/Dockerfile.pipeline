@@ -56,6 +56,7 @@ COPY project_empros/tests/test_phase3_guardrails.py         /repo/project_empros
 COPY project_empros/tests/lab_mlops_serving/                /repo/project_empros/tests/lab_mlops_serving/
 COPY project_empros/tests/lab_mlops_train/                  /repo/project_empros/tests/lab_mlops_train/
 COPY project_empros/tests/pytest.ini                        /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py                        /repo/project_empros/tests/
 COPY project_empros/tests/Execute-CognitiveBypass.sh        /repo/project_empros/tests/
 COPY project_empros/tests/Invoke-CrossPollinationStress.py  /repo/project_empros/tests/
 COPY windows/                                               /repo/windows/

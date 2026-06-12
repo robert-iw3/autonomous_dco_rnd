@@ -1,0 +1,44 @@
+# .gitignore for the infra/ sensor tree
+# ignores Rust build output, Python/pytest caches, and transient test
+# artifacts so they never clutter commits.
+
+# -- Rust build artifacts ------------------------------------------------------
+target/
+dist/
+**/*.rs.bk
+
+# -- Python --------------------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# -- Test / coverage caches ----------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# -- Transient test artifacts (durable buffers, raw logs) ----------------------
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# -- Node (any embedded UI tooling) -------------------------------------------
+node_modules/
+
+# -- Keep generated test reports (the only test artifact we DO commit) ---------
+# reports/ dirs are tracked; these negations document intent and protect report
+# files from any broader ignore rule above.
+!**/reports/
+!**/reports/*.xml
+!**/reports/*.md
+!**/reports/*.json
+!**/reports/*.html

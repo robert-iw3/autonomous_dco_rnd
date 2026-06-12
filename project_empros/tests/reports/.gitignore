@@ -1,0 +1,12 @@
+# Canonical per-section CI reports (written by run_tests.sh / Dockerfile.*) are
+# committed. Ad-hoc / host-run reports auto-named by tests/conftest.py are
+# ignored so they never clutter commits.
+*
+!.gitignore
+!offline.xml
+!sensors.xml
+!mlops.xml
+!analytics.xml
+!services.xml
+!pipeline.xml
+!detchamber.xml

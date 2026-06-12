@@ -1,20 +1,23 @@
 ```text
 analytics/llm_hunter/
-├── Dockerfile             # glibc (python:3.12-slim-bookworm) multi-stage build,
-│                          #   non-root 'hunter' user, embedding model pre-baked for air-gap
-├── requirements.in        # Source deps (locked into requirements.txt via compile-requirements.sh)
-├── compile-requirements.sh# Hermetic pip-compile in an ephemeral container
-├── orchestrator.py        # Event loop (Redis list + NATS JetStream), DAG compile, governed SOAR dispatch
-├── state.py               # InvestigativeState, the four strict schemas, entity reducer, RAG signature
-├── tools/                 # The Safe Execution Sandbox (deterministic, bounded, self-correcting)
-│   ├── __init__.py        # Role-based tool assignment (RBAC) + singleton tool instances
-│   ├── sanitizer.py       # CognitiveSanitizer: neutralize / wrap_untrusted / canary / outbound DLP
-│   ├── duckdb_query.py    # Ephemeral read-only SQL, word-boundary keyword guard, local-FS block, cell wrapping
-│   ├── qdrant_search.py   # Multi-vector similarity search; historical payloads wrapped as untrusted
-│   ├── ti_lookup.py       # Multi-source TI gateway (VT/AbuseIPDB/OTX/X-Force/GreyNoise), cached + rate-limited
-│   └── entity_manager.py  # update_entity_status -- the swarm's blast-radius state-machine writer
-└── agents/                # The Swarm Personas
-    ├── __init__.py        # Package marker
+├── Dockerfile              # glibc (python:3.12-slim-bookworm) multi-stage build,
+│                           #   non-root 'hunter' user, embedding model pre-baked for air-gap
+├── requirements.in         # Source deps (locked into requirements.txt via compile-requirements.sh)
+├── compile-requirements.sh # Hermetic pip-compile in an ephemeral container
+├── orchestrator.py         # Event loop (Redis list + NATS JetStream), DAG compile, governed SOAR dispatch
+├── state.py                # InvestigativeState, the four strict schemas, entity reducer, RAG signature
+├── tools/                  # The Safe Execution Sandbox (deterministic, bounded, self-correcting)
+│   ├── __init__.py         # Role-based tool assignment (RBAC) + singleton tool instances
+│   ├── sanitizer.py        # CognitiveSanitizer: neutralize / wrap_untrusted / canary / outbound DLP
+│   ├── duckdb_query.py     # Ephemeral read-only SQL, word-boundary keyword guard, local-FS block, cell wrapping
+│   ├── qdrant_search.py    # Multi-vector similarity search; historical payloads wrapped as untrusted
+│   ├── ti_lookup.py        # Multi-source TI gateway (VT/AbuseIPDB/OTX/X-Force/GreyNoise), cached + rate-limited
+│   ├── entity_manager.py   # update_entity_status -- the swarm's blast-radius state-machine writer
+│   ├── query_cookbook.py   # 30 schema-correct DuckDB QueryPatterns injected into expert SOPs
+│   ├── siem_query.py       # SiemQueryTool: read-only SPL/ES|QL pivot into the fanned-out Splunk/Elastic SIEMs (CIM/ECS), bounded + fail-open
+│   └── siem_cookbook.py    # SIEM pivot patterns (CIM/ECS) injected into expert SOPs; counterpart cross-source disproof pivot
+└── agents/                 # The Swarm Personas
+    ├── __init__.py         # Package marker
     ├── llm_providers.py    # Shared failover chain + lazy single embedder (centralized, air-gap aware)
     ├── expert_base.py      # Shared expert harness (correct slicing, summarization, canary, sanitization)
     ├── supervisor.py       # Incident Commander: RAG immunity, temporal pivot, blast-radius cap, routing
@@ -64,7 +67,7 @@ It then emits a structured `SupervisorDecision` (route to an expert or FINISH +
 `VerdictSchema`). Source-type routing sends `aws_*`/`azure_*` to cloud,
 `network_tap` to nettap, and endpoint sources to host/net.
 
-### 3–6. The Forensic Experts (`host`, `net`, `cloud`, `nettap`)
+### 3-6. The Forensic Experts (`host`, `net`, `cloud`, `nettap`)
 Each module is intentionally thin: it owns only its Standard Operating Procedure
 prompt and its RBAC tool group, then delegates to the shared
 `expert_base.run_expert` harness. Each expert writes competing hypotheses
@@ -78,6 +81,20 @@ back to the supervisor rather than its full ReAct transcript.
   correlation by ARN/UPN, impossible-travel.
 * **NetTap** -- 42-field full-PCAP L7 sessions; JA3/TLS cert, DNS tunneling, beacon
   detection, plus a Model-A baseline-reconstruction cross-reference path.
+
+**SIEM pivot during investigation (`siem_query.py` + `siem_cookbook.py`).** Beyond
+cold storage, every expert can pivot to a reachable enterprise SIEM the middleware
+already fans out to -- Splunk (SPL) and Elastic (ES|QL) -- and query the **same
+normalized telemetry plus the OTHER sources that SIEM collects** (firewall, proxy,
+IAM/AD, DNS) that Nexus never ingested. Because the fanout normalizes to CIM/ECS,
+the same query skill spans both; the model correlates by **entity (IP/host/user) +
+time window**, since the CIM/ECS projection carries no Nexus `event_id`. The
+`SiemQueryTool` is read-only (generating/destructive commands rejected), forces a
+time + row bound, restricts to a config-driven index allowlist (Nexus + approved
+cross-source), wraps every result row as `<untrusted_payload>`, and **fails open** --
+an unreachable SIEM never blocks the investigation. It is sovereign-by-default:
+inert unless a backend is enabled in `nexus.toml [siem]`, in which case each
+expert's SOP gains a gated SIEM playbook of proven SPL/ES|QL pivots.
 
 ### 7. Review board -- adversarial per-expert counterparts (`review_board.py`)
 Every expert has a **counterpart** whose only job is to **disprove** that
@@ -93,6 +110,15 @@ immunity, and the board never escalates to containment itself). It **fails
 closed**: if an implicated domain is unreviewable (every LLM provider
 unreachable) it demotes to `monitor` rather than letting an unreviewed
 containment proceed.
+
+Counterparts also **disprove with their own SIEM evidence**, not just skeptical
+reasoning over the transcript: before grading, a counterpart runs a disconfirming
+**cross-source prevalence query** for the disputed IP (`_counterpart_siem_lookup`)
+-- a destination reached by *many distinct enterprise sources* (CDN / OS-updater /
+NTP / telemetry SaaS) is benign infrastructure, not C2, and overrides a single-host
+"beacon" claim. The lookup fails to transcript-only reasoning when no SIEM is
+reachable (never an auto-pass), the SIEM rows are `<untrusted_payload>` evidence,
+and the pure `aggregate_board` decision rule is untouched.
 
 ### 8. Response -- report, governance, action, memory (`response.py`)
 * Synthesizes the `messages` history into a chronological Markdown incident report.
@@ -129,6 +155,15 @@ Deterministic, bounded, self-correcting tools.
   nothing is configured. The verdict is derived solely from provider responses --
   never from the agent's own `reasoning` text (which previously created a
   self-confirming bias loop).
+* **SIEM pivot (`siem_query.py`):** read-only Splunk SPL / Elastic ES|QL queries
+  into the SIEMs the middleware fans out to, over the fanned-out CIM/ECS telemetry
+  *and* operator-approved cross-source indexes (firewall/proxy/IAM/DNS). Generating
+  and destructive commands are rejected, a time window + row cap are force-injected,
+  the index allowlist is config-driven, and every row is wrapped untrusted. Sovereign
+  by default (inert unless `nexus.toml [siem]` enables a backend) and **fail-open** --
+  a SIEM outage degrades to cold-storage-only investigation. A companion
+  `siem_cookbook.py` seeds the experts' SOPs (and the counterparts' disproof) with
+  proven SPL/ES|QL pivot patterns, the SIEM analogue of the DuckDB query cookbook.
 
 ### Pillar 2 -- Dynamic State & Entity Tracking
 `InvestigativeState` tracks the message history and an actively merged
@@ -139,7 +174,10 @@ cell truncation cap tool-output size.
 
 ### Pillar 3 -- Hierarchical Topology & RBAC
 Supervisor/worker split. Tool visibility is role-scoped in `tools/__init__.py`:
-the host expert has no external Threat-Intel egress; net/cloud/nettap do. Shared
+the host expert has no external Threat-Intel egress; net/cloud/nettap do. Every
+expert additionally carries the read-only **SIEM pivot**, and a dedicated
+`COUNTERPART_TOOLS` kit (DuckDB + Qdrant + TI + SIEM, but **no** entity-mutation or
+acquisition agency) is what the review-board counterparts use to disprove. Shared
 LLM and embedder plumbing lives once in `llm_providers.py`.
 
 ### Pillar 4 -- Episodic Memory & Temporal Correlation
@@ -161,6 +199,46 @@ LLM and embedder plumbing lives once in `llm_providers.py`.
 ---
 
 ### Changelog
+
+12JUN2026 -- SIEM-federated investigation (WS-G, phases G0-G2):
+
+**Problem.** The middleware fanout already mirrors normalized telemetry into the
+enterprise SIEMs (CIM→Splunk, ECS→Elastic), but that data was write-only from the
+swarm's view -- it investigated only its own cold storage, ignoring the SIEM's
+correlation primitives, longer retention, and the **other sources** the SIEM holds
+(firewall/proxy/IAM/DNS) that Nexus never ingested.
+
+**`tools/siem_query.py` -- `SiemQueryTool`.** A read-only pivot bound to every
+expert. Dialect adapters (Splunk export API / Elastic `_query`) over an injectable
+transport; a pure guard rejects generating/destructive commands (`| delete`,
+`outputlookup`, `collect`, `rest`, ...), force-injects a time window + row cap, and
+enforces a config-driven index allowlist (`nexus_*` ∪ operator-approved
+cross-source). Results are `<untrusted_payload>`-wrapped; the tool **fails open**.
+`SIEM_SCHEMA` (the CIM/ECS field contract) is embedded and **drift-tested** against
+`middleware/config/{cim,ecs}_mappings.yaml`. Central `[siem]` config in `nexus.toml`
+is sovereign-by-default (double-gated on `enabled_backends` + token env).
+
+**`tools/siem_cookbook.py`.** Phase-ordered SPL/ES|QL pivot patterns (scope →
+lineage → correlate → aggregate → **disprove**), each declaring the CIM/ECS fields
+it touches (field-validity is CI-enforced). `render_siem_playbook()` is gated on the
+live config and injected into all four expert SOPs.
+
+**Review-board counterpart disproof (§3b).** `_counterpart_siem_lookup` runs a
+**cross-source prevalence query** for the disputed IP before grading -- a
+destination reached by many distinct enterprise sources is benign infrastructure,
+overriding a single-host beacon claim. It fails to transcript-only when no SIEM is
+reachable; `aggregate_board` stays a pure, unchanged decision rule.
+
+**Findings the tests surfaced + fixed.** (F1) the CIM/ECS projection carries no
+Nexus `event_id` → pivots correlate by entity+time; (F2) `SplunkAdapter.parse`
+dropped a single-line export response → made robust to every stream/dict/list
+shape; (F3) two cookbook patterns declared a `time` field unused by their template.
+**Tests:** `test_siem_config.py` (8), `test_siem_query.py` (42, incl. a real
+mock-HTTP Splunk/Elastic integration + red-team result-injection), `test_siem_cookbook.py`
+(12), `test_siem_review_board.py` (12). Full analytics regression green. Corpus
+training on `detection_training/` (Track 9) and the dockerized E2E lab are next.
+
+---
 
 10JUN2026 -- Query Cookbook (DuckDB query logic up front):
 

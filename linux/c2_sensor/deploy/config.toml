@@ -22,7 +22,7 @@ tls_key_path = "/app/certs/key.pem"
 static_ui_path = "/app/ui/static"
 # DEPRECATED: jwt_secret and default_admin_password are tracked for cleanup, use env vars.
 # On first boot, start_core will provide random generated credentials for login
-jwt_secret = "CHANGE_ME_IN_PRODUCTION"
+jwt_secret = "51009f9664431d3187c32669266977ae195883d38600fe50fdb8e1a1a7b8b70f"
 default_admin_password = "admin"
 
 [mitigation]

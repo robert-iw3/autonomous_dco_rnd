@@ -6,6 +6,7 @@ import logging
 
 from tools import CLOUD_ANALYST_TOOLS
 from tools.query_cookbook import render_playbook
+from tools.siem_cookbook import render_siem_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
@@ -129,6 +130,10 @@ CONSTRAINTS:
 """
 
 cloud_sop_prompt += "\n\n" + render_playbook(CLOUD_SENSORS)
+# SIEM federation (WS-G): gated -- empty SOP addition unless a backend is enabled.
+_siem_play = render_siem_playbook()
+if _siem_play:
+    cloud_sop_prompt += "\n\n" + _siem_play
 
 EXECUTORS = make_executors(CLOUD_ANALYST_TOOLS, temperature=0.0)
 

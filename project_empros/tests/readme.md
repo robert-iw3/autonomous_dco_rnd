@@ -40,11 +40,12 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | Section | Dockerfile | What it tests | Base image |
 |---------|-----------|---------------|------------|
 | `offline` | `Dockerfile.offline` | TurboVec, RSI loop (107 tests, ~0.3s) | Alpine 3.23 |
-| `sensors` | `Dockerfile.sensors` | All 14 sensor pipeline contracts (605 tests) | Alpine 3.23 |
-| `mlops` | `Dockerfile.mlops` | Data flow, Track 6 dry-run, TI ingest, eval minilab | Debian slim |
-| `analytics` | `Dockerfile.analytics` | LLM hunter, agentic swarm, redteam bypass | Alpine 3.23 |
+| `sensors` | `Dockerfile.sensors` | 14 sensor pipeline contracts + HMAC transmission + e2e sensor pipeline | Alpine 3.23 |
+| `mlops` | `Dockerfile.mlops` | Data flow, Track 6 dry-run, TI ingest, eval minilab, s3 parquet worker | Debian slim |
+| `analytics` | `Dockerfile.analytics` | LLM hunter (incl. review board + AI controls), agentic swarm, redteam bypass | Alpine 3.23 |
 | `services` | `Dockerfile.services` | Worker/infra/orchestration source contracts (255 tests) | Alpine 3.23 |
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
+| `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
 
 > `mlops` and `pipeline` use `python:3.12-slim` (Debian glibc) because PyTorch CPU wheels link against glibc symbols absent from musl libc.
 
@@ -66,17 +67,35 @@ The script maps changed file paths to sections automatically:
 
 ### Reports
 
-JUnit XML reports are written to `tests/reports/<section>.xml` on the host. They persist after containers are removed and can be ingested by any CI/CD system (Jenkins, GitHub Actions, GitLab CI):
+**Every test run produces a JUnit report in `tests/reports/`.** Two mechanisms guarantee it:
+
+1. **Section runners** pass an explicit `--junit-xml=/reports/<section>.xml`, producing the
+   canonical per-section reports below. These are **committed** (CI-ingestible by Jenkins / GitHub
+   Actions / GitLab CI) and persist after the ephemeral containers are removed.
+2. **Any other invocation** (host `pytest`, a single-file ad-hoc run) gets a report auto-assigned
+   by [`conftest.py`](conftest.py), named from the selected path(s) — e.g.
+   `pytest tests/lab_analytics_hunter/test_ai_controls.py` writes
+   `tests/reports/test_ai_controls.xml`. These ad-hoc reports are **gitignored** (see
+   [`reports/.gitignore`](reports/.gitignore)) so they never clutter commits; the canonical
+   section reports are the only ones tracked.
 
 ```
 tests/reports/
-├── offline.xml
-├── sensors.xml
-├── mlops.xml
-├── analytics.xml
-├── services.xml
-└── pipeline.xml
+├── offline.xml      ┐
+├── sensors.xml      │
+├── mlops.xml        │  canonical per-section reports (committed)
+├── analytics.xml    │
+├── services.xml     │
+├── pipeline.xml     │
+└── detchamber.xml   ┘
 ```
+
+**Coverage is enforced.** [`test_report_coverage.py`](test_report_coverage.py) (host-only) asserts
+that *every* `test_*.py` under `tests/` is either run by a report-emitting section or listed (with
+justification) as a live-infra / host-only exclusion. An orphaned test — one that no section runs,
+so it would never produce a report — is a hard CI failure. Live-only labs (`lab_nats_ingress`,
+`lab_qdrant_pipeline`, `lab_middleware`, `test_model_regression.py`) still emit a report via
+`conftest.py` when run against their infrastructure.
 
 ---
 

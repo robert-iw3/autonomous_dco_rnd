@@ -6,6 +6,7 @@ import logging
 
 from tools import NETWORK_ANALYST_TOOLS
 from tools.query_cookbook import render_playbook
+from tools.siem_cookbook import render_siem_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
@@ -67,6 +68,10 @@ CONSTRAINTS:
 """
 
 net_sop_prompt += "\n\n" + render_playbook(NET_SENSORS)
+# SIEM federation (WS-G): gated -- empty SOP addition unless a backend is enabled.
+_siem_play = render_siem_playbook()
+if _siem_play:
+    net_sop_prompt += "\n\n" + _siem_play
 
 EXECUTORS = make_executors(NETWORK_ANALYST_TOOLS, temperature=0.0)
 

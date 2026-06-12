@@ -1,0 +1,36 @@
+=============================================
+  Rust Security Audit - Sat May 30 13:08:25 CDT 2026
+  Workspace: /home/shiftyroot/Documents/GitHub/ai_rnd/project_empros
+=============================================
+
+---------------------------------------------
+  Full Workspace (root Cargo.toml)
+---------------------------------------------
+    Updating crates.io index
+     Locking 487 packages to latest compatible versions
+      Adding async-nats v0.48.0 (available: v0.49.0)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding gethostname v0.5.0 (available: v1.1.0)
+      Adding hmac v0.12.1 (available: v0.13.0)
+      Adding jsonwebtoken v9.3.1 (available: v10.4.0)
+      Adding matchit v0.8.4 (available: v0.8.6)
+      Adding metrics-exporter-prometheus v0.16.2 (available: v0.18.3)
+      Adding minijinja v1.0.22 (available: v2.20.0)
+      Adding notify v6.1.1 (available: v8.2.0)
+      Adding object_store v0.11.2 (available: v0.13.2)
+      Adding opentelemetry v0.21.0 (available: v0.32.0)
+      Adding opentelemetry_sdk v0.21.2 (available: v0.32.1)
+      Adding redis v0.27.6 (available: v1.2.2)
+      Adding reqwest v0.12.28 (available: v0.13.4)
+      Adding sha2 v0.10.9 (available: v0.11.0)
+      Adding tikv-jemallocator v0.6.1 (available: v0.7.0)
+      Adding toml v0.8.23 (available: v1.1.2+spec-1.1.0)
+      Adding tracing-opentelemetry v0.22.0 (available: v0.33.0)
+    Fetching advisory database from `https://github.com/RustSec/advisory-db.git`
+      Loaded 1099 security advisories (from /usr/local/cargo/advisory-db)
+    Updating crates.io index
+    Scanning Cargo.lock for vulnerabilities (502 crate dependencies)
+
+=============================================
+  Audit Complete (exit: 0)
+=============================================

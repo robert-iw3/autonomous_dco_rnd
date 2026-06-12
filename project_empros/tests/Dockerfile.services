@@ -34,6 +34,7 @@ COPY project_empros/tests/lab_orchestration/            /repo/project_empros/tes
 COPY project_empros/tests/lab_nats_ingress/nats-test.conf /repo/project_empros/tests/lab_nats_ingress/
 COPY project_empros/tests/deploy/                       /repo/project_empros/tests/deploy/
 COPY project_empros/tests/pytest.ini                    /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py                    /repo/project_empros/tests/
 
 ENV PYTHONPATH=/repo/project_empros
 WORKDIR /repo/project_empros

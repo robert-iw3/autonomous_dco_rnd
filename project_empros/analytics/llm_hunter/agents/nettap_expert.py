@@ -7,6 +7,7 @@ from typing import Dict, Any
 
 from tools import NETTAP_ANALYST_TOOLS
 from tools.query_cookbook import render_playbook
+from tools.siem_cookbook import render_siem_playbook
 from agents.expert_base import make_executors, run_expert
 from state import InvestigativeState
 
@@ -90,6 +91,10 @@ CONSTRAINTS:
 """
 
 nettap_sop_prompt += "\n\n" + render_playbook(NETTAP_SENSORS)
+# SIEM federation (WS-G): gated -- empty SOP addition unless a backend is enabled.
+_siem_play = render_siem_playbook()
+if _siem_play:
+    nettap_sop_prompt += "\n\n" + _siem_play
 
 
 def _baseline_context(alert: Dict[str, Any]) -> str:

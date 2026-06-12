@@ -221,7 +221,7 @@ context_columns = [
     "is_internal_dst", "port_class"
 ]
 
-# ── Missing schema mappings (synced from services/config/nexus.toml) ─────────
+# -- Missing schema mappings (synced from services/config/nexus.toml) ---------
 
 [schema_mappings.sysmon_sensor]
 identifier_column  = "sysmon_event_id"
@@ -272,7 +272,7 @@ vector_columns = [
 ]
 context_columns = ["process_name", "file_path", "plist_path", "code_signature", "quarantine_flag", "publisher"]
 
-# ── GCP / VMware Connectors (UnifiedFlowRecord → cloud_flow vector) ──────────
+# -- GCP / VMware Connectors (UnifiedFlowRecord → cloud_flow vector) ----------
 # All emit the same 33-column UnifiedFlowRecord schema. Each gets its own
 # sensor_type for per-source NATS routing and Hive partition granularity,
 # but they share the cloud_flow named vector (size 5).
@@ -385,3 +385,33 @@ api_type = "rest_openai_compatible"
 api_key_env_var = "AZURE_OPENAI_KEY"
 endpoint = "https://corp-ai.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-15-preview"
 model = "gpt-4o"
+
+# --- SIEM Federation (WS-G) ----------------------------------------
+# Sovereign-by-default: the swarm's SiemQueryTool can reach a backend ONLY if it
+# is listed in enabled_backends AND its token env var is set. Leave
+# enabled_backends empty for an air-gapped deployment with no SIEM surface.
+# nexus_indexes MUST match the middleware fanout (middleware.toml [splunk]/[elastic]);
+# extra_indexes are operator-approved OTHER sources the SIEM collects (B).
+[siem]
+enabled_backends = []          # e.g. ["splunk", "elastic"] to enable
+default_window_hours = 6       # forced time-bound when the model omits one
+max_rows = 200                 # forced result cap per query
+
+[siem.splunk]
+dialect = "spl"
+search_url = "https://splunk-sh.internal:8089"
+token_env_var = "NEXUS_SPLUNK_TOKEN"
+nexus_indexes = ["nexus_endpoint", "nexus_cloud", "nexus_network", "nexus_alerts"]
+extra_indexes = []             # e.g. ["fw_traffic", "proxy", "ad_audit", "dns"]
+datamodels = []                # e.g. ["Network_Traffic", "Authentication"] (CIM tstats)
+schema = "cim"
+verify_tls = true
+
+[siem.elastic]
+dialect = "esql"               # "esql" | "kql"
+search_url = "https://elastic.internal:9200"
+apikey_env_var = "NEXUS_ELASTIC_APIKEY"
+nexus_indexes = ["nexus-endpoint", "nexus-cloud", "nexus-network"]
+extra_indexes = []             # e.g. ["logs-firewall-*", "logs-proxy-*", "logs-okta-*"]
+schema = "ecs"
+verify_tls = true
