@@ -237,7 +237,7 @@ Offline. Stubs NATS, LangGraph, and Prometheus; imports `orchestrator.py`, `stat
 | Alert schema | All 20+ `source_type` literals; `anomaly_score` bounds (0–1); `raw_event` default |
 | SOAR schema | Blast-radius cap (max 5 targets); enum-only `action_type`; confidence bounds |
 | `_initial_route()` | Deterministic first-hop: cloud→`cloud_expert`, network_tap→`nettap_expert`, c2→`net_expert`, endpoint→`host_expert` |
-| `supervisor_router()` | True positive → `critic`; false positive / no verdict → `response_agent` |
+| `supervisor_router()` | True positive → `review_board`; false positive / no verdict → `response_agent` |
 | Canary generation | `CANARY_<12hex>` format; uniqueness across 100 calls |
 | Sanitizer | Token defang, HTML escape, field truncation, RFC 1918 DLP scrub |
 | Canary leak guard | Guard present in `trigger_swarm`; fires before normal-path `_dispatch_soar` |
@@ -245,7 +245,7 @@ Offline. Stubs NATS, LangGraph, and Prometheus; imports `orchestrator.py`, `stat
 | Timeout | Escalates to `manual_review_required` via `_dispatch_soar`; no DLQ |
 | NATS subjects | `nexus.alerts.>`, `nexus.soar.execute` (lowercase), `nexus.dlq.cognitive` |
 | State keys | `next_agent`, `verdict`, `incident_report`, `action_payload`, `canary` |
-| Graph topology | All 7 agent nodes; expert nodes return to supervisor; critic→response_agent |
+| Graph topology | All 7 agent nodes; expert nodes return to supervisor; review_board→response_agent |
 | DoS guard | `_investigation_sema` wraps `trigger_swarm` body |
 | DLP scrub | `scrub_outbound_dlp()` applied in `_dispatch_soar` |
 | Do-not-pivot | DNS resolvers, loopback, link-local metadata in `GLOBAL_DO_NOT_PIVOT` |

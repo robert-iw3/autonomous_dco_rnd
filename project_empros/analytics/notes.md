@@ -22,7 +22,7 @@ analytics/llm_hunter/
     ├── net_expert.py       # C2 flow analyst (jitter, exfil, DGA)
     ├── cloud_expert.py     # AWS (VPC/CloudTrail/GuardDuty) + Azure (NSG/Activity/Entra ID) forensics
     ├── nettap_expert.py    # 42-field full-PCAP L7 session forensics (JA3/TLS/DNS/HTTP/GeoIP)
-    ├── critic.py           # Independent Red-Team critic (fails CLOSED)
+    ├── review_board.py     # Adversarial review board: per-expert counterparts disprove (fails CLOSED)
     └── response.py         # Incident-report synthesizer, HitL circuit breaker, SOAR payload, RAG writer
 ```
 
@@ -79,16 +79,20 @@ back to the supervisor rather than its full ReAct transcript.
 * **NetTap** -- 42-field full-PCAP L7 sessions; JA3/TLS cert, DNS tunneling, beacon
   detection, plus a Model-A baseline-reconstruction cross-reference path.
 
-### 7. Critic -- independent Red-Team review (`critic.py`)
-Review is **symmetric**: routed to when the supervisor proposes a True Positive
-(grades benign alternative ruled out, behavioral proof of execution, blast
-radius fully cleared; may override to dismiss) AND when it proposes a weak
-False Positive -- confidence below `FP_CONFIDENCE_GATE` or an incomplete blast
-radius (grades evidence of work, unexplained behavior, blast radius; an
-unendorsed dismissal is returned at low confidence so it can never mint
-immunity, and the critic never escalates to containment itself). It **fails
-closed**: if every LLM provider is unreachable it demotes to `monitor` rather
-than letting an unreviewed containment proceed.
+### 7. Review board -- adversarial per-expert counterparts (`review_board.py`)
+Every expert has a **counterpart** whose only job is to **disprove** that
+expert's contribution; a finding is confirmed a True Positive **only if no
+implicated counterpart can disprove it**. Review is **symmetric**: routed to
+when the supervisor proposes a True Positive (each implicated counterpart grades
+benign alternative ruled out, behavioral proof of execution, blast radius fully
+cleared -- a single credible disproof vetoes the board and overrides to monitor)
+AND when it proposes a weak False Positive -- confidence below
+`FP_CONFIDENCE_GATE` or an incomplete blast radius (a counterpart that surfaces
+unexplained malice returns the dismissal at low confidence so it can never mint
+immunity, and the board never escalates to containment itself). It **fails
+closed**: if an implicated domain is unreviewable (every LLM provider
+unreachable) it demotes to `monitor` rather than letting an unreviewed
+containment proceed.
 
 ### 8. Response -- report, governance, action, memory (`response.py`)
 * Synthesizes the `messages` history into a chronological Markdown incident report.
@@ -263,8 +267,9 @@ effect, unlike a conditional-edge mutation, which LangGraph discards).
 target Parquet path before analytical queries, loading the day's live columns
 instead of trusting hardcoded schemas.
 
-**4 -- Red-Team critic.** Independent skeptical node before the response agent;
-overrides weak True Positives and fails closed when unavailable.
+**4 -- Adversarial review board.** Per-expert counterparts try to disprove the
+finding before the response agent; a single credible disproof overrides weak
+True Positives, and the board fails closed when a domain is unreviewable.
 
 **5 -- Structured incident timelines.** The response agent renders the reasoning
 chain into a chronological Markdown report (blast radius, attack timeline, final

@@ -789,7 +789,7 @@ class TestLLMCircuitBreaker:
         "analytics/llm_hunter/agents/llm_providers.py"
     )
     CALL_SITES = [
-        Path(__file__).parent.parent / "analytics/llm_hunter/agents/critic.py",
+        Path(__file__).parent.parent / "analytics/llm_hunter/agents/review_board.py",
         Path(__file__).parent.parent / "analytics/llm_hunter/agents/supervisor.py",
         Path(__file__).parent.parent / "analytics/llm_hunter/agents/response.py",
         Path(__file__).parent.parent / "analytics/llm_hunter/agents/expert_base.py",

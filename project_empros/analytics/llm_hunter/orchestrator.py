@@ -37,7 +37,7 @@ from agents.host_expert import host_expert_node
 from agents.net_expert import net_expert_node
 from agents.cloud_expert import cloud_expert_node
 from agents.nettap_expert import nettap_expert_node
-from agents.critic import critic_node
+from agents.review_board import review_board_node
 from agents.response import response_agent
 from detonation_enrichment import enrichment_decision
 from tools.sanitizer import CognitiveSanitizer
@@ -104,8 +104,8 @@ def supervisor_router(state: InvestigativeState) -> str:
     in conditional-edge functions; the blast-radius cap that used to live here
     therefore never took effect and now lives in the supervisor node + reducer).
 
-    Critic review is symmetric: True Positives are reviewed before containment
-    (as before), and False Positives are reviewed before dismissal whenever the
+    Review-board review is symmetric: True Positives are reviewed before
+    containment, and False Positives are reviewed before dismissal whenever the
     dismissal is weak -- confidence below FP_CONFIDENCE_GATE or an incomplete
     blast radius. An unreviewed weak FP previously went straight to the response
     agent and was written into RAG memory, where immunity would auto-dismiss its
@@ -118,11 +118,11 @@ def supervisor_router(state: InvestigativeState) -> str:
     if not verdict:
         return "response_agent"  # nothing to review
     if verdict.get("is_true_positive"):
-        return "critic"
+        return "review_board"
     if state.get("analysis_complete", True) is False:
-        return "critic"
+        return "review_board"
     if float(verdict.get("confidence", 0.0) or 0.0) < FP_CONFIDENCE_GATE:
-        return "critic"
+        return "review_board"
     return "response_agent"
 
 
@@ -133,7 +133,7 @@ def build_graph(checkpointer):
     builder.add_node("net_expert", net_expert_node)
     builder.add_node("cloud_expert", cloud_expert_node)
     builder.add_node("nettap_expert", nettap_expert_node)
-    builder.add_node("critic", critic_node)
+    builder.add_node("review_board", review_board_node)
     builder.add_node("response_agent", response_agent)
 
     builder.set_entry_point("supervisor")
@@ -142,14 +142,14 @@ def build_graph(checkpointer):
         "net_expert": "net_expert",
         "cloud_expert": "cloud_expert",
         "nettap_expert": "nettap_expert",
-        "critic": "critic",
+        "review_board": "review_board",
         "response_agent": "response_agent",
     })
     builder.add_edge("host_expert", "supervisor")
     builder.add_edge("net_expert", "supervisor")
     builder.add_edge("cloud_expert", "supervisor")
     builder.add_edge("nettap_expert", "supervisor")
-    builder.add_edge("critic", "response_agent")
+    builder.add_edge("review_board", "response_agent")
     builder.add_edge("response_agent", END)
     return builder.compile(checkpointer=checkpointer)
 

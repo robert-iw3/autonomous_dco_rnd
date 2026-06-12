@@ -3,6 +3,7 @@ Tier-3 Incident Commander (Supervisor).
 """
 
 import os
+import time
 import asyncio
 import logging
 from typing import Literal, Optional, Dict, List, Any
@@ -16,6 +17,7 @@ from state import (InvestigativeState, VerdictSchema, MAX_ENTITIES, MAX_GATE_OVE
                    build_memory_signature, route_for_source_type)
 from agents.llm_providers import (build_failover_chain, get_embedder, CONFIG,
                                    circuit_is_callable, record_call_success, record_call_failure)
+from agents.controls import memory_is_actionable
 from tools.nexus_config import apply_s3_settings
 from qdrant_client import AsyncQdrantClient
 
@@ -225,11 +227,12 @@ async def supervisor_agent(state: InvestigativeState):
                 limit=1,
                 score_threshold=IMMUNITY_THRESHOLD,
             )
-            # Immunity requires an *eligible* stored FP: complete blast radius and
-            # confidence at/above FP_CONFIDENCE_GATE (critic-reviewed otherwise).
-            # Default True only for legacy points written before the flag existed.
-            if (hits and not hits[0].payload.get("is_true_positive", True)
-                    and hits[0].payload.get("immunity_eligible", True)):
+            # Immunity requires an *eligible*, non-expired stored FP: complete blast
+            # radius, confidence at/above FP_CONFIDENCE_GATE (review-board-reviewed
+            # otherwise), and within the memory TTL (NIST GV-1.3-005 -- a stale FP
+            # must not entrench a permanent blind spot). Legacy points without a
+            # created_at timestamp preserve prior behavior and do not expire.
+            if hits and memory_is_actionable(hits[0].payload, time.time()):
                 m = hits[0]
                 logger.warning(
                     f"RAG IMMUNITY TRIGGERED: match with historical False Positive "
@@ -372,7 +375,7 @@ async def supervisor_agent(state: InvestigativeState):
                 return result
 
             # Overrides exhausted: stop fighting the model. Accept FINISH but mark
-            # the analysis incomplete -- the router sends it through the critic and
+            # the analysis incomplete -- the router sends it through the review board and
             # the response agent surfaces it as manual_review_required instead of a
             # clean autonomous verdict, and it can never mint immunity memory.
             logger.error(

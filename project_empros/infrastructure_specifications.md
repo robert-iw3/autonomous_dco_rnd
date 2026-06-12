@@ -166,9 +166,10 @@ Tier-3 Incident Commander (supervisor.py)
   ├─ cloud_expert.py      ← Cloud API chain analysis
   │   Tools: CloudTrail query, IAM role graph, GuardDuty enrichment
   │
-  └─ critic.py            ← Adversarial red-team skeptic
-      Challenges every conclusion -- requires behavioral proof on all 3 axes
-      before recommending containment
+  └─ review_board.py      ← Adversarial review board (per-expert counterparts)
+      Every expert has a counterpart that tries to disprove its contribution;
+      a TP is confirmed only if no implicated counterpart can disprove it,
+      requiring behavioral proof on all 3 axes before recommending containment
 
 All agents share:
   ├─ ti_lookup.py         ← Internal OpenCTI (air-gapped) + external providers

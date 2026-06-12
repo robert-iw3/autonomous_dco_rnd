@@ -18,7 +18,7 @@ MAX_ENTITIES = 10  # hard cap on simultaneously tracked entities per investigati
 # ─── Deep-Analysis Loop Gates ──────────────────────────────────────
 # FP_CONFIDENCE_GATE is the single confidence threshold for the False Positive
 # review/memory contract: an FP verdict BELOW the gate is routed through the
-# Red-Team critic before the response agent (it cannot be dismissed unreviewed),
+# adversarial review board before the response agent (it cannot be dismissed unreviewed),
 # and only an FP verdict AT/ABOVE the gate with a complete blast radius may be
 # stored as immunity-eligible RAG memory. This closes the self-poisoning loop
 # where one lazy FP verdict granted permanent auto-dismissal of its signature.
@@ -227,7 +227,7 @@ class InvestigativeState(TypedDict):
     entities_of_interest: Annotated[Dict[str, dict], merge_entities]
     next_agent: Literal[
         "host_expert", "net_expert", "cloud_expert", "nettap_expert",
-        "critic", "response_agent", "FINISH",
+        "review_board", "response_agent", "FINISH",
     ]
     verdict: Optional[Dict[str, Any]]
     action_payload: Optional[Dict[str, Any]]
@@ -239,6 +239,6 @@ class InvestigativeState(TypedDict):
     gate_overrides: int
     # False when the verdict was accepted with an unresolved blast radius (gate
     # exhausted, blast-radius cap, or total provider failure). Such verdicts are
-    # critic-reviewed, surfaced as manual_review_required, and never mint
+    # review-board-reviewed, surfaced as manual_review_required, and never mint
     # immunity-eligible RAG memory.
     analysis_complete: Optional[bool]

@@ -6,8 +6,8 @@ Wires the Det Chamber into the swarm:
   * `AcquisitionRequestSchema` -- the validated request the host_expert's
     acquire_and_detonate tool emits (first-line path safety; the deterministic
     worker re-validates with the full deny-list),
-  * a confidence GATE so acquisition only fires on a high-confidence (critic-
-    reviewed) TP,
+  * a confidence GATE so acquisition only fires on a high-confidence
+    (review-board-confirmed) TP,
   * the enrichment loop-back: a `nexus.alerts.detonation` result maps to a
     follow-up SOAR action -- contain on malicious, RESTORE on benign (false
     positive), manual review on a custody failure.
@@ -85,7 +85,7 @@ def test_acquisition_request_rejects_bad_input(bad):
         state.AcquisitionRequestSchema(**base)
 
 
-# ─── acquire tool gating (auto on critic-reviewed TP + threshold) ────────────
+# ─── acquire tool gating (auto on review-board-confirmed TP + threshold) ────────────
 def test_gate_blocks_low_confidence():
     assert ad.should_acquire(0.95) is True
     assert ad.should_acquire(0.50) is False

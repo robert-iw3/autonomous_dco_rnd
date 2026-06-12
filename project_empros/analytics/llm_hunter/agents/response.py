@@ -3,6 +3,7 @@ Response Agent -- final report synthesis, HitL circuit breaker, SOAR payload, RA
 """
 
 import os
+import time
 import uuid
 import logging
 import asyncio
@@ -16,6 +17,7 @@ from redis.asyncio import Redis
 from state import InvestigativeState, build_memory_signature, FP_CONFIDENCE_GATE
 from agents.llm_providers import (build_failover_chain, get_embedder,
                                    circuit_is_callable, record_call_success, record_call_failure)
+from agents.controls import stamp_ai_provenance
 from tools.sanitizer import CognitiveSanitizer
 
 logger = logging.getLogger("nexus-response")
@@ -103,8 +105,8 @@ async def _persist_memory(alert: dict, verdict: dict, action_type: str, incident
 
     `immunity_eligible` gates what the supervisor may act on: only an FP verdict
     with a complete blast radius and confidence >= FP_CONFIDENCE_GATE (i.e. one
-    that either skipped the critic because it was strong, or survived critic
-    review) may auto-dismiss future alerts of the same signature. Everything else
+    that either skipped the review board because it was strong, or survived
+    review-board review) may auto-dismiss future alerts of the same signature. Everything else
     is stored for the audit trail but can never short-circuit an investigation.
     """
     try:
@@ -126,6 +128,9 @@ async def _persist_memory(alert: dict, verdict: dict, action_type: str, incident
                     "action": action_type,
                     "is_true_positive": bool(verdict.get("is_true_positive", False)),
                     "immunity_eligible": bool(immunity_eligible),
+                    # NIST GV-1.3-005: timestamp so the supervisor's recall can
+                    # expire stale immunity rather than entrenching a blind spot.
+                    "created_at": time.time(),
                     "incident_report": incident_report,
                 },
             )],
@@ -165,6 +170,10 @@ async def response_agent(state: InvestigativeState):
         logger.error(f"Failed to generate report on all providers: {last_error}")
         incident_report = "Report generation failed due to Swarm timeout or error."
 
+    # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
+    # AI-generated so a human consumer is never misled about its source.
+    incident_report = stamp_ai_provenance(incident_report)
+
     target = alert.get("sensor_id", "")
     recommended_action = verdict.get("recommended_action", "monitor")
     action_type_map = {
@@ -178,8 +187,8 @@ async def response_agent(state: InvestigativeState):
         analysis_complete = state.get("analysis_complete", True) is not False
         confidence = float(verdict.get("confidence", 0.0) or 0.0)
         # Only a complete-analysis FP at/above the confidence gate may mint
-        # immunity. Weak FPs were critic-reviewed upstream; if the critic could
-        # not endorse them, their confidence stays below the gate by design.
+        # immunity. Weak FPs were review-board-reviewed upstream; if no counterpart
+        # could endorse them, their confidence stays below the gate by design.
         immunity_eligible = analysis_complete and confidence >= FP_CONFIDENCE_GATE
         action_type = action_type_map.get(recommended_action, "manual_review_required")
         if not analysis_complete:

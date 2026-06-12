@@ -388,8 +388,10 @@ class TestInitialRouteSourceCode:
 class TestSupervisorRouterSourceCode:
     """supervisor_router routing contracts verified from source."""
 
-    def test_finish_with_tp_routes_to_critic(self):
-        assert '"critic"' in ORCHESTRATOR_SRC
+    def test_finish_with_tp_routes_to_review_board(self):
+        # TP findings now route to the adversarial review board (the critic was
+        # superseded by a board of per-expert counterparts).
+        assert '"review_board"' in ORCHESTRATOR_SRC
         assert "is_true_positive" in ORCHESTRATOR_SRC
 
     def test_finish_without_tp_routes_to_response_agent(self):

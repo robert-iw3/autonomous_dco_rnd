@@ -15,7 +15,7 @@ Coverage areas:
   A. Alert schema validation (UnifiedAlertSchema)
   B. SOAR schema blast-radius controls (SoarExecutionSchema)
   C. Initial routing (_initial_route) -- deterministic first-hop
-  D. Supervisor router (supervisor_router) -- verdict-gated critic path
+  D. Supervisor router (supervisor_router) -- verdict-gated review-board path
   E. Canary generation and format (CognitiveSanitizer.generate_canary)
   F. Canary sanitization (neutralize_string, generate_boundary)
   G. Canary leak guard -- present in trigger_swarm source
@@ -168,7 +168,7 @@ for _agent_mod, _attr in (
     ("agents.net_expert",    "net_expert_node"),
     ("agents.cloud_expert",  "cloud_expert_node"),
     ("agents.nettap_expert", "nettap_expert_node"),
-    ("agents.critic",        "critic_node"),
+    ("agents.review_board",  "review_board_node"),
     ("agents.response",      "response_agent"),
 ):
     _m = _ensure_stub(_agent_mod)
@@ -396,9 +396,9 @@ class TestInitialRoute:
 
 class TestSupervisorRouter:
 
-    def test_true_positive_verdict_routes_to_critic(self):
+    def test_true_positive_verdict_routes_to_review_board(self):
         state = {"verdict": {"is_true_positive": True}}
-        assert _orch.supervisor_router(state) == "critic"
+        assert _orch.supervisor_router(state) == "review_board"
 
     def test_high_confidence_fp_routes_to_response_agent(self):
         # A strong dismissal (>= FP_CONFIDENCE_GATE, complete analysis) skips review.
@@ -406,22 +406,22 @@ class TestSupervisorRouter:
                  "analysis_complete": True}
         assert _orch.supervisor_router(state) == "response_agent"
 
-    def test_low_confidence_fp_routes_to_critic(self):
+    def test_low_confidence_fp_routes_to_review_board(self):
         # A weak dismissal must survive Red-Team review before it can be stored.
         state = {"verdict": {"is_true_positive": False, "confidence": 0.40},
                  "analysis_complete": True}
-        assert _orch.supervisor_router(state) == "critic"
+        assert _orch.supervisor_router(state) == "review_board"
 
-    def test_fp_without_confidence_routes_to_critic(self):
+    def test_fp_without_confidence_routes_to_review_board(self):
         # Missing confidence is treated as 0.0 -- never an unreviewed dismissal.
         state = {"verdict": {"is_true_positive": False}}
-        assert _orch.supervisor_router(state) == "critic"
+        assert _orch.supervisor_router(state) == "review_board"
 
-    def test_incomplete_analysis_fp_routes_to_critic(self):
+    def test_incomplete_analysis_fp_routes_to_review_board(self):
         # Unresolved blast radius forces review even at high confidence.
         state = {"verdict": {"is_true_positive": False, "confidence": 0.95},
                  "analysis_complete": False}
-        assert _orch.supervisor_router(state) == "critic"
+        assert _orch.supervisor_router(state) == "review_board"
 
     def test_fp_at_exact_gate_routes_to_response_agent(self):
         state = {"verdict": {"is_true_positive": False,
@@ -445,8 +445,9 @@ class TestSupervisorRouter:
 
 SUPERVISOR_SRC  = (HUNTER_DIR / "agents/supervisor.py").read_text()
 RESPONSE_SRC    = (HUNTER_DIR / "agents/response.py").read_text()
-CRITIC_SRC      = (HUNTER_DIR / "agents/critic.py").read_text()
+REVIEW_BOARD_SRC = (HUNTER_DIR / "agents/review_board.py").read_text()
 EXPERT_BASE_SRC = (HUNTER_DIR / "agents/expert_base.py").read_text()
+CONTROLS_SRC    = (HUNTER_DIR / "agents/controls.py").read_text()
 
 
 class TestThoroughnessGate:
@@ -514,19 +515,33 @@ class TestImmunityEligibility:
         assert "analysis_complete" in RESPONSE_SRC
 
     def test_supervisor_recall_checks_eligibility(self):
-        assert 'payload.get("immunity_eligible"' in SUPERVISOR_SRC
+        # The eligibility gate now lives in controls.memory_is_actionable, which
+        # the supervisor recall delegates to; the gate still enforces the
+        # immunity_eligible flag (and additionally a TTL -- NIST GV-1.3-005).
+        assert "memory_is_actionable" in SUPERVISOR_SRC
+        assert 'p.get("immunity_eligible"' in CONTROLS_SRC
+        assert 'p.get("is_true_positive"' in CONTROLS_SRC
+
+    def test_immunity_memory_has_ttl_expiry(self):
+        # A stored FP must not entrench a permanent blind spot: recall checks a TTL
+        # and the write path stamps created_at.
+        assert "created_at" in RESPONSE_SRC
+        assert "NEXUS_MEMORY_TTL_SECONDS" in CONTROLS_SRC
 
     def test_incomplete_analysis_surfaces_as_manual_review(self):
         # A dismissal over an unresolved blast radius must hit the manual queue,
         # not vanish as a silent no-action FP.
         assert '"action_type": "manual_review_required"' in RESPONSE_SRC
 
-    def test_critic_reviews_fp_dismissals(self):
-        assert "FALSE POSITIVE" in CRITIC_SRC
-        assert "EVIDENCE OF WORK" in CRITIC_SRC
+    def test_review_board_reviews_fp_dismissals(self):
+        # The board reviews FP dismissals symmetrically (counterparts argue malice).
+        assert "dismissal" in REVIEW_BOARD_SRC
+        assert "disprov" in REVIEW_BOARD_SRC  # counterparts try to disprove
 
-    def test_critic_never_escalates_to_containment(self):
-        assert "never escalate to containment" in CRITIC_SRC
+    def test_review_board_never_escalates_to_containment(self):
+        # A disproved dismissal drops to monitor below the gate; never auto-contain.
+        assert "not escalated to containment" in REVIEW_BOARD_SRC.lower() \
+            or "never auto-escalated to containment" in REVIEW_BOARD_SRC.lower()
 
 
 # ── E & F. Canary generation ──────────────────────────────────────────────────
@@ -789,7 +804,7 @@ class TestAgentNodeRegistration:
         build_fn = ORCHESTRATOR_SRC[ORCHESTRATOR_SRC.find("def build_graph("):]
         build_fn = build_fn[:build_fn.find("\ndef ", 1)]
         for node in ("supervisor", "host_expert", "net_expert",
-                     "cloud_expert", "nettap_expert", "critic", "response_agent"):
+                     "cloud_expert", "nettap_expert", "review_board", "response_agent"):
             assert f'"{node}"' in build_fn or f"'{node}'" in build_fn, \
                 f"Node {node!r} not added in build_graph"
 
@@ -807,11 +822,11 @@ class TestAgentNodeRegistration:
                    f"add_edge('{node}', 'supervisor')" in build_fn, \
                 f"{node} must return edge to supervisor"
 
-    def test_critic_routes_to_response_agent(self):
+    def test_review_board_routes_to_response_agent(self):
         build_fn = ORCHESTRATOR_SRC[ORCHESTRATOR_SRC.find("def build_graph("):]
         build_fn = build_fn[:build_fn.find("\ndef ", 1)]
-        assert 'add_edge("critic", "response_agent")' in build_fn or \
-               "add_edge('critic', 'response_agent')" in build_fn
+        assert 'add_edge("review_board", "response_agent")' in build_fn or \
+               "add_edge('review_board', 'response_agent')" in build_fn
 
 
 # ── M. DoS semaphore guard ────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ PROJECT_EMPROS/
 │   │   │   ├── internal_networking/       # VPC, internal firewall, and subnet routing configurations
 │   │   │   ├── minio_node/                # On-prem S3-compatible object storage: binary install, systemd, TLS, bucket lifecycle, service accounts
 │   │   │   ├── nats_node/                 # Deployment of the JetStream high-velocity persistent binary bus
-│   │   │   ├── nexus_hunter/              # Swarm orchestration daemon: Python agent environment + all agents (supervisor, host/net/cloud/nettap expert, critic, response) + tool registry
+│   │   │   ├── nexus_hunter/              # Swarm orchestration daemon: Python agent environment + all agents (supervisor, host/net/cloud/nettap expert, review_board, response) + tool registry
 │   │   │   ├── observability_node/        # Setup for Prometheus exporters, Grafana, and system metrics scraping
 │   │   │   ├── opencti_node/              # Air-gapped OpenCTI 6.8 TI stack: docker-compose, .env template, MITRE ATT&CK import, agent token propagation
 │   │   │   ├── podman_setup/              # Installation and daemonless configuration of the Podman container engine

@@ -113,7 +113,7 @@ Both analyzers emit the same envelope (`summary_schema`: `{timestamp, host_ip, f
 - **Locked-down malware storage** — `nexus-quarantine` is a **dedicated** bucket (never the
   telemetry cold-storage lake): own KMS key, versioning, lifecycle auto-expiry, public-access-block,
   TLS-only, **Object Lock/WORM**, and a policy denying every principal except the det_chamber roles.
-- **Bounded autonomy** — acquisition fires only on a critic-reviewed TP at/above `NEXUS_ACQUIRE_GATE`;
+- **Bounded autonomy** — acquisition fires only on a review-board-confirmed TP at/above `NEXUS_ACQUIRE_GATE`;
   path traversal / wildcards / OS-critical files / oversize are refused before any collection.
 
 ## Testing
