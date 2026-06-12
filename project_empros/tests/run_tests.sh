@@ -46,6 +46,7 @@ SECTIONS=(
     "services|Dockerfile.services|Worker + infra source-contract tests (pure source reads)"
     "pipeline|Dockerfile.pipeline|Phase1/2/3 pipeline, guardrails, mlops_serving, mlops_train"
     "detchamber|Dockerfile.detchamber|Det Chamber engine + acquisition + intake/detonation lifecycle"
+    "siem|Dockerfile.siemfed|SIEM-federated investigation mock E2E (CIM/ECS fanout + swarm pivot + counterpart disproof)"
 )
 
 # -- Change → section trigger map ---------------------------------------------
@@ -56,8 +57,10 @@ TRIGGERS=(
     "mlops/scripts/:mlops pipeline offline"
     "mlops/config/:pipeline"
     "mlops/data/:mlops"
+    "analytics/llm_hunter/tools/siem|analytics/llm_hunter/agents/review_board:analytics siem"
     "analytics/llm_hunter/:analytics services"
     "analytics/:analytics"
+    "middleware/config/:siem services"
     "det_chamber/:detchamber"
     "services/worker_ti_ingest/:mlops"
     "services/config/nexus:sensors"
@@ -76,6 +79,7 @@ TRIGGERS=(
     "tests/test_worker_contracts|tests/lab_worker_rules|tests/lab_infra|tests/lab_operations|tests/lab_orchestration:services"
     "tests/lab_analytics_hunter|tests/lab_agentic_swarm|tests/lab_redteam:analytics"
     "tests/lab_det_chamber:detchamber"
+    "tests/lab_siem_federation:siem"
     "tests/lab_mlops_serving|tests/lab_mlops_train:pipeline"
     "tests/sensors/:sensors"
 )

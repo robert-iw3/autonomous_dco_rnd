@@ -53,6 +53,7 @@ COPY project_empros/tests/test_track6_dryrun.py             /repo/project_empros
 COPY project_empros/tests/test_s3_query_alignment.py        /repo/project_empros/tests/
 COPY project_empros/tests/test_cross_source_temporal.py     /repo/project_empros/tests/
 COPY project_empros/tests/test_worker_ti_ingest.py          /repo/project_empros/tests/
+COPY project_empros/tests/test_siem_pivot_corpus.py         /repo/project_empros/tests/
 COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py  /repo/project_empros/tests/lab_mlops_train/
 COPY project_empros/tests/mlops_eval_minilab/               /repo/project_empros/tests/mlops_eval_minilab/
 COPY project_empros/tests/lab_s3_worker/                    /repo/project_empros/tests/lab_s3_worker/
@@ -69,6 +70,7 @@ CMD ["python3", "-m", "pytest", \
      "tests/test_s3_query_alignment.py", \
      "tests/test_cross_source_temporal.py", \
      "tests/test_worker_ti_ingest.py", \
+     "tests/test_siem_pivot_corpus.py", \
      "tests/lab_mlops_train/test_rsi_loop.py", \
      "tests/mlops_eval_minilab/", \
      "tests/lab_s3_worker/", \

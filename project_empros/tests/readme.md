@@ -46,6 +46,7 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | `services` | `Dockerfile.services` | Worker/infra/orchestration source contracts (255 tests) | Alpine 3.23 |
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
 | `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
+| `siem` | `Dockerfile.siemfed` | SIEM-federated investigation mock E2E (CIM/ECS fanout → mock Splunk/Elastic → swarm pivot + counterpart disproof + conservation) | Alpine 3.23 |
 
 > `mlops` and `pipeline` use `python:3.12-slim` (Debian glibc) because PyTorch CPU wheels link against glibc symbols absent from musl libc.
 
@@ -87,7 +88,8 @@ tests/reports/
 ├── analytics.xml    │
 ├── services.xml     │
 ├── pipeline.xml     │
-└── detchamber.xml   ┘
+├── detchamber.xml   │
+└── siem.xml         ┘
 ```
 
 **Coverage is enforced.** [`test_report_coverage.py`](test_report_coverage.py) (host-only) asserts

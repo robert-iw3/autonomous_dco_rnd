@@ -19,19 +19,28 @@ Engineering fixes from the gap analysis (§3), with their implementing module an
 | Item | NIST action | Status | Implementation | Tests |
 |---|---|---|---|---|
 | **P3** Confabulated-evidence grounding | MS-2.5-003 | ✅ Implemented & tested | `controls.enforce_grounding` wired into `review_board_node` | `test_ai_controls.py::TestGroundingEnforcement` + `test_review_board.py::test_workflow_confabulated_tp_is_grounding_demoted` / `..._grounded_tp_survives...` |
-| **P3** Confidence-calibration logging | MS-2.13-001 | 🟨 Helper implemented & tested (wiring to operator-disposition feed pending) | `controls.calibration_record` | `test_ai_controls.py::TestCalibration` |
 | **P1** Immunity-memory TTL / expiry | GV-1.3-005 | ✅ Implemented & tested | `controls.memory_is_actionable` (recall, `supervisor.py`) + `created_at` stamp (`response._persist_memory`) | `test_ai_controls.py::TestMemoryTTL` + `test_agentic_swarm_contracts.py::test_immunity_memory_has_ttl_expiry` |
 | **P5** AI-origin provenance disclosure | MP-5.1-003 | ✅ Implemented & tested | `controls.stamp_ai_provenance` wired into `response_agent` | `test_ai_controls.py::TestProvenanceDisclosure` |
-| **P2** Frontier model version pinning | MP-4.1-007 | 🟨 Validator implemented & tested (config pin + boot-time gate pending) | `controls.unpinned_frontier_models` / `is_floating_model` | `test_ai_controls.py::TestFrontierPinning` |
-| **P1** Disparity / fairness audit over verdict history | MS-2.11-002 | 🟨 Analysis implemented & tested (periodic Qdrant-scroll scheduler pending) | `controls.fairness_report` | `test_ai_controls.py::TestFairnessReport` |
-| **P1** Immunity-memory homogenization / model-collapse monitor | GV-1.3-005, MS-2.11-005 | 🟨 Analysis implemented & tested (periodic scheduler pending) | `controls.memory_homogenization` | `test_ai_controls.py::TestMemoryHomogenization` |
-| **P4** RAG-memory retention policy / decommission | GV-1.7-002 | ⬜ Pending (TTL groundwork landed via P1) | - | - |
-| **P6** AI system inventory / risk-tier / incident template | GV-1.6, GV-1.3, MG-4.3 | ⬜ Pending (documentation) | - | - |
-| **P7** Training/inference energy estimate | MS-2.12-003 | ⬜ Pending (documentation) | - | - |
+
+### Wave 2 — NC items (NC-1…NC-6)
+
+| Item | NIST action | Status | Implementation | Tests |
+|---|---|---|---|---|
+| **NC-1** Bias/disparity + homogenization **scheduled audit** | MS-2.11-002, GV-1.3-005, MS-2.11-005 | ✅ Implemented & tested | `agents/bias_audit.py` (`run_bias_audit`, `collect_and_audit` w/ Qdrant scroll + report writer) over `controls.fairness_report` / `memory_homogenization` | `test_nist_controls_wave2.py::TestBiasAudit` (+ `test_ai_controls.py` pure analytics) |
+| **NC-2** Calibration operator-disposition feed + Brier trend | MS-2.13-001 | ✅ Implemented & tested | `agents/calibration_ledger.py` (`record_disposition`, `brier_trend`) over `controls.calibration_record` | `test_nist_controls_wave2.py::TestCalibrationLedger` |
+| **NC-3** Frontier model **boot-time pin enforcement** | MP-4.1-007 | ✅ Implemented & tested | `llm_providers.frontier_pin_allowed` gates `build_failover_chain` (refuses floating alias unless `NEXUS_ALLOW_FLOATING_FRONTIER=1`) | `test_nist_controls_wave2.py::TestFrontierPinEnforcement` + `test_ai_controls.py::TestFrontierPinning` |
+| **NC-4** RAG-memory retention / decommission policy | GV-1.7-002, MS-2.10-001 | ✅ Documented (+ TTL enforced in code) | [governance/data_retention_decommission_policy.md](governance/data_retention_decommission_policy.md) | membership-inference review = POA&M-4 |
+| **NC-5** Governance docs (inventory / risk-tier / incident / applicability) + **SSP** | GV-1.6, GV-1.3, MG-4.3, GV-1.3-003 | ✅ Documented (PDF) | [governance/](governance/) — system_security_plan, ai_system_inventory, gai_risk_tier_statement, ai_incident_response_plan, applicability_determinations | — |
+| **NC-6** Training/inference energy estimate | MS-2.12-003 | ✅ Documented | [governance/environmental_impact_estimate.md](governance/environmental_impact_estimate.md) | — |
 
 Legend: ✅ done · 🟨 partial (pure logic landed, integration/ops wiring remains) · ⬜ not started.
 
-Regression: the four hunter/swarm suites + worker contracts + the new control suite run green together (`342 passed`).
+**Remaining (operational, not code):** schedule the NC-1 bias-audit + NC-2 calibration jobs on a
+cron/RSI cadence and alert on a flag (POA&M-1); capture frontier model cards + SLAs; periodic
+membership-inference review (POA&M-4). The control *logic and jobs* are implemented and tested.
+
+Regression: the hunter/swarm/worker suites + the new control + wave-2 suites run green together
+(SIEM-plan sweep `435 passed`; wave-2 controls `40 passed`).
 
 ---
 
@@ -39,20 +48,24 @@ Regression: the four hunter/swarm suites + worker contracts + the new control su
 
 | # | GAI Risk (NIST §2) | Applicability | Coverage | Headline gap |
 |---|---|---|---|---|
-| 2.1 | CBRN Information or Capabilities | Low / N-A | n/a | Determination undocumented (GV-1.3-003) |
-| 2.2 | **Confabulation** | High | 🟡 Partial | Evidence-grounding (`enforce_grounding`) + calibration telemetry (`calibration_record`) landed; construct-validity metric & active-learning failure capture pending |
-| 2.3 | Dangerous, Violent, Hateful Content | Low / N-A | n/a | - |
-| 2.4 | **Data Privacy** | High | 🟡 Partial | RAG-memory leakage / membership-inference + retention/decommission unaddressed |
-| 2.5 | Environmental Impacts | Medium | 🔴 Gap | No energy/carbon measurement of training or inference |
-| 2.6 | **Harmful Bias & Homogenization** | High | 🟡 Partial | Disparity audit (`fairness_report`), homogenization monitor (`memory_homogenization`) + memory TTL landed; periodic scheduling/automation and model-card-level bias eval pending |
-| 2.7 | **Human-AI Configuration** | High | 🟡 Partial | AI-origin disclosure (`stamp_ai_provenance`) landed; automation-bias / over-reliance measurement & override-outcome calibration feed pending |
-| 2.8 | Information Integrity | Medium | 🟡 Partial | Verdict-lineage audit trail not tamper-evident; provenance largely N-A |
-| 2.9 | **Information Security** | High | 🟢 Strong | Periodic red-team cadence + AI-incident reporting not formalized |
-| 2.10 | Intellectual Property | Low / N-A | n/a | Frontier-model data/IP terms undocumented |
-| 2.11 | Obscene / CSAM / NCII | N-A | n/a | - |
-| 2.12 | **Value Chain & Component Integration** | High | 🟡 Partial | Frontier-pin validator (`unpinned_frontier_models`) landed; boot-time pin enforcement, model-card review, version-drift re-eval, SBOM & vendor SLA pending |
+| 2.1 | CBRN Information or Capabilities | Low / N-A | n/a | Determination **documented** ([applicability_determinations](governance/applicability_determinations.md)) |
+| 2.2 | **Confabulation** | High | 🟡 Partial | Evidence-grounding + calibration ledger (NC-2) landed; construct-validity metric & active-learning failure capture pending |
+| 2.3 | Dangerous, Violent, Hateful Content | Low / N-A | n/a | Determination documented |
+| 2.4 | **Data Privacy** | High | 🟡 Partial | Retention/decommission **policy landed** (NC-4) + memory TTL; periodic membership-inference review (POA&M-4) pending |
+| 2.5 | Environmental Impacts | Medium | 🟡 Partial | Footprint **estimate documented** (NC-6); per-run measurement folded into the MLOps metric plane |
+| 2.6 | **Harmful Bias & Homogenization** | High | 🟢 Strong | Disparity + homogenization run as a **scheduled audit job** (NC-1, `bias_audit`) over the tested analytics + memory TTL; cron alerting (POA&M-1) + model-card bias eval remain |
+| 2.7 | **Human-AI Configuration** | High | 🟡 Partial | AI-origin disclosure + **calibration feed/Brier ledger** (NC-2) + HitL landed; automation-bias / over-reliance measurement pending |
+| 2.8 | Information Integrity | Medium | 🟡 Partial | Provenance-stamped reports + audit ledgers; tamper-evident verdict-lineage chain remains |
+| 2.9 | **Information Security** | High | 🟢 Strong | Strongest area; AI-incident process now **documented** (governance/), periodic red-team cadence remains |
+| 2.10 | Intellectual Property | Low / N-A | n/a | Determination documented; frontier data/IP terms = inventory POA&M |
+| 2.11 | Obscene / CSAM / NCII | N-A | n/a | Determination documented |
+| 2.12 | **Value Chain & Component Integration** | High | 🟡 Partial | **Frontier boot-time pin enforcement** landed (NC-3); model-card review, version-drift re-eval, SBOM & vendor SLA pending |
 
-**Cross-cutting GOVERN gaps** (apply to all risks): no AI system inventory (GV-1.6), no documented GAI risk-tiering (GV-1.3), no incident-disclosure process (GV-4.3 / MG-4.3), no decommissioning protocol (GV-1.7), no TEVV/document-retention policy (GV-1.5-003).
+**Cross-cutting GOVERN — now closed (documented in [governance/](governance/)):** AI system inventory
+(GV-1.6), GAI risk-tiering (GV-1.3), AI incident-response + after-action template (GV-4.3 / MG-4.3),
+decommissioning protocol (GV-1.7), applicability determinations (GV-1.3-003), and the **System
+Security Plan** (SP 800-53 + CSF 2.0 + AI RMF). Remaining items are operational (scheduling, model
+cards, periodic reviews), tracked in the SSP POA&M.
 
 Legend: 🟢 Strong · 🟡 Partial · 🔴 Gap.
 

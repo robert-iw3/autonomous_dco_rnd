@@ -190,6 +190,16 @@ class TestTool:
         out = tool._run("c", "splunk", 'search index=secret dest="x"')
         assert "SIEM_QUERY_REJECTED" in out
 
+    def test_future_backend_returns_not_implemented(self):
+        # WS-G G5: a configured-but-unimplemented future backend degrades honestly
+        cfg = {"default_window_hours": 6, "max_rows": 200, "any_active": True,
+               "backends": {"sentinel": {"dialect": "sentinel_kql", "search_url": "http://x",
+                                          "token": "t", "verify_tls": False,
+                                          "allowed_indexes": ["nexus_endpoint"], "active": True}}}
+        out = sq.SiemQueryTool(siem_config=cfg)._run("c", "sentinel",
+                                                     'search index=nexus_endpoint dest="x"')
+        assert "SIEM_BACKEND_NOT_IMPLEMENTED" in out and "sentinel_kql" in out
+
     def test_transport_failure_fails_open(self):
         def boom(*a, **k):
             raise ConnectionError("refused")

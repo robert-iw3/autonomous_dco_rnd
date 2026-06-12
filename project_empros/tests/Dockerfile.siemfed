@@ -1,0 +1,31 @@
+# SECTION: siem
+# Tests:   tests/lab_siem_federation/  -- SIEM-federated investigation mock E2E
+#          (CIM/ECS fanout -> mock Splunk/Elastic -> swarm SiemQueryTool pivot ->
+#           write<->read conservation + counterpart prevalence disproof)
+# Deps:    pytest, requests, pyyaml. langchain is stubbed at module level; the
+#          mock SIEM is an in-process http.server (no real Splunk/Elastic).
+#   docker build -f project_empros/tests/Dockerfile.siemfed -t nexus-test-siemfed .
+FROM docker.io/alpine:3.23
+
+RUN apk add --no-cache python3 py3-pip
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN pip3 install --no-cache-dir \
+    "pytest>=7.4.0" \
+    "requests>=2.31.0" \
+    "pyyaml>=6.0"
+
+COPY project_empros/analytics/llm_hunter/tools/  /repo/project_empros/analytics/llm_hunter/tools/
+COPY project_empros/middleware/config/           /repo/project_empros/middleware/config/
+COPY project_empros/tests/lab_siem_federation/   /repo/project_empros/tests/lab_siem_federation/
+COPY project_empros/tests/pytest.ini             /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py            /repo/project_empros/tests/
+
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/lab_siem_federation/", \
+     "-v", "--tb=short", "--junit-xml=/reports/siem.xml"]

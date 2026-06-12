@@ -138,6 +138,28 @@ def _build_one(name: str, cfg: dict, temperature: float):
     )
 
 
+# NC-3 (NIST MP-4.1-007): a frontier (external SaaS) provider that drives verdicts
+# must be version-pinned -- a floating alias lets the provider silently change
+# behavior with no regression gate. Boot refuses to build such a provider unless
+# the operator explicitly opts in.
+_FRONTIER_API = {"anthropic", "openai"}
+
+
+def frontier_pin_allowed(name: str, cfg: dict, allow_floating: bool = None):
+    """(ok, reason). Internal/sovereign providers and non-frontier api types are
+    out of scope (their weights are hash-verified by the supply-chain control)."""
+    from agents.controls import is_floating_model
+    if allow_floating is None:
+        allow_floating = os.getenv("NEXUS_ALLOW_FLOATING_FRONTIER", "").lower() in ("1", "true", "yes")
+    cfg = cfg or {}
+    if str(name).startswith("internal_") or cfg.get("api_type") not in _FRONTIER_API:
+        return True, ""
+    if is_floating_model(cfg.get("model", "")) and not allow_floating:
+        return False, (f"frontier provider '{name}' has floating model '{cfg.get('model', '')}' "
+                       f"-- pin a version or set NEXUS_ALLOW_FLOATING_FRONTIER=1 (NIST MP-4.1-007)")
+    return True, ""
+
+
 def build_failover_chain(temperature: float = 0.0):
     """
     Ordered list of (provider_name, chat_model) per [hunter].active_provider and
@@ -149,6 +171,10 @@ def build_failover_chain(temperature: float = 0.0):
     for name in get_llm_provider_order():
         cfg = llm_cfg.get(name)
         if not cfg:
+            continue
+        ok, reason = frontier_pin_allowed(name, cfg)
+        if not ok:
+            logger.error("Refusing LLM provider: %s", reason)
             continue
         try:
             chain.append((name, _build_one(name, cfg, temperature)))
