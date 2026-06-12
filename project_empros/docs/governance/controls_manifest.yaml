@@ -1,0 +1,427 @@
+# -----------------------------------------------------------------------------
+# Sentinel Nexus — Master Controls Manifest (single source of truth)
+#
+# Every security / AI-governance control is recorded here ONCE with its framework
+# mappings, implementing module, and proving tests. The governance markdown
+# (controls_catalog.md) is GENERATED from this file by `gen_governance.py`; a
+# CI sync-test (test_governance_manifest.py) fails if the docs drift from this
+# manifest OR if a referenced implementation/test path no longer exists -- so the
+# documentation cannot fall out of date as the code changes.
+#
+# To add/update a control: edit this file, run `gen_governance.py`, rebuild PDFs.
+# Status: implemented | partial | documented | planned
+# CSF 2.0 functions: GV govern · ID identify · PR protect · DE detect · RS respond · RC recover
+# -----------------------------------------------------------------------------
+
+meta:
+  system: "Sentinel Nexus"
+  version: "1.0"
+  maintained_by: "Information Security & AI Governance"
+
+controls:
+
+  # -- AI Security & Adversarial Defenses (OWASP LLM / MITRE ATLAS) ------------
+  - id: SEC-CANARY
+    title: Canary token prompt-leak tripwire
+    category: AI Security
+    status: implemented
+    description: UUID canary injected into agent prompts; a leak in any output halts the SOAR pipeline.
+    implementation: analytics/llm_hunter/tools/sanitizer.py
+    tests: ["tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM01]
+      atlas: [AML.T0042]
+      sp_800_53: [SI-4, SI-7]
+      csf_2_0: [DE, PR]
+    owner: Platform Engineering
+
+  - id: SEC-SANITIZER
+    title: Cognitive boundary isolation & untrusted-payload wrapping
+    category: AI Security
+    status: implemented
+    description: Adversary-controlled telemetry wrapped in dynamic XML boundaries, control tokens defanged, HTML-escaped; experts forbidden to obey untrusted content.
+    implementation: analytics/llm_hunter/tools/sanitizer.py
+    tests: ["tests/lab_redteam/test_cognitive_bypass.py"]
+    frameworks:
+      owasp_llm: [LLM01]
+      atlas: [AML.T0043]
+      sp_800_53: [SI-10]
+      csf_2_0: [PR]
+    owner: Platform Engineering
+
+  - id: SEC-DUCKDB-SANDBOX
+    title: Read-only data-lake query sandbox
+    category: AI Security
+    status: implemented
+    description: Ephemeral in-memory DuckDB, destructive-keyword + local-FS block, auto LIMIT, per-cell truncation + untrusted wrapping.
+    implementation: analytics/llm_hunter/tools/duckdb_query.py
+    tests: ["tests/lab_analytics_hunter/test_query_cookbook.py"]
+    frameworks:
+      owasp_llm: [LLM02, LLM08]
+      sp_800_53: [AC-3, AC-6, CM-7, SI-10]
+      csf_2_0: [PR]
+    owner: Platform Engineering
+
+  - id: SEC-OUTPUT-SCHEMA
+    title: Strict SOAR output-contract enforcement
+    category: AI Security
+    status: implemented
+    description: All execution plans validated against SoarExecutionSchema (blast-radius cap, enum actions); off-contract payloads dropped.
+    implementation: analytics/llm_hunter/state.py
+    tests: ["tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM07, LLM08]
+      sp_800_53: [SI-7, SI-10]
+      csf_2_0: [PR, RS]
+    owner: Platform Engineering
+
+  - id: SEC-SUPPLY-CHAIN
+    title: Cryptographic model supply-chain integrity (SHA-384)
+    category: AI Security
+    status: implemented
+    description: Boot verifies SHA-384 of model weights against build-time digests; mismatch refuses to load.
+    implementation: mlops/serve_vllm.sh
+    tests: ["tests/lab_mlops_serving/test_mlops_serving.py"]
+    frameworks:
+      atlas: [AML.T0044]
+      sp_800_53: [SR-3, SR-4, SR-11, SI-7]
+      csf_2_0: [PR, ID]
+    owner: MLOps
+
+  - id: SEC-REGRESSION-GATE
+    title: Deterministic regression / deploy gate
+    category: AI Security
+    status: implemented
+    description: 03_eval_model.py gauntlet (OS-context, schema, injection, spatial, SIEM-pivot validity); <99% accuracy halts deploy.
+    implementation: mlops/scripts/03_eval_model.py
+    tests: ["tests/lab_mlops_serving/test_mlops_serving.py"]
+    frameworks:
+      owasp_llm: [LLM09]
+      atlas: [AML.T0043, AML.T0015]
+      sp_800_53: [CM-3, CA-2, SI-7]
+      csf_2_0: [GV, PR]
+    owner: MLOps
+
+  # -- Agentic governance / NIST AI 600-1 -------------------------------------
+  - id: AI-REVIEW-BOARD
+    title: Adversarial review board (per-expert counterparts)
+    category: NIST AI 600-1
+    status: implemented
+    description: Each expert has a counterpart that tries to disprove the finding; TP only if none can. Fails closed.
+    implementation: analytics/llm_hunter/agents/review_board.py
+    tests: ["tests/lab_analytics_hunter/test_review_board.py", "tests/lab_analytics_hunter/test_review_board_simulation.py"]
+    frameworks:
+      nist_ai_600_1: [MG-1.3-002]
+      owasp_llm: [LLM09]
+      sp_800_53: [SI-7, RA-3]
+      csf_2_0: [DE, RS]
+    owner: AI Governance
+
+  - id: AI-GROUNDING
+    title: Confabulated-evidence grounding
+    category: NIST AI 600-1
+    status: implemented
+    description: A confirmed TP citing an artifact never retrieved is demoted to monitor (fail-closed).
+    implementation: analytics/llm_hunter/agents/controls.py
+    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestGroundingEnforcement"]
+    frameworks:
+      nist_ai_600_1: [MS-2.5-003]
+      sp_800_53: [SI-7]
+      csf_2_0: [DE]
+    owner: AI Governance
+
+  - id: AI-MEMORY-TTL
+    title: Immunity-memory TTL / expiry
+    category: NIST AI 600-1
+    status: implemented
+    description: Stored FP signatures expire (default 30 d) so a stale/wrong FP cannot entrench a permanent blind spot.
+    implementation: analytics/llm_hunter/agents/controls.py
+    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestMemoryTTL"]
+    frameworks:
+      nist_ai_600_1: [GV-1.3-005]
+      sp_800_53: [SC-28, AU-9]
+      csf_2_0: [GV, PR]
+    owner: AI Governance
+
+  - id: AI-PROVENANCE
+    title: AI-origin provenance disclosure
+    category: NIST AI 600-1
+    status: implemented
+    description: Every incident report is stamped AI-generated so consumers are never misled.
+    implementation: analytics/llm_hunter/agents/controls.py
+    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestProvenanceDisclosure"]
+    frameworks:
+      nist_ai_600_1: [MP-5.1-003]
+      sp_800_53: [AU-3]
+      csf_2_0: [GV]
+    owner: AI Governance
+
+  - id: NC-1-BIAS-AUDIT
+    title: Bias/disparity + homogenization scheduled audit
+    category: NIST AI 600-1
+    status: implemented
+    description: Job scrolls verdict/immunity memory; disaggregated containment-disparity + model-collapse monitor; writes a flagged report.
+    implementation: analytics/llm_hunter/agents/bias_audit.py
+    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestBiasAudit"]
+    frameworks:
+      nist_ai_600_1: [MS-2.11-002, GV-1.3-005, MS-2.11-005]
+      sp_800_53: [AU-6, RA-3]
+      csf_2_0: [GV, DE]
+    owner: AI Governance
+
+  - id: NC-2-CALIBRATION
+    title: Confidence-calibration ledger
+    category: NIST AI 600-1
+    status: implemented
+    description: Pairs operator dispositions with predicted confidence into a Brier/over-confidence trend.
+    implementation: analytics/llm_hunter/agents/calibration_ledger.py
+    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestCalibrationLedger"]
+    frameworks:
+      nist_ai_600_1: [MS-2.13-001]
+      sp_800_53: [AU-6, CA-7]
+      csf_2_0: [GV, DE]
+    owner: AI Governance
+
+  - id: NC-3-FRONTIER-PIN
+    title: Frontier model boot-time version-pin enforcement
+    category: NIST AI 600-1
+    status: implemented
+    description: build_failover_chain refuses a frontier provider on a floating alias unless explicitly opted in.
+    implementation: analytics/llm_hunter/agents/llm_providers.py
+    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestFrontierPinEnforcement"]
+    frameworks:
+      nist_ai_600_1: [MP-4.1-007]
+      sp_800_53: [SR-3, CM-2]
+      csf_2_0: [GV, ID]
+    owner: AI Governance
+
+  - id: NC-4-RETENTION
+    title: Data retention & decommissioning policy
+    category: NIST AI 600-1
+    status: documented
+    description: Retention/expiry + secure decommission + membership-inference posture for AI data stores.
+    implementation: docs/governance/data_retention_decommission_policy.md
+    tests: []
+    frameworks:
+      nist_ai_600_1: [GV-1.7-002, MS-2.10-001]
+      sp_800_53: [SC-28, AU-9, SI-12]
+      csf_2_0: [GV, PR]
+    owner: AI Governance
+
+  - id: NC-6-ENERGY
+    title: Environmental impact estimate
+    category: NIST AI 600-1
+    status: documented
+    description: Training/inference footprint estimate + tracking approach.
+    implementation: docs/governance/environmental_impact_estimate.md
+    tests: []
+    frameworks:
+      nist_ai_600_1: [MS-2.12-003]
+      csf_2_0: [GV]
+    owner: AI Governance
+
+  # -- SIEM-federated investigation (WS-G) ------------------------------------
+  - id: SIEM-TOOL-GUARD
+    title: SIEM query tool — read-only / bounded / allowlist
+    category: SIEM Federation
+    status: implemented
+    description: Splunk SPL / Elastic ES|QL pivot; rejects generating/destructive commands, forces time+row bounds, config-driven index allowlist, untrusted-wraps results, fails open.
+    implementation: analytics/llm_hunter/tools/siem_query.py
+    tests: ["tests/lab_analytics_hunter/test_siem_query.py"]
+    frameworks:
+      owasp_llm: [LLM02, LLM08]
+      sp_800_53: [AC-3, AC-4, SI-10]
+      csf_2_0: [DE, PR]
+    owner: Platform Engineering
+
+  - id: SIEM-CONFIG-CONTRACT
+    title: SIEM config ↔ fanout index contract
+    category: SIEM Federation
+    status: implemented
+    description: Sovereign-by-default [siem] config; the swarm's queryable indexes are contract-tested against the middleware fanout.
+    implementation: analytics/llm_hunter/tools/nexus_config.py
+    tests: ["tests/lab_analytics_hunter/test_siem_config.py"]
+    frameworks:
+      sp_800_53: [CM-2, AC-4]
+      csf_2_0: [GV, ID]
+    owner: Platform Engineering
+
+  - id: SIEM-COUNTERPART-DISPROOF
+    title: Review-board counterpart SIEM disproof
+    category: SIEM Federation
+    status: implemented
+    description: Counterparts run a cross-source prevalence query to disprove a finding; fails to transcript-only when no SIEM.
+    implementation: analytics/llm_hunter/agents/review_board.py
+    tests: ["tests/lab_analytics_hunter/test_siem_review_board.py"]
+    frameworks:
+      nist_ai_600_1: [MS-2.5-003, MG-1.3-002]
+      csf_2_0: [DE]
+    owner: AI Governance
+
+  - id: SIEM-E2E
+    title: SIEM federation end-to-end conservation
+    category: SIEM Federation
+    status: implemented
+    description: Fanout (real CIM/ECS mappings) → mock SIEM → swarm pivot; write↔read conservation + disproof proven.
+    implementation: tests/lab_siem_federation/test_siem_federation_e2e.py
+    tests: ["tests/lab_siem_federation/test_siem_federation_e2e.py"]
+    frameworks:
+      sp_800_53: [CA-2, SI-4]
+      csf_2_0: [DE]
+    owner: Platform Engineering
+
+  # -- Secure ingestion / transmission ----------------------------------------
+  - id: ING-ZERO-TRUST
+    title: Zero-Trust ingestion gateway (HMAC + 3-tier replay defense)
+    category: Ingestion Integrity
+    status: implemented
+    description: TLS+JWT; HMAC-SHA256 canonical lineage stamp; temporal-drift, monotonic-sequence, cross-OS/collision validation; adaptive sensor banning.
+    implementation: services/core_ingress/src/integrity.rs
+    tests: ["tests/test_worker_contracts.py"]
+    frameworks:
+      sp_800_53: [SC-7, SC-8, SC-16, SI-7, SI-10, AC-7]
+      csf_2_0: [PR, DE]
+    owner: Platform Engineering
+
+  - id: ING-DLQ-BREAKER
+    title: Durable worker circuit breaker + dead-letter routing
+    category: Ingestion Integrity
+    status: implemented
+    description: Exponential-backoff retry, circuit breaker, poison-message DLQ with metrics; graceful SIGTERM drain.
+    implementation: libs/lib_siem_core/src/lib.rs
+    tests: ["tests/test_worker_contracts.py"]
+    frameworks:
+      sp_800_53: [SI-4, CP-10]
+      csf_2_0: [DE, RC]
+    owner: Platform Engineering
+
+  # -- Infrastructure hardening (IaC, Layer 0) --------------------------------
+  - id: IAC-HARDENING
+    title: OS / kernel / network hardening baseline
+    category: Infrastructure Hardening
+    status: implemented
+    description: sysctl (ASLR, rp_filter, syncookies, no source-routing), mount hardening (noexec/nosuid/nodev), SSH lockdown, default-DROP firewall, auditd + AIDE + fail2ban, account policy, rootless Podman.
+    implementation: hardening/tasks/main.yml
+    tests: ["infrastructure/tests/test_infrastructure.py"]
+    frameworks:
+      sp_800_53: [AC-17, AU-2, AU-12, CM-7, IA-5, SC-5, SC-7, SI-3, SI-7, SI-16]
+      csf_2_0: [PR, DE]
+    owner: Infrastructure
+
+  # ── Additional AI-security controls (complete the OWASP/ATLAS coverage) ─────
+  - id: SEC-MODEL-DOS
+    title: Model denial-of-service bounding
+    category: AI Security
+    status: implemented
+    description: LangGraph recursion_limit + absolute asyncio timeouts bound execution; neutralizes context-saturation/VRAM-exhaustion attacks.
+    implementation: analytics/llm_hunter/orchestrator.py
+    tests: ["tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM04]
+      sp_800_53: [SC-5, SC-6]
+      csf_2_0: [PR, DE]
+    owner: Platform Engineering
+
+  - id: SEC-RLHF-QUARANTINE
+    title: Sybil RLHF poisoning quarantine
+    category: AI Security
+    status: implemented
+    description: worker_rlhf monitors operator-override velocity; coordinated malicious dismissals trip an atomic circuit breaker quarantining the tainted reward data.
+    implementation: services/worker_rlhf/src/main.rs
+    tests: ["tests/test_worker_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM03]
+      atlas: [AML.T0031, AML.T0020]
+      sp_800_53: [SI-4, SI-10, SI-7]
+      csf_2_0: [PR, DE]
+    owner: MLOps
+
+  - id: SEC-DLP-EGRESS
+    title: Outbound DLP / sovereign data isolation
+    category: AI Security
+    status: implemented
+    description: CognitiveSanitizer scrubs RFC-1918 ranges + high-entropy credentials from any payload before frontier egress.
+    implementation: analytics/llm_hunter/tools/sanitizer.py
+    tests: ["tests/lab_redteam/test_cognitive_bypass.py"]
+    frameworks:
+      owasp_llm: [LLM06]
+      sp_800_53: [AC-4, SC-7]
+      csf_2_0: [PR]
+    owner: Platform Engineering
+
+  - id: SEC-TRAINING-HYGIENE
+    title: Training-data hygiene & credential scrubbing
+    category: AI Security
+    status: implemented
+    description: Regex credential sanitization on every telemetry payload before it enters the corpus; deterministic 85/15 held-out split.
+    implementation: mlops/scripts/01_spool_datasets.py
+    tests: ["tests/lab_mlops_serving/test_mlops_serving.py"]
+    frameworks:
+      owasp_llm: [LLM03]
+      atlas: [AML.T0020]
+      sp_800_53: [SI-12, AC-4]
+      csf_2_0: [PR]
+    owner: MLOps
+
+  - id: SEC-BLAST-RADIUS
+    title: Blast-radius cap & entity state machine
+    category: AI Security
+    status: implemented
+    description: MAX_ENTITIES cap (in-node), GLOBAL_DO_NOT_PIVOT drop at reduce, severity-monotonic entity status, TIER-1 assets force manual review.
+    implementation: analytics/llm_hunter/state.py
+    tests: ["tests/lab_analytics_hunter/test_hunter_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM08]
+      sp_800_53: [AC-6, SI-7]
+      csf_2_0: [PR, RS]
+    owner: Platform Engineering
+
+  - id: SEC-FAILOVER
+    title: Cascading LLM failover & sovereign degradation
+    category: AI Security
+    status: implemented
+    description: Per-node provider failover chain; total failure emits a safe default verdict (monitor) rather than crashing — degrade-to-monitoring.
+    implementation: analytics/llm_hunter/agents/llm_providers.py
+    tests: ["tests/test_worker_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM05]
+      sp_800_53: [CP-10, SI-4]
+      csf_2_0: [RC, DE]
+    owner: Platform Engineering
+
+  - id: SEC-IDEMPOTENT-SOAR
+    title: Idempotent SOAR execution & deduplication
+    category: AI Security
+    status: implemented
+    description: 15-minute rolling idempotency key (Nats-Msg-Id) + 7-day Redis event dedup so containment applies exactly once.
+    implementation: analytics/llm_hunter/agents/response.py
+    tests: ["tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"]
+    frameworks:
+      sp_800_53: [SI-10, SC-5]
+      csf_2_0: [RS]
+    owner: Platform Engineering
+
+  - id: SEC-VECTOR-DIM
+    title: Vector dimensionality validation
+    category: AI Security
+    status: implemented
+    description: QdrantVectorSearchTool validates target vector dimensionality per named space before search; rejects malformed/adversarial vectors.
+    implementation: analytics/llm_hunter/tools/qdrant_search.py
+    tests: ["tests/lab_analytics_hunter/test_hunter_contracts.py"]
+    frameworks:
+      owasp_llm: [LLM03]
+      sp_800_53: [SI-10]
+      csf_2_0: [PR]
+    owner: Platform Engineering
+
+  - id: SEC-ENDPOINT-ID
+    title: Endpoint identity injection defense
+    category: Ingestion Integrity
+    status: implemented
+    description: Sensor endpoint_id regex-validated in the Rust ingestion layer before reaching Qdrant/Parquet (blocks injection/path traversal).
+    implementation: libs/lib_siem_core/src/models.rs
+    tests: ["tests/test_worker_contracts.py"]
+    frameworks:
+      sp_800_53: [SI-10]
+      csf_2_0: [PR]
+    owner: Platform Engineering

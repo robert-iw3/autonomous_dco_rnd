@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Framework enumerations + applicability for the Applicability & Gap Matrix.
+#
+# The generator computes, per item: N-A (applicable:false), Covered (a manifest
+# control references its id), or GAP (applicable but no control). For GAP items
+# the `remediation` is shown -- the "addressable but not yet addressed" list.
+# OWASP ids match controls_manifest owasp_llm ids; ATLAS ids match atlas ids.
+# ─────────────────────────────────────────────────────────────────────────────
+
+owasp_llm:
+  title: "OWASP Top 10 for Large Language Model Applications (2023)"
+  items:
+    - {id: LLM01, name: "Prompt Injection", applicable: true}
+    - {id: LLM02, name: "Insecure Output Handling", applicable: true}
+    - {id: LLM03, name: "Training Data Poisoning", applicable: true}
+    - {id: LLM04, name: "Model Denial of Service", applicable: true}
+    - {id: LLM05, name: "Supply Chain Vulnerabilities", applicable: true}
+    - {id: LLM06, name: "Sensitive Information Disclosure", applicable: true}
+    - {id: LLM07, name: "Insecure Plugin Design", applicable: true}
+    - {id: LLM08, name: "Excessive Agency", applicable: true}
+    - {id: LLM09, name: "Overreliance", applicable: true}
+    - id: LLM10
+      name: "Model Theft"
+      applicable: true
+      remediation: >
+        Addressable: rate-limit + anomaly-monitor the sovereign inference endpoints
+        and add model-extraction / membership-inference detection; tighten access
+        control and egress monitoring on weight artifacts. SHA-384 verification
+        protects weight INTEGRITY (tampering) but not exfiltration/theft.
+
+atlas:
+  title: "MITRE ATLAS — platform-relevant techniques"
+  items:
+    - {id: AML.T0042, name: "Verify Attack (prompt-leak tripwire defended)", applicable: true}
+    - {id: AML.T0043, name: "Craft Adversarial Data", applicable: true}
+    - {id: AML.T0015, name: "Evade ML Model", applicable: true}
+    - {id: AML.T0044, name: "Full ML Model Access (weight tampering)", applicable: true}
+    - {id: AML.T0031, name: "Erode ML Model Integrity (reward poisoning)", applicable: true}
+    - {id: AML.T0020, name: "Poison Training Data", applicable: true}
+    - id: AML.T0024
+      name: "Exfiltration via ML Inference API (model extraction)"
+      applicable: true
+      remediation: >
+        Addressable: detect model-extraction query patterns + membership inference
+        on the internal vLLM endpoints (rate/volume anomaly + canary outputs). Ties
+        to OWASP LLM10 and NIST MS-2.10-001 (POA&M-4).
+    - id: AML.T0040
+      name: "ML Model Inference API Access"
+      applicable: true
+      remediation: >
+        Addressable: enforce authn/z + per-caller quotas on the sovereign inference
+        endpoints and log/alert on abnormal query volume (currently network-isolated
+        but not rate-monitored).
+    - {id: AML.T0048, name: "Societal Harm", applicable: false,
+       reason: "Defensive internal SOC system; not a public content generator (see applicability determinations)."}
