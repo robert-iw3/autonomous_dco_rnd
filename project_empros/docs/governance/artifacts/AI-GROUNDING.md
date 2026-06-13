@@ -4,7 +4,7 @@
 
 Every cited artifact in a verdict must trace to the assembled evidence corpus; ungrounded (confabulated) claims are flagged and the verdict is demoted.
 
-`analytics/llm_hunter/agents/controls.py:L82-L112`
+`analytics/llm_hunter/agents/controls.py:L84-L114`
 
 ```python
 def enforce_grounding(board_result: dict, state: dict):

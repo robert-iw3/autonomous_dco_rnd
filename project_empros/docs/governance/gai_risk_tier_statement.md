@@ -25,9 +25,9 @@ production estate at machine speed.
 
 | Factor | Assessment |
 |---|---|
-| Autonomy / consequence | **High** — autonomous containment can isolate hosts / block traffic; a wrong action is operationally disruptive. Mitigated by HitL circuit breaker, fail-closed critic, TIER-1 manual review. |
+| Autonomy / consequence | **High** — autonomous containment can isolate hosts / block traffic; a wrong action is operationally disruptive. Mitigated by HitL circuit breaker, fail-closed critic, TIER-1 manual review — with **automation-bias / over-reliance measured** (NC-8) so the human check is verified, not assumed. |
 | Impact to fundamental rights / public safety | **Low–moderate** — internal defensive system; no decisions about individuals' rights. Bias risk is *allocative* (which assets get contained), monitored by the fairness audit (NC-1). |
-| Information-integrity abuse potential | **Moderate** — confabulated evidence could mislead responders; mitigated by review-board grounding + deterministic eval gate. |
+| Information-integrity abuse potential | **Moderate** — confabulated evidence could mislead responders; mitigated by review-board grounding + deterministic eval gate + a **tamper-evident verdict-lineage hash chain** (NC-10). |
 | Malicious-use / dual-use | **Moderate** — a defensive tool with read-only sandboxes; the Det Chamber detonates malware in isolation. Strong supply-chain + injection defenses. |
 | New security vulnerabilities introduced | **Moderate** — LLM attack surface (prompt injection, model theft); addressed by canary, sanitizer, SHA-384 weights, red-team gates. |
 | Reliability / variability over time | **Moderate** — model/data drift and the immunity feedback loop; addressed by regression gate, calibration ledger, bias/homogenization audit, model-collapse monitor. |
@@ -44,7 +44,9 @@ Because the system is Tier 1, the following are **mandatory** (and implemented):
   signal or unreviewable verdict).
 - Sovereign-by-default external dependencies (frontier models / TI / SIEM off unless
   explicitly enabled), with frontier version-pin enforcement.
-- Continuous bias/homogenization auditing and confidence-calibration tracking.
+- Continuous bias/homogenization auditing, confidence-calibration tracking, and
+  automation-bias / over-reliance measurement of operator decisions (NC-8).
+- Tamper-evident verdict lineage (NC-10) over every autonomous decision.
 
 ## Specialized risk levels (GV-1.3-005)
 

@@ -61,7 +61,7 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | Family | Title | Controls referenced |
 |---|---|---|
 | AC | Access Control | AC-17, AC-3, AC-4, AC-6, AC-7 |
-| AU | Audit and Accountability | AU-12, AU-2, AU-3, AU-6, AU-9 |
+| AU | Audit and Accountability | AU-10, AU-12, AU-2, AU-3, AU-6, AU-9 |
 | CA | Assessment, Authorization, and Monitoring | CA-2, CA-7 |
 | CM | Configuration Management | CM-2, CM-3, CM-7 |
 | CP | Contingency Planning | CP-10 |
@@ -82,21 +82,21 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | Fn | Category | Title | Realised by | Coverage |
 |---|---|---|---|---|
 | GV Govern | GV.OC | Organizational Context | _policy / process — see SSP_ | Process |
-| GV Govern | GV.OV | Oversight | NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-6-ENERGY | Technical |
+| GV Govern | GV.OV | Oversight | NC-1-BIAS-AUDIT, NC-11-ENERGY-ACCOUNTING, NC-2-CALIBRATION, NC-6-ENERGY, NC-8-OVER-RELIANCE | Technical |
 | GV Govern | GV.PO | Policy | NC-4-RETENTION | Technical |
 | GV Govern | GV.RM | Risk Management Strategy | _policy / process — see SSP_ | Process |
 | GV Govern | GV.RR | Roles, Responsibilities & Authorities | AI-PROVENANCE | Technical |
 | GV Govern | GV.SC | Cybersecurity Supply Chain Risk Mgmt | NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN | Technical |
 | ID Identify | ID.AM | Asset Management | NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT | Technical |
-| ID Identify | ID.IM | Improvement | NC-2-CALIBRATION, SEC-REGRESSION-GATE | Technical |
+| ID Identify | ID.IM | Improvement | NC-2-CALIBRATION, NC-9-ACTIVE-LEARNING, SEC-REGRESSION-GATE | Technical |
 | ID Identify | ID.RA | Risk Assessment | _policy / process — see SSP_ | Process |
 | PR Protect | PR.AA | Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD | Technical |
 | PR Protect | PR.AT | Awareness & Training | _policy / process — see SSP_ | Process |
-| PR Protect | PR.DS | Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM | Technical |
+| PR Protect | PR.DS | Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM | Technical |
 | PR Protect | PR.IR | Technology Infrastructure Resilience | SEC-BLAST-RADIUS, SEC-FAILOVER, SEC-MODEL-DOS | Technical |
 | PR Protect | PR.PS | Platform Security | IAC-HARDENING, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-SANITIZER, SEC-SUPPLY-CHAIN | Technical |
-| DE Detect | DE.AE | Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, SIEM-COUNTERPART-DISPROOF | Technical |
-| DE Detect | DE.CM | Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD | Technical |
+| DE Detect | DE.AE | Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, NC-10-VERDICT-LINEAGE, NC-9-ACTIVE-LEARNING, SIEM-COUNTERPART-DISPROOF | Technical |
+| DE Detect | DE.CM | Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-8-OVER-RELIANCE, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD | Technical |
 | RS Respond | RS.AN | Incident Analysis | AI-REVIEW-BOARD | Technical |
 | RS Respond | RS.CO | Incident Response Reporting & Comms | _policy / process — see SSP_ | Process |
 | RS Respond | RS.MA | Incident Management | _policy / process — see SSP_ | Process |

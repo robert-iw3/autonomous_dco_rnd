@@ -4,7 +4,7 @@
 
 Machine-generated narrative is stamped with an explicit AI-origin disclosure before it leaves the system.
 
-`analytics/llm_hunter/agents/controls.py:L176-L190`
+`analytics/llm_hunter/agents/controls.py:L178-L192`
 
 ```python
 def stamp_ai_provenance(report: str) -> str:

@@ -164,3 +164,27 @@ evidence:
   SEC-ENDPOINT-ID:
     - {file: libs/lib_siem_core/src/models.rs, anchor: "pub struct DynamicUebaVector", after: 6,
        caption: "Endpoint identifiers are validated against a strict regex at the type boundary, defeating identity-injection via malformed endpoint_id."}
+
+  NC-8-OVER-RELIANCE:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def over_reliance_report", after: 22,
+       caption: "Measures the human side of HitL: automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band."}
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def record_reliance", after: 10,
+       caption: "Each operator decision is logged as an accept-vs-override reliance point against the eventual ground truth."}
+
+  NC-9-ACTIVE-LEARNING:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def is_model_failure", after: 9,
+       caption: "A verdict is a captured failure when it cites ungrounded evidence or its class contradicts operator ground truth."}
+    - {file: analytics/llm_hunter/agents/active_learning.py, anchor: "def capture", after: 12,
+       caption: "Failures are appended to a hard-example corpus the MLOps plane consumes for continuous improvement; correct verdicts are a no-op."}
+
+  NC-10-VERDICT-LINEAGE:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def verify_lineage", after: 10,
+       caption: "SHA-256 hash chain over verdict records: each entry binds the previous hash, so any edit, deletion, or reorder is detected and the first broken index returned."}
+    - {file: analytics/llm_hunter/agents/verdict_ledger.py, anchor: "def append_verdict", after: 9,
+       caption: "Durable append: every verdict is chained onto the prior entry's hash, giving autonomous-containment decisions a tamper-evident trail."}
+
+  NC-11-ENERGY-ACCOUNTING:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def estimate_inference_energy", after: 11,
+       caption: "Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor."}
+    - {file: analytics/llm_hunter/agents/energy_accounting.py, anchor: "def record_run", after: 10,
+       caption: "Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals()."}

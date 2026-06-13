@@ -4,7 +4,7 @@
 
 Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions.
 
-`analytics/llm_hunter/agents/controls.py:L145-L173`
+`analytics/llm_hunter/agents/controls.py:L147-L175`
 
 ```python
 def memory_is_actionable(payload: dict, now: float, ttl_seconds: int = None) -> bool:

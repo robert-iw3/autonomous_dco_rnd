@@ -18,9 +18,10 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any
 
-from agents.controls import calibration_record
+from agents.controls import calibration_record, over_reliance_report, reliance_record
 
 DEFAULT_LEDGER = os.getenv("NEXUS_CALIBRATION_LEDGER", "/var/lib/nexus/calibration_v1.jsonl")
+DEFAULT_RELIANCE_LEDGER = os.getenv("NEXUS_RELIANCE_LEDGER", "/var/lib/nexus/reliance_v1.jsonl")
 
 
 def record_disposition(verdict: dict, operator_disposition: str, event_id: str = "",
@@ -35,6 +36,31 @@ def record_disposition(verdict: dict, operator_disposition: str, event_id: str =
     with open(p, "a") as f:
         f.write(json.dumps(rec) + "\n")
     return rec
+
+
+# -- NC-7 automation-bias / over-reliance (NIST MG-1.3-002, MP-3.4-005) -------
+# Same operator-disposition feedback loop, measured from the *human* side: did the
+# operator accept or override the verdict, and (once ground truth is known) how
+# often was a wrong AI call rubber-stamped. Shares load_ledger; separate ledger.
+
+def record_reliance(verdict: dict, operator_action: str,
+                    ground_truth_disposition=None, event_id: str = "",
+                    ledger_path: str = DEFAULT_RELIANCE_LEDGER) -> dict:
+    """Append one human-AI reliance data point (accept vs override + ground truth)."""
+    rec = reliance_record(verdict, operator_action, ground_truth_disposition)
+    rec["event_id"] = event_id
+    rec["ts"] = time.time()
+    p = Path(ledger_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as f:
+        f.write(json.dumps(rec) + "\n")
+    return rec
+
+
+def over_reliance(records, high_conf: float = 0.8, min_support: int = 5,
+                  max_automation_bias: float = 0.5) -> dict:
+    """Automation-bias / over-reliance health over reliance records."""
+    return over_reliance_report(records, high_conf, min_support, max_automation_bias)
 
 
 def load_ledger(ledger_path: str = DEFAULT_LEDGER) -> List[Dict[str, Any]]:

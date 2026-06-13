@@ -22,7 +22,7 @@ This dossier answers each control with the **actual source code** that satisfies
 
 Every cited artifact in a verdict must trace to the assembled evidence corpus; ungrounded (confabulated) claims are flagged and the verdict is demoted.
 
-`analytics/llm_hunter/agents/controls.py:L82-L112`
+`analytics/llm_hunter/agents/controls.py:L84-L114`
 
 ```python
 def enforce_grounding(board_result: dict, state: dict):
@@ -66,7 +66,7 @@ def enforce_grounding(board_result: dict, state: dict):
 
 Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions.
 
-`analytics/llm_hunter/agents/controls.py:L145-L173`
+`analytics/llm_hunter/agents/controls.py:L147-L175`
 
 ```python
 def memory_is_actionable(payload: dict, now: float, ttl_seconds: int = None) -> bool:
@@ -108,7 +108,7 @@ AI_PROVENANCE_BANNER = (
 
 Machine-generated narrative is stamped with an explicit AI-origin disclosure before it leaves the system.
 
-`analytics/llm_hunter/agents/controls.py:L176-L190`
+`analytics/llm_hunter/agents/controls.py:L178-L192`
 
 ```python
 def stamp_ai_provenance(report: str) -> str:
@@ -357,13 +357,97 @@ def run_bias_audit(records: List[Dict[str, Any]], dimension: str = "source_type"
 
 \newpage
 
+### NC-10-VERDICT-LINEAGE — Tamper-evident verdict lineage
+
+*Implementation: `analytics/llm_hunter/agents/verdict_ledger.py`*
+
+SHA-256 hash chain over verdict records: each entry binds the previous hash, so any edit, deletion, or reorder is detected and the first broken index returned.
+
+`analytics/llm_hunter/agents/controls.py:L486-L496`
+
+```python
+def verify_lineage(entries) -> dict:
+    """Verify the hash chain. Returns the first broken index (or None if valid)."""
+    prev = GENESIS_HASH
+    for i, e in enumerate(entries or []):
+        if e.get("prev_hash") != prev:
+            return {"valid": False, "broken_at": i, "reason": "prev_hash mismatch"}
+        if e.get("entry_hash") != _entry_hash(prev, e.get("record")):
+            return {"valid": False, "broken_at": i, "reason": "entry_hash mismatch"}
+        prev = e["entry_hash"]
+    return {"valid": True, "broken_at": None, "reason": ""}
+
+```
+
+Durable append: every verdict is chained onto the prior entry's hash, giving autonomous-containment decisions a tamper-evident trail.
+
+`analytics/llm_hunter/agents/verdict_ledger.py:L37-L46`
+
+```python
+def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
+    """Append `record` as the next hash-chain entry. Returns the chain entry."""
+    entries = load_ledger(ledger_path)
+    prev = entries[-1]["entry_hash"] if entries else GENESIS_HASH
+    entry = lineage_entry(prev, record)
+    p = Path(ledger_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    return entry
+```
+
+\newpage
+
+### NC-11-ENERGY-ACCOUNTING — Per-run inference energy accounting
+
+*Implementation: `analytics/llm_hunter/agents/energy_accounting.py`*
+
+Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor.
+
+`analytics/llm_hunter/agents/controls.py:L506-L517`
+
+```python
+def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,
+                              grid_gco2_per_kwh: float = 400.0) -> dict:
+    """Per-run energy (Wh) and carbon (gCO2e) estimate. Negative inputs clamp to 0."""
+    duration_s = max(0.0, float(duration_s))
+    avg_power_w = max(0.0, float(avg_power_w))
+    pue = float(pue)
+    energy_wh = avg_power_w * (duration_s / 3600.0) * pue
+    co2e_g = (energy_wh / 1000.0) * float(grid_gco2_per_kwh)
+    return {
+        "energy_wh": round(energy_wh, 6),
+        "co2e_g": round(co2e_g, 6),
+        "duration_s": duration_s,
+```
+
+Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals().
+
+`analytics/llm_hunter/agents/energy_accounting.py:L23-L33`
+
+```python
+def record_run(duration_s, avg_power_w, event_id: str = "", pue: float = 1.5,
+               grid_gco2_per_kwh: float = 400.0,
+               ledger_path: str = DEFAULT_LEDGER) -> dict:
+    """Estimate + append one run's energy/carbon. Returns the record."""
+    rec = estimate_inference_energy(duration_s, avg_power_w, pue, grid_gco2_per_kwh)
+    rec["event_id"] = event_id
+    rec["ts"] = time.time()
+    p = Path(ledger_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as f:
+        f.write(json.dumps(rec) + "\n")
+```
+
+\newpage
+
 ### NC-2-CALIBRATION — Confidence-calibration ledger
 
 *Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
 
 Each verdict's stated confidence is recorded against the operator's ground-truth disposition…
 
-`analytics/llm_hunter/agents/calibration_ledger.py:L26-L38`
+`analytics/llm_hunter/agents/calibration_ledger.py:L27-L39`
 
 ```python
 def record_disposition(verdict: dict, operator_disposition: str, event_id: str = "",
@@ -383,7 +467,7 @@ def record_disposition(verdict: dict, operator_disposition: str, event_id: str =
 
 …and the Brier-score trend is computed so miscalibration is measurable and trackable over time.
 
-`analytics/llm_hunter/agents/calibration_ledger.py:L55-L77`
+`analytics/llm_hunter/agents/calibration_ledger.py:L81-L103`
 
 ```python
 def brier_trend(records: List[Dict[str, Any]], last_n: int = 0) -> dict:
@@ -436,6 +520,103 @@ def frontier_pin_allowed(name: str, cfg: dict, allow_floating: bool = None):
                        f"-- pin a version or set NEXUS_ALLOW_FLOATING_FRONTIER=1 (NIST MP-4.1-007)")
     return True, ""
 
+```
+
+\newpage
+
+### NC-8-OVER-RELIANCE — Automation-bias / over-reliance measurement
+
+*Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
+
+Measures the human side of HitL: automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band.
+
+`analytics/llm_hunter/agents/controls.py:L370-L392`
+
+```python
+def over_reliance_report(records, high_conf: float = 0.8, min_support: int = 5,
+                         max_automation_bias: float = 0.5) -> dict:
+    """Automation-bias / over-reliance metrics over reliance records.
+
+    `automation_bias` = P(operator accepted | AI was wrong) -- the share of the
+    swarm's mistakes the human rubber-stamped (only defined where ground truth
+    exists). `caught_rate` = P(override | AI wrong). Acceptance is also split by AI
+    confidence band as a complementary automation-bias signal. A run is flagged
+    when automation_bias exceeds `max_automation_bias` with enough wrong-call
+    support.
+    """
+    recs = list(records or [])
+    n = len(recs)
+    base = {"n": n, "accept_rate": None, "override_rate": None,
+            "accept_rate_high_conf": None, "accept_rate_low_conf": None,
+            "n_ai_wrong": 0, "n_ai_correct": 0, "automation_bias": None,
+            "caught_rate": None, "over_distrust": None, "flagged": False, "reasons": []}
+    if n == 0:
+        return base
+
+    accepts = sum(1 for r in recs if r.get("accepted"))
+    base["accept_rate"] = round(accepts / n, 4)
+    base["override_rate"] = round((n - accepts) / n, 4)
+```
+
+Each operator decision is logged as an accept-vs-override reliance point against the eventual ground truth.
+
+`analytics/llm_hunter/agents/calibration_ledger.py:L46-L56`
+
+```python
+def record_reliance(verdict: dict, operator_action: str,
+                    ground_truth_disposition=None, event_id: str = "",
+                    ledger_path: str = DEFAULT_RELIANCE_LEDGER) -> dict:
+    """Append one human-AI reliance data point (accept vs override + ground truth)."""
+    rec = reliance_record(verdict, operator_action, ground_truth_disposition)
+    rec["event_id"] = event_id
+    rec["ts"] = time.time()
+    p = Path(ledger_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as f:
+        f.write(json.dumps(rec) + "\n")
+```
+
+\newpage
+
+### NC-9-ACTIVE-LEARNING — Active-learning failure capture
+
+*Implementation: `analytics/llm_hunter/agents/active_learning.py`*
+
+A verdict is a captured failure when it cites ungrounded evidence or its class contradicts operator ground truth.
+
+`analytics/llm_hunter/agents/controls.py:L429-L438`
+
+```python
+def is_model_failure(verdict: dict, ground_truth_disposition=None,
+                     grounding_violation: bool = False) -> bool:
+    """True if this verdict is a captured failure: an ungrounded citation, or a
+    class mismatch against operator ground truth (when ground truth is known)."""
+    if grounding_violation:
+        return True
+    if ground_truth_disposition is None:
+        return False
+    truth_tp = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+    return bool((verdict or {}).get("is_true_positive")) != truth_tp
+```
+
+Failures are appended to a hard-example corpus the MLOps plane consumes for continuous improvement; correct verdicts are a no-op.
+
+`analytics/llm_hunter/agents/active_learning.py:L23-L35`
+
+```python
+def capture(verdict: dict, operator_disposition: Optional[str] = None,
+            grounding_violation: bool = False, event_id: str = "",
+            artifacts=None, corpus_path: str = DEFAULT_CORPUS) -> Optional[dict]:
+    """Append a hard-example record if this verdict was a failure; else no-op.
+    Returns the written record (with `ts`) or None."""
+    rec = failure_record(verdict, operator_disposition, grounding_violation, event_id, artifacts)
+    if rec is None:
+        return None
+    rec["ts"] = time.time()
+    p = Path(corpus_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as f:
+        f.write(json.dumps(rec) + "\n")
 ```
 
 \newpage

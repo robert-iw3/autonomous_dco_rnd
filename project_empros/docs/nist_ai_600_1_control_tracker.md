@@ -59,6 +59,27 @@ Proof: [tests/lab_analytics_hunter/test_governance_manifest.py](../tests/lab_ana
 an SP 800-53 / CSF 2.0 reference is not a real OSCAL control, or a cited code-evidence anchor no
 longer resolves.
 
+### Wave 4 — closing the remaining code-implementable gaps (13 Jun 2026)
+
+The remaining 🟡 risks that had a *code* remedy (not just policy) are now implemented + tested.
+All logic is pure/stdlib in [agents/controls.py](../analytics/llm_hunter/agents/controls.py) with thin
+durable-ledger wrappers; proven in [test_ai_controls.py](../tests/lab_analytics_hunter/test_ai_controls.py)
+(pure) + [test_nist_controls_wave4.py](../tests/lab_analytics_hunter/test_nist_controls_wave4.py) (jobs).
+
+| Item | NIST action | Risk | Status | Implementation | Tests |
+|---|---|---|---|---|---|
+| **NC-8** Automation-bias / over-reliance measurement | MG-1.3-002, MP-3.4-005 | 2.7 | ✅ Implemented & tested | `controls.reliance_record` / `over_reliance_report`; `calibration_ledger.record_reliance` / `over_reliance` — `automation_bias = P(accepted \| AI wrong)`, split by confidence band | `TestOverReliance` + `TestRelianceLedger` |
+| **NC-9** Active-learning failure capture | MG-4.1-004 | 2.2 | ✅ Implemented & tested | `controls.is_model_failure` / `failure_record`; `agents/active_learning.py` writes a hard-example corpus for the MLOps plane | `TestActiveLearningFailure` + `TestActiveLearning` |
+| **NC-10** Tamper-evident verdict lineage | MS-2.8 (Information Integrity) | 2.8 | ✅ Implemented & tested | `controls.lineage_entry` / `verify_lineage` (SHA-256 chain); `agents/verdict_ledger.py` durable append + verify | `TestVerdictLineage` + `TestVerdictLedger` |
+| **NC-11** Per-run inference energy accounting | MS-2.12-003 | 2.5 | ✅ Implemented & tested | `controls.estimate_inference_energy`; `agents/energy_accounting.py` per-run ledger + `totals()` | `TestInferenceEnergy` + `TestEnergyAccounting` |
+
+All four are registered in the GRC manifest (`governance/controls_manifest.yaml`) with code evidence
+(`governance/evidence_map.yaml` → `artifacts/NC-{7,8,9,10}-*.md`) and CSF 2.0 category mappings; the
+26-test governance guard stays green. **Remaining gaps are now purely operational/documentation**
+(POA&M), not code: frontier model cards + SBOM + vendor SLAs (2.12), periodic membership-inference
+review (2.4, POA&M-4), cron scheduling of the audit/calibration/reliance jobs (POA&M-1), and the
+red-team cadence (2.9).
+
 ---
 
 ## 1. Coverage summary
@@ -66,13 +87,13 @@ longer resolves.
 | # | GAI Risk (NIST §2) | Applicability | Coverage | Headline gap |
 |---|---|---|---|---|
 | 2.1 | CBRN Information or Capabilities | Low / N-A | n/a | Determination **documented** ([applicability_determinations](governance/applicability_determinations.md)) |
-| 2.2 | **Confabulation** | High | 🟡 Partial | Evidence-grounding + calibration ledger (NC-2) landed; construct-validity metric & active-learning failure capture pending |
+| 2.2 | **Confabulation** | High | 🟢 Strong | Evidence-grounding + calibration ledger (NC-2) + **active-learning failure capture (NC-9)** landed; only a construct-validity measurement-science refinement remains |
 | 2.3 | Dangerous, Violent, Hateful Content | Low / N-A | n/a | Determination documented |
 | 2.4 | **Data Privacy** | High | 🟡 Partial | Retention/decommission **policy landed** (NC-4) + memory TTL; periodic membership-inference review (POA&M-4) pending |
-| 2.5 | Environmental Impacts | Medium | 🟡 Partial | Footprint **estimate documented** (NC-6); per-run measurement folded into the MLOps metric plane |
+| 2.5 | Environmental Impacts | Medium | 🟢 Strong | Footprint **estimate documented** (NC-6) + **per-run energy/carbon accounting in code (NC-11)** feeding the MLOps metric plane |
 | 2.6 | **Harmful Bias & Homogenization** | High | 🟢 Strong | Disparity + homogenization run as a **scheduled audit job** (NC-1, `bias_audit`) over the tested analytics + memory TTL; cron alerting (POA&M-1) + model-card bias eval remain |
-| 2.7 | **Human-AI Configuration** | High | 🟡 Partial | AI-origin disclosure + **calibration feed/Brier ledger** (NC-2) + HitL landed; automation-bias / over-reliance measurement pending |
-| 2.8 | Information Integrity | Medium | 🟡 Partial | Provenance-stamped reports + audit ledgers; tamper-evident verdict-lineage chain remains |
+| 2.7 | **Human-AI Configuration** | High | 🟢 Strong | AI-origin disclosure + **calibration feed/Brier ledger** (NC-2) + HitL + **automation-bias / over-reliance measurement (NC-8)** landed; operator-trust cron alerting remains (POA&M-1) |
+| 2.8 | Information Integrity | Medium | 🟢 Strong | Provenance-stamped reports + audit ledgers + **tamper-evident verdict-lineage hash chain (NC-10)** landed |
 | 2.9 | **Information Security** | High | 🟢 Strong | Strongest area; AI-incident process now **documented** (governance/), periodic red-team cadence remains |
 | 2.10 | Intellectual Property | Low / N-A | n/a | Determination documented; frontier data/IP terms = inventory POA&M |
 | 2.11 | Obscene / CSAM / NCII | N-A | n/a | Determination documented |

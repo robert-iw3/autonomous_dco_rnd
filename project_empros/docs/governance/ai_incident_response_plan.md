@@ -52,11 +52,15 @@ AI/ML component contributes to harm or unacceptable risk, including:
 Most AI incidents are surfaced by an existing control, not manual discovery:
 the **canary tripwire** (prompt-leak), the **review-board grounding** override, the
 **bias/homogenization audit** (NC-1), the **calibration ledger** drift (NC-2), the
-**deploy-gate eval** failure, the **cognitive-fault DLQ**, and operator dispositions.
+**automation-bias / over-reliance metric** (NC-8, operators rubber-stamping wrong AI calls),
+the **deploy-gate eval** failure, the **cognitive-fault DLQ**, and operator dispositions.
 
 ## Response workflow
 
 1. **Detect & record** — the control logs to its ledger/DLQ; create the incident record.
+   The **tamper-evident verdict-lineage chain** (NC-10) provides a non-repudiable record of
+   the decisions in play, and the **active-learning capture** (NC-9) preserves the failing
+   verdict as a hard example for post-incident model improvement.
 2. **Contain** — for a model issue, **re-pin the last-known-good registry version**
    (planned WS-A) or disable the affected backend; the platform's fail-safe defaults
    mean detection degrades to monitoring rather than mis-acting.

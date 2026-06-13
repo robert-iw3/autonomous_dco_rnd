@@ -40,11 +40,17 @@ small fraction of events, avoiding generative inference on the bulk of telemetry
 
 ## Tracking & refinement (MS-2.12-003)
 
+- **Per-run energy/carbon accounting is now implemented in code (control NC-11):**
+  `agents.controls.estimate_inference_energy` (energy = power × time × PUE; carbon from a
+  grid-intensity factor) plus the `agents/energy_accounting.py` ledger (`record_run` +
+  `totals`) turn the order-of-magnitude estimates below into measured per-run figures the
+  MLOps metric plane rolls up. Proven by `test_ai_controls.py::TestInferenceEnergy` +
+  `test_nist_controls_wave4.py::TestEnergyAccounting`.
 - Capture measured GPU energy per training run from the scheduler/host telemetry and
   record it in the RSI ledger alongside `gate_scores`.
 - Account inference compute via the existing per-investigation efficiency metrics
   (turns, llm_calls, tokens_est, wall_ms) planned in the MLOps maturation metric plane
-  (WS-A, `InvestigationMetrics`) — these double as an energy proxy.
+  (WS-A, `InvestigationMetrics`) — these feed the NC-11 estimator's power×time inputs.
 - Verify trade-offs between inference-time and additional training-time resources when
   proposing a quantized/edge variant.
 - Address green-washing: any carbon-offset claim must be evidence-backed.

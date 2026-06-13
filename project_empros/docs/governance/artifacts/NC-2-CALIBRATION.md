@@ -4,7 +4,7 @@
 
 Each verdict's stated confidence is recorded against the operator's ground-truth disposition…
 
-`analytics/llm_hunter/agents/calibration_ledger.py:L26-L38`
+`analytics/llm_hunter/agents/calibration_ledger.py:L27-L39`
 
 ```python
 def record_disposition(verdict: dict, operator_disposition: str, event_id: str = "",
@@ -24,7 +24,7 @@ def record_disposition(verdict: dict, operator_disposition: str, event_id: str =
 
 …and the Brier-score trend is computed so miscalibration is measurable and trackable over time.
 
-`analytics/llm_hunter/agents/calibration_ledger.py:L55-L77`
+`analytics/llm_hunter/agents/calibration_ledger.py:L81-L103`
 
 ```python
 def brier_trend(records: List[Dict[str, Any]], last_n: int = 0) -> dict:

@@ -22,7 +22,10 @@ AI-relevant data stores in Sentinel Nexus. It addresses control item **NC-4**.
 | Cold storage (Parquet on MinIO/S3) | Normalized sensor telemetry (Hive-partitioned) | High |
 | Qdrant vector index | UEBA math vectors + payloads (per-investigation) | High |
 | **`nexus_swarm_memory`** (Qdrant) | Verdict/immunity signatures + embeddings + incident reports | High |
-| RSI / calibration / bias-audit ledgers | Cycle outcomes, calibration points, audit reports | Moderate |
+| RSI / calibration / bias-audit / **over-reliance** ledgers | Cycle outcomes, calibration points, audit reports, accept-vs-override reliance points (NC-2/NC-8) | Moderate |
+| **Verdict-lineage ledger** (NC-10) | Append-only SHA-256 hash chain over verdict/audit records | Moderate |
+| **Active-learning failure corpus** (NC-9) | Misclassified / ungrounded verdicts captured as hard examples | Moderate |
+| **Energy-accounting ledger** (NC-11) | Per-run energy (Wh) + carbon (gCO2e) estimates | Low |
 | MLOps staging / training corpora | Synthetic + sanitized telemetry SFT records | Moderate |
 
 ## Retention & expiry
@@ -32,7 +35,10 @@ AI-relevant data stores in Sentinel Nexus. It addresses control item **NC-4**.
 | Cold storage | Per data-classification schedule (operator-set) | S3 lifecycle / partition pruning |
 | DR snapshots | 7 days local | `dr_snapshot` timer |
 | `nexus_swarm_memory` immunity points | **TTL-bounded** (default 30 d, `NEXUS_MEMORY_TTL_SECONDS`) | A point past TTL no longer grants auto-dismissal (control implemented; recall delegates to `memory_is_actionable`) |
-| Calibration / bias ledgers | Rolling; archived not deleted | Append-only files |
+| Calibration / bias / over-reliance ledgers | Rolling; archived not deleted | Append-only files |
+| Verdict-lineage ledger (NC-10) | Retained for the audit horizon; **never edited** (an edit breaks the hash chain by design) | Append-only, tamper-evident chain |
+| Active-learning failure corpus (NC-9) | Retained until consumed into a training run, then archived | Append-only JSONL |
+| Energy-accounting ledger (NC-11) | Rolling; aggregated into the metric plane | Append-only JSONL |
 
 **Membership-inference posture (MS-2.10-001).** `nexus_swarm_memory` stores embeddings
 of alert signatures. Risk: an adversary with read access could infer prior incidents.

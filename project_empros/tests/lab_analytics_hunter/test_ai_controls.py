@@ -266,3 +266,138 @@ class TestMemoryHomogenization:
     def test_empty_memory_is_not_homogenized(self):
         h = controls.memory_homogenization([])
         assert h["homogenized"] is False and h["total"] == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Wave 4 — remaining code-implementable AI 600-1 gaps
+#   NC-7  Automation-bias / over-reliance measurement (2.7 / MG-1.3-002, MP-3.4-005)
+#   NC-8  Active-learning failure capture            (2.2 / MG-4.1-004)
+#   NC-9  Tamper-evident verdict lineage             (2.8 Information Integrity)
+#   NC-10 Per-run inference energy accounting        (2.5 / MS-2.12-003)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ----------- NC-7: automation-bias / over-reliance --------------------------
+class TestOverReliance:
+    def _rec(self, ai_tp, conf, action, truth):
+        return controls.reliance_record(
+            {"is_true_positive": ai_tp, "confidence": conf}, action, truth)
+
+    def test_record_marks_accept_vs_override_and_ai_correctness(self):
+        r = self._rec(True, 0.9, "accept", "true_positive")
+        assert r["accepted"] is True and r["ai_tp"] is True
+        assert r["ground_truth_tp"] is True and r["ai_correct"] is True
+        o = self._rec(True, 0.9, "override", "false_positive")
+        assert o["accepted"] is False and o["ai_correct"] is False
+
+    def test_override_without_ground_truth_has_no_correctness(self):
+        r = self._rec(False, 0.3, "override", None)
+        assert r["accepted"] is False
+        assert "ai_correct" not in r and "ground_truth_tp" not in r
+
+    def test_automation_bias_flagged_when_humans_rubber_stamp_wrong_calls(self):
+        # AI wrong 6 times; operator accepted 5 of them -> high automation bias
+        recs = [self._rec(True, 0.95, "accept", "false_positive") for _ in range(5)]
+        recs += [self._rec(True, 0.95, "override", "false_positive")]      # caught 1
+        recs += [self._rec(True, 0.9, "accept", "true_positive") for _ in range(4)]  # correct accepts
+        rep = controls.over_reliance_report(recs, min_support=3)
+        assert rep["n_ai_wrong"] == 6
+        assert rep["automation_bias"] == pytest.approx(5 / 6, abs=1e-3)
+        assert rep["caught_rate"] == pytest.approx(1 / 6, abs=1e-3)
+        assert rep["flagged"] is True
+        assert any("automation" in r for r in rep["reasons"])
+
+    def test_healthy_oversight_is_not_flagged(self):
+        # operator catches most AI errors
+        recs = [self._rec(True, 0.9, "override", "false_positive") for _ in range(5)]
+        recs += [self._rec(True, 0.9, "accept", "true_positive") for _ in range(5)]
+        rep = controls.over_reliance_report(recs, min_support=3)
+        assert rep["automation_bias"] == pytest.approx(0.0, abs=1e-6)
+        assert rep["flagged"] is False
+
+    def test_acceptance_rises_with_confidence_band(self):
+        recs = [self._rec(True, 0.95, "accept", "true_positive") for _ in range(4)]
+        recs += [self._rec(True, 0.2, "override", "false_positive") for _ in range(4)]
+        rep = controls.over_reliance_report(recs)
+        assert rep["accept_rate_high_conf"] == pytest.approx(1.0)
+        assert rep["accept_rate_low_conf"] == pytest.approx(0.0)
+
+    def test_empty_is_safe(self):
+        rep = controls.over_reliance_report([])
+        assert rep["n"] == 0 and rep["flagged"] is False
+        assert rep["automation_bias"] is None
+
+
+# ----------- NC-8: active-learning failure capture --------------------------
+class TestActiveLearningFailure:
+    def test_misclassification_is_a_failure(self):
+        v = {"is_true_positive": True, "confidence": 0.9}
+        assert controls.is_model_failure(v, "false_positive") is True
+        rec = controls.failure_record(v, "false_positive", event_id="e1",
+                                      artifacts=["203.0.113.7"])
+        assert rec["reason"] == "misclassification"
+        assert rec["predicted_tp"] is True and rec["realized_tp"] is False
+        assert rec["artifacts"] == ["203.0.113.7"]
+
+    def test_grounding_violation_is_a_failure_even_if_class_matches(self):
+        v = {"is_true_positive": True, "confidence": 0.9}
+        assert controls.is_model_failure(v, "true_positive", grounding_violation=True) is True
+        rec = controls.failure_record(v, "true_positive", grounding_violation=True)
+        assert rec["reason"] == "ungrounded_evidence"
+
+    def test_correct_grounded_verdict_is_not_captured(self):
+        v = {"is_true_positive": True, "confidence": 0.9}
+        assert controls.is_model_failure(v, "true_positive") is False
+        assert controls.failure_record(v, "true_positive") is None
+
+    def test_no_ground_truth_and_no_grounding_issue_is_not_a_failure(self):
+        assert controls.is_model_failure({"is_true_positive": True}, None) is False
+
+
+# ----------- NC-9: tamper-evident verdict lineage ---------------------------
+class TestVerdictLineage:
+    def test_chain_links_and_verifies(self):
+        e1 = controls.lineage_entry(None, {"event_id": "a", "verdict": "tp"})
+        e2 = controls.lineage_entry(e1["entry_hash"], {"event_id": "b", "verdict": "fp"})
+        assert e1["prev_hash"] == controls.GENESIS_HASH
+        assert e2["prev_hash"] == e1["entry_hash"]
+        res = controls.verify_lineage([e1, e2])
+        assert res["valid"] is True and res["broken_at"] is None
+
+    def test_tampered_record_breaks_the_chain(self):
+        e1 = controls.lineage_entry(None, {"event_id": "a", "verdict": "tp"})
+        e2 = controls.lineage_entry(e1["entry_hash"], {"event_id": "b", "verdict": "fp"})
+        e2_tampered = dict(e2, record={"event_id": "b", "verdict": "tp"})  # flip verdict
+        res = controls.verify_lineage([e1, e2_tampered])
+        assert res["valid"] is False and res["broken_at"] == 1
+
+    def test_reordered_entries_break_the_chain(self):
+        e1 = controls.lineage_entry(None, {"i": 1})
+        e2 = controls.lineage_entry(e1["entry_hash"], {"i": 2})
+        res = controls.verify_lineage([e2, e1])
+        assert res["valid"] is False and res["broken_at"] == 0
+
+    def test_canonicalization_is_key_order_independent(self):
+        a = controls.lineage_entry(None, {"x": 1, "y": 2})
+        b = controls.lineage_entry(None, {"y": 2, "x": 1})
+        assert a["entry_hash"] == b["entry_hash"]
+
+    def test_empty_chain_is_valid(self):
+        assert controls.verify_lineage([])["valid"] is True
+
+
+# ----------- NC-10: per-run inference energy accounting ----------------------
+class TestInferenceEnergy:
+    def test_energy_and_carbon_math(self):
+        # 300 W for 1 h at PUE 1.5 -> 450 Wh; at 400 gCO2/kWh -> 180 g
+        r = controls.estimate_inference_energy(3600, 300, pue=1.5, grid_gco2_per_kwh=400.0)
+        assert r["energy_wh"] == pytest.approx(450.0, abs=1e-6)
+        assert r["co2e_g"] == pytest.approx(180.0, abs=1e-6)
+
+    def test_zero_and_negative_inputs_are_clamped(self):
+        r = controls.estimate_inference_energy(-5, -10)
+        assert r["energy_wh"] == 0.0 and r["co2e_g"] == 0.0
+
+    def test_pue_scales_overhead(self):
+        base = controls.estimate_inference_energy(3600, 100, pue=1.0)["energy_wh"]
+        pue2 = controls.estimate_inference_energy(3600, 100, pue=2.0)["energy_wh"]
+        assert pue2 == pytest.approx(2 * base)

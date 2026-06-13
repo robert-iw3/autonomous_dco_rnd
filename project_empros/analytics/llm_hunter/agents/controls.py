@@ -14,6 +14,8 @@ Implements:
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import os
 import re
@@ -329,4 +331,190 @@ def memory_homogenization(signatures, top_share_threshold: float = 0.5,
         "top_share": round(top_share, 4),
         "normalized_entropy": round(norm_entropy, 4),
         "homogenized": bool(homogenized),
+    }
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# NC-7 -- Automation-bias / over-reliance measurement
+#         (NIST MG-1.3-002, MP-3.4-005; Risk 2.7 Human-AI Configuration)
+#
+# Structural HitL is not enough: if operators rubber-stamp the swarm's verdicts
+# (especially confident ones), the human review is theatre. These measure the
+# *human side* -- whether operators accept or override, and, once ground truth is
+# known, how often a wrong AI call was accepted (automation bias) vs caught.
+# ───────────────────────────────────────────────────────────────────────────
+
+_OVERRIDE_ACTIONS = {"override", "overrode", "overruled", "reject", "rejected",
+                     "escalate", "escalated", "manual", "correct", "corrected"}
+
+
+def reliance_record(verdict: dict, operator_action: str,
+                    ground_truth_disposition=None) -> dict:
+    """One human-AI reliance data point: the AI verdict, whether the operator
+    accepted or overrode it, and (optionally) the eventual ground truth. Anything
+    not an explicit override counts as acceptance (the default, riskier posture)."""
+    v = verdict or {}
+    act = str(operator_action).strip().lower()
+    rec = {
+        "ai_tp": bool(v.get("is_true_positive")),
+        "ai_confidence": float(v.get("confidence", 0.0) or 0.0),
+        "accepted": act not in _OVERRIDE_ACTIONS,
+    }
+    if ground_truth_disposition is not None:
+        truth_tp = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+        rec["ground_truth_tp"] = truth_tp
+        rec["ai_correct"] = (rec["ai_tp"] == truth_tp)
+    return rec
+
+
+def over_reliance_report(records, high_conf: float = 0.8, min_support: int = 5,
+                         max_automation_bias: float = 0.5) -> dict:
+    """Automation-bias / over-reliance metrics over reliance records.
+
+    `automation_bias` = P(operator accepted | AI was wrong) -- the share of the
+    swarm's mistakes the human rubber-stamped (only defined where ground truth
+    exists). `caught_rate` = P(override | AI wrong). Acceptance is also split by AI
+    confidence band as a complementary automation-bias signal. A run is flagged
+    when automation_bias exceeds `max_automation_bias` with enough wrong-call
+    support.
+    """
+    recs = list(records or [])
+    n = len(recs)
+    base = {"n": n, "accept_rate": None, "override_rate": None,
+            "accept_rate_high_conf": None, "accept_rate_low_conf": None,
+            "n_ai_wrong": 0, "n_ai_correct": 0, "automation_bias": None,
+            "caught_rate": None, "over_distrust": None, "flagged": False, "reasons": []}
+    if n == 0:
+        return base
+
+    accepts = sum(1 for r in recs if r.get("accepted"))
+    base["accept_rate"] = round(accepts / n, 4)
+    base["override_rate"] = round((n - accepts) / n, 4)
+
+    hi = [r for r in recs if r.get("ai_confidence", 0.0) >= high_conf]
+    lo = [r for r in recs if r.get("ai_confidence", 0.0) < high_conf]
+    if hi:
+        base["accept_rate_high_conf"] = round(sum(1 for r in hi if r.get("accepted")) / len(hi), 4)
+    if lo:
+        base["accept_rate_low_conf"] = round(sum(1 for r in lo if r.get("accepted")) / len(lo), 4)
+
+    truthed = [r for r in recs if "ai_correct" in r]
+    wrong = [r for r in truthed if not r["ai_correct"]]
+    right = [r for r in truthed if r["ai_correct"]]
+    base["n_ai_wrong"], base["n_ai_correct"] = len(wrong), len(right)
+    if wrong:
+        base["automation_bias"] = round(sum(1 for r in wrong if r.get("accepted")) / len(wrong), 4)
+        base["caught_rate"] = round(sum(1 for r in wrong if not r.get("accepted")) / len(wrong), 4)
+    if right:
+        base["over_distrust"] = round(sum(1 for r in right if not r.get("accepted")) / len(right), 4)
+
+    reasons = []
+    if base["automation_bias"] is not None and len(wrong) >= min_support \
+            and base["automation_bias"] > max_automation_bias:
+        reasons.append(f"automation-bias {base['automation_bias']} of {len(wrong)} wrong AI calls "
+                       f"were accepted (> {max_automation_bias})")
+    base["reasons"] = reasons
+    base["flagged"] = bool(reasons)
+    return base
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# NC-8 -- Active-learning failure capture (NIST MG-4.1-004, Risk 2.2 Confabulation)
+#
+# Turn the swarm's mistakes into training signal: when an operator's ground truth
+# contradicts the verdict, or the verdict cited ungrounded evidence, emit a
+# structured hard example for the MLOps continuous-improvement corpus.
+# ───────────────────────────────────────────────────────────────────────────
+
+def is_model_failure(verdict: dict, ground_truth_disposition=None,
+                     grounding_violation: bool = False) -> bool:
+    """True if this verdict is a captured failure: an ungrounded citation, or a
+    class mismatch against operator ground truth (when ground truth is known)."""
+    if grounding_violation:
+        return True
+    if ground_truth_disposition is None:
+        return False
+    truth_tp = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+    return bool((verdict or {}).get("is_true_positive")) != truth_tp
+
+
+def failure_record(verdict: dict, ground_truth_disposition=None,
+                   grounding_violation: bool = False, event_id: str = "",
+                   artifacts=None) -> dict | None:
+    """Structured hard-example record, or None if the verdict was not a failure."""
+    if not is_model_failure(verdict, ground_truth_disposition, grounding_violation):
+        return None
+    v = verdict or {}
+    realized = None
+    if ground_truth_disposition is not None:
+        realized = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+    return {
+        "event_id": event_id,
+        "predicted_tp": bool(v.get("is_true_positive")),
+        "predicted_confidence": float(v.get("confidence", 0.0) or 0.0),
+        "realized_tp": realized,
+        "reason": "ungrounded_evidence" if grounding_violation else "misclassification",
+        "artifacts": sorted(set(artifacts or [])),
+    }
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# NC-9 -- Tamper-evident verdict lineage (Risk 2.8 Information Integrity)
+#
+# An append-only SHA-256 hash chain over verdict/audit records: each entry binds
+# the previous entry's hash, so any post-hoc edit, deletion, or reorder breaks the
+# chain. Gives autonomous-containment decisions a verifiable, tamper-evident trail.
+# ───────────────────────────────────────────────────────────────────────────
+
+GENESIS_HASH = "0" * 64
+
+
+def _canonical(record) -> str:
+    return json.dumps(record, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _entry_hash(prev_hash: str, record) -> str:
+    return hashlib.sha256((prev_hash + _canonical(record)).encode("utf-8")).hexdigest()
+
+
+def lineage_entry(prev_hash, record) -> dict:
+    """Build one chain entry linking `record` to `prev_hash` (genesis if None)."""
+    prev = prev_hash or GENESIS_HASH
+    return {"record": record, "prev_hash": prev, "entry_hash": _entry_hash(prev, record)}
+
+
+def verify_lineage(entries) -> dict:
+    """Verify the hash chain. Returns the first broken index (or None if valid)."""
+    prev = GENESIS_HASH
+    for i, e in enumerate(entries or []):
+        if e.get("prev_hash") != prev:
+            return {"valid": False, "broken_at": i, "reason": "prev_hash mismatch"}
+        if e.get("entry_hash") != _entry_hash(prev, e.get("record")):
+            return {"valid": False, "broken_at": i, "reason": "entry_hash mismatch"}
+        prev = e["entry_hash"]
+    return {"valid": True, "broken_at": None, "reason": ""}
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# NC-10 -- Per-run inference energy accounting (NIST MS-2.12-003, Risk 2.5)
+#
+# Folds the one-time footprint estimate (NC-6) into a per-run measurement:
+# energy = power x time x PUE; carbon from a grid intensity factor. Deterministic;
+# assumptions are documented in governance/environmental_impact_estimate.md.
+# ───────────────────────────────────────────────────────────────────────────
+
+def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,
+                              grid_gco2_per_kwh: float = 400.0) -> dict:
+    """Per-run energy (Wh) and carbon (gCO2e) estimate. Negative inputs clamp to 0."""
+    duration_s = max(0.0, float(duration_s))
+    avg_power_w = max(0.0, float(avg_power_w))
+    pue = float(pue)
+    energy_wh = avg_power_w * (duration_s / 3600.0) * pue
+    co2e_g = (energy_wh / 1000.0) * float(grid_gco2_per_kwh)
+    return {
+        "energy_wh": round(energy_wh, 6),
+        "co2e_g": round(co2e_g, 6),
+        "duration_s": duration_s,
+        "avg_power_w": avg_power_w,
+        "pue": pue,
     }

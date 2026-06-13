@@ -220,6 +220,70 @@ controls:
       csf_2_0: [GV]
     owner: AI Governance
 
+  # -- NIST AI 600-1 wave 4 (close remaining code-implementable gaps) ----------
+  - id: NC-8-OVER-RELIANCE
+    title: Automation-bias / over-reliance measurement
+    category: NIST AI 600-1
+    status: implemented
+    description: Measures the human side of HitL — accept-vs-override and how often a wrong AI
+      call is rubber-stamped (automation bias), by AI-confidence band, over operator dispositions.
+    implementation: analytics/llm_hunter/agents/calibration_ledger.py
+    tests:
+    - tests/lab_analytics_hunter/test_ai_controls.py::TestOverReliance
+    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestRelianceLedger
+    frameworks:
+      nist_ai_600_1: [MG-1.3-002, MP-3.4-005]
+      sp_800_53: [AU-6, CA-7]
+      csf_2_0: [GV, DE]
+    owner: AI Governance
+
+  - id: NC-9-ACTIVE-LEARNING
+    title: Active-learning failure capture
+    category: NIST AI 600-1
+    status: implemented
+    description: Captures the swarm's misclassifications + ungrounded-evidence verdicts as a
+      structured hard-example corpus for MLOps continuous improvement.
+    implementation: analytics/llm_hunter/agents/active_learning.py
+    tests:
+    - tests/lab_analytics_hunter/test_ai_controls.py::TestActiveLearningFailure
+    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestActiveLearning
+    frameworks:
+      nist_ai_600_1: [MG-4.1-004]
+      sp_800_53: [CA-7, SI-4]
+      csf_2_0: [ID, DE]
+    owner: AI Governance
+
+  - id: NC-10-VERDICT-LINEAGE
+    title: Tamper-evident verdict lineage
+    category: NIST AI 600-1
+    status: implemented
+    description: Append-only SHA-256 hash chain over verdict/audit records; any post-hoc edit,
+      deletion, or reorder breaks verification — a tamper-evident trail for autonomous decisions.
+    implementation: analytics/llm_hunter/agents/verdict_ledger.py
+    tests:
+    - tests/lab_analytics_hunter/test_ai_controls.py::TestVerdictLineage
+    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestVerdictLedger
+    frameworks:
+      nist_ai_600_1: [MS-2.8-003]
+      sp_800_53: [AU-9, AU-10, SI-7]
+      csf_2_0: [PR, DE]
+    owner: AI Governance
+
+  - id: NC-11-ENERGY-ACCOUNTING
+    title: Per-run inference energy accounting
+    category: NIST AI 600-1
+    status: implemented
+    description: Folds the one-time footprint estimate (NC-6) into a per-run energy (Wh) + carbon
+      (gCO2e) measurement the MLOps metric plane rolls up.
+    implementation: analytics/llm_hunter/agents/energy_accounting.py
+    tests:
+    - tests/lab_analytics_hunter/test_ai_controls.py::TestInferenceEnergy
+    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestEnergyAccounting
+    frameworks:
+      nist_ai_600_1: [MS-2.12-003]
+      csf_2_0: [GV]
+    owner: AI Governance
+
   # -- SIEM-federated investigation (WS-G) ------------------------------------
   - id: SIEM-TOOL-GUARD
     title: SIEM query tool — read-only / bounded / allowlist
