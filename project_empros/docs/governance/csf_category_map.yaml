@@ -1,0 +1,48 @@
+# NIST CSF 2.0 — control → category mapping (category granularity)
+#
+# Each manifest control is mapped to the CSF 2.0 *category(ies)* it most directly
+# realises. Categories (22) are coarse enough to be asserted with confidence for a
+# technical platform; subcategory-level mapping is left to the SSP narrative.
+#
+# Authoritative category ids/titles: _oscal_csf_v2.0.json (NIST OSCAL v1.4.0).
+# Validated by tests/lab_analytics_hunter/test_governance_manifest.py:
+#   * every category id here must exist in the CSF 2.0 catalog;
+#   * every control id here must exist in controls_manifest.yaml (and vice-versa).
+#
+# Categories deliberately NOT covered by a code control (GV.OC, GV.RM, ID.RA,
+# PR.AT, RS.MA, RS.CO, RC.CO) are organizational/process categories addressed by
+# the policy layer (System Security Plan, AI Incident Response Plan, Applicability
+# Determinations) rather than by software — see applicability_matrix.md.
+
+map:
+  SEC-CANARY:                [DE.CM, PR.DS]
+  SEC-SANITIZER:             [PR.PS]
+  SEC-DUCKDB-SANDBOX:        [PR.AA, PR.PS]
+  SEC-OUTPUT-SCHEMA:         [PR.PS, RS.MI]
+  SEC-SUPPLY-CHAIN:          [GV.SC, PR.PS]
+  SEC-REGRESSION-GATE:       [ID.IM, PR.PS]
+  AI-REVIEW-BOARD:           [DE.AE, RS.AN]
+  AI-GROUNDING:              [DE.AE]
+  AI-MEMORY-TTL:             [PR.DS]
+  AI-PROVENANCE:             [GV.RR]
+  NC-1-BIAS-AUDIT:           [GV.OV, DE.CM]
+  NC-2-CALIBRATION:          [GV.OV, ID.IM]
+  NC-3-FRONTIER-PIN:         [GV.SC, ID.AM]
+  NC-4-RETENTION:            [GV.PO, PR.DS]
+  NC-6-ENERGY:               [GV.OV]
+  SIEM-TOOL-GUARD:           [DE.CM, PR.AA]
+  SIEM-CONFIG-CONTRACT:      [ID.AM]
+  SIEM-COUNTERPART-DISPROOF: [DE.AE]
+  SIEM-E2E:                  [DE.CM]
+  ING-ZERO-TRUST:            [PR.AA, PR.DS, DE.CM]
+  ING-DLQ-BREAKER:           [DE.CM, RC.RP]
+  IAC-HARDENING:             [PR.PS, PR.AA, DE.CM]
+  SEC-MODEL-DOS:             [PR.IR, DE.CM]
+  SEC-RLHF-QUARANTINE:       [PR.DS, DE.CM]
+  SEC-DLP-EGRESS:            [PR.DS]
+  SEC-TRAINING-HYGIENE:      [PR.DS]
+  SEC-BLAST-RADIUS:          [RS.MI, PR.IR]
+  SEC-FAILOVER:              [RC.RP, PR.IR]
+  SEC-IDEMPOTENT-SOAR:       [RS.MI]
+  SEC-VECTOR-DIM:            [PR.DS]
+  SEC-ENDPOINT-ID:           [PR.AA]

@@ -132,6 +132,95 @@ class TestOscalAlignment:
         assert not bad, f"manifest references SP 800-53 controls absent from OSCAL rev5: {bad}"
 
 
+class TestCsfAlignment:
+    """CSF 2.0 category map must be coherent with the authoritative catalog + manifest."""
+
+    CSF = gg.load_csf()
+    CSF_MAP = gg.load_csf_map()
+
+    def test_csf_catalog_present(self):
+        assert self.CSF.get("v2_categories"), "CSF 2.0 OSCAL cache missing/empty"
+        assert len(self.CSF["v2_categories"]) == 22, "CSF 2.0 has 22 categories"
+
+    def test_mapped_categories_are_real(self):
+        valid = set(self.CSF.get("v2_categories", []))
+        bad = []
+        for cid, cats in self.CSF_MAP.items():
+            for cat in (cats or []):
+                if cat not in valid:
+                    bad.append((cid, cat))
+        assert not bad, f"csf_category_map references categories absent from CSF 2.0 catalog: {bad}"
+
+    def test_map_control_ids_exist(self):
+        ids = {c["id"] for c in CONTROLS}
+        unknown = sorted(set(self.CSF_MAP) - ids)
+        assert not unknown, f"csf_category_map references unknown control ids: {unknown}"
+
+    def test_every_control_has_a_csf_category(self):
+        ids = {c["id"] for c in CONTROLS}
+        unmapped = sorted(ids - set(self.CSF_MAP))
+        assert not unmapped, f"controls with no CSF 2.0 category mapping: {unmapped}"
+
+    def test_matrix_has_csf_coverage_view(self):
+        mat = gg.render_matrix(MANIFEST, OSCAL, REF)
+        assert "## NIST CSF 2.0 — Function & Category Coverage" in mat
+        # the seven process-layer categories must be surfaced as Process, not silently dropped
+        assert "_policy / process — see SSP_" in mat
+
+    def test_catalog_has_csf_category_xref(self):
+        out = gg.render_catalog(MANIFEST, OSCAL)
+        assert "### NIST CSF 2.0 Category" in out
+
+
+class TestControlEvidence:
+    """The code-evidence dossier must resolve against real source and stay in sync."""
+
+    import importlib  # noqa
+    ge = __import__("gen_evidence")
+    EVID = ge.load_evidence_map()
+
+    def test_evidence_map_present(self):
+        assert self.EVID, "evidence_map.yaml missing/empty"
+
+    def test_evidence_control_ids_exist(self):
+        ids = {c["id"] for c in CONTROLS}
+        unknown = sorted(set(self.EVID) - ids)
+        assert not unknown, f"evidence_map references unknown control ids: {unknown}"
+
+    def test_every_anchor_resolves(self):
+        """Each cited anchor must exist in its file (snippet tracks the code)."""
+        bad = []
+        for cid, entries in self.EVID.items():
+            for e in entries:
+                try:
+                    lang, citation, snippet = self.ge.extract_snippet(e)
+                    assert snippet.strip(), f"{cid}: empty snippet for {e.get('anchor')!r}"
+                except self.ge.AnchorError as err:
+                    bad.append((cid, str(err)))
+        assert not bad, f"evidence anchors no longer resolve (regenerate): {bad}"
+
+    def test_implemented_controls_have_code_evidence(self):
+        """Every 'implemented' control whose impl is code (not a pure-doc) must cite evidence."""
+        missing = []
+        for c in CONTROLS:
+            if c["status"] != "implemented":
+                continue
+            impls = c["implementation"]
+            impls = [impls] if isinstance(impls, str) else impls
+            if all(p.endswith(".md") for p in impls):   # pure documentation control
+                continue
+            if c["id"] not in self.EVID:
+                missing.append(c["id"])
+        assert not missing, f"implemented code controls with no extracted evidence: {missing}"
+
+    def test_artifacts_in_sync(self):
+        """artifacts/*.md and control_evidence.md must match a fresh extraction."""
+        outputs = self.ge.build_outputs()
+        stale = [p.name for p, exp in outputs.items()
+                 if (p.read_text() if p.exists() else "") != exp]
+        assert not stale, f"evidence artifacts STALE -- run gen_evidence.py: {stale}"
+
+
 class TestApplicabilityMatrix:
     def test_reference_items_have_required_fields(self):
         for fw in ("owasp_llm", "atlas"):

@@ -71,6 +71,42 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | SI | System and Information Integrity | SI-10, SI-12, SI-16, SI-3, SI-4, SI-7 |
 | SR | Supply Chain Risk Management | SR-11, SR-3, SR-4 |
 
+\newpage
+
+## NIST CSF 2.0 — Function & Category Coverage
+
+*Authoritative function/category titles from NIST OSCAL v1.4.0 (CSF 2.0). Controls are mapped at **category** granularity in `csf_category_map.yaml`.*
+
+*Of the **22** CSF 2.0 categories, **15** are realised by a technical control; the remaining **7** are organizational / process categories carried by the policy layer (System Security Plan, AI Incident Response Plan, Applicability Determinations) rather than by software.*
+
+| Fn | Category | Title | Realised by | Coverage |
+|---|---|---|---|---|
+| GV Govern | GV.OC | Organizational Context | _policy / process — see SSP_ | Process |
+| GV Govern | GV.OV | Oversight | NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-6-ENERGY | Technical |
+| GV Govern | GV.PO | Policy | NC-4-RETENTION | Technical |
+| GV Govern | GV.RM | Risk Management Strategy | _policy / process — see SSP_ | Process |
+| GV Govern | GV.RR | Roles, Responsibilities & Authorities | AI-PROVENANCE | Technical |
+| GV Govern | GV.SC | Cybersecurity Supply Chain Risk Mgmt | NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN | Technical |
+| ID Identify | ID.AM | Asset Management | NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT | Technical |
+| ID Identify | ID.IM | Improvement | NC-2-CALIBRATION, SEC-REGRESSION-GATE | Technical |
+| ID Identify | ID.RA | Risk Assessment | _policy / process — see SSP_ | Process |
+| PR Protect | PR.AA | Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD | Technical |
+| PR Protect | PR.AT | Awareness & Training | _policy / process — see SSP_ | Process |
+| PR Protect | PR.DS | Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM | Technical |
+| PR Protect | PR.IR | Technology Infrastructure Resilience | SEC-BLAST-RADIUS, SEC-FAILOVER, SEC-MODEL-DOS | Technical |
+| PR Protect | PR.PS | Platform Security | IAC-HARDENING, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-SANITIZER, SEC-SUPPLY-CHAIN | Technical |
+| DE Detect | DE.AE | Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, SIEM-COUNTERPART-DISPROOF | Technical |
+| DE Detect | DE.CM | Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD | Technical |
+| RS Respond | RS.AN | Incident Analysis | AI-REVIEW-BOARD | Technical |
+| RS Respond | RS.CO | Incident Response Reporting & Comms | _policy / process — see SSP_ | Process |
+| RS Respond | RS.MA | Incident Management | _policy / process — see SSP_ | Process |
+| RS Respond | RS.MI | Incident Mitigation | SEC-BLAST-RADIUS, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA | Technical |
+| RC Recover | RC.CO | Incident Recovery Comms | _policy / process — see SSP_ | Process |
+| RC Recover | RC.RP | Incident Recovery Plan Execution | ING-DLQ-BREAKER, SEC-FAILOVER | Technical |
+
+**Process-layer categories** (no code control by design): GV.OC Organizational Context, GV.RM Risk Management Strategy, ID.RA Risk Assessment, PR.AT Awareness & Training, RC.CO Incident Recovery Comms, RS.CO Incident Response Reporting & Comms, RS.MA Incident Management. These are addressed as policy/governance obligations in the System Security Plan and supporting governance documents, consistent with a defensive SOC platform whose mission, risk-tolerance, workforce-training, and incident-management *processes* are organizational rather than implemented in the codebase.
+
+
 ## NIST AI 600-1 (GenAI Profile)
 
 The 12 GAI risk families and their coverage/gaps are maintained in `../nist_ai_600_1_control_tracker.md` §1 (e.g. Confabulation, Bias/Homogenization, and Value-Chain are the active high-exposure areas; CBRN/CSAM/violent/IP are N-A per the Applicability Determinations).

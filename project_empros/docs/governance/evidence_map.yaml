@@ -1,0 +1,166 @@
+# Control → code-evidence map.
+#
+# Each control points at the *actual* source that satisfies it. gen_evidence.py
+# extracts a snippet anchored on a unique substring (so the evidence tracks the
+# code: if the anchor moves or is renamed, the drift test fails and the artifact
+# must be regenerated). A control may cite several snippets across several files —
+# the "culmination" that together answers the control.
+#
+# entry fields:
+#   file    – path relative to project_empros/
+#   anchor  – a unique substring on the first line of the snippet
+#   before  – context lines to include *above* the anchor line (default 0)
+#   after   – lines to include *below* the anchor line (default 0)
+#   caption – how this snippet answers the control
+#
+# Validated by tests/lab_analytics_hunter/test_governance_manifest.py
+# (anchor must resolve; file must exist; every cited control must be in the manifest).
+# Pure-documentation controls (no code) are intentionally absent and rendered as
+# "documentation control" pointing at their governance artifact.
+
+evidence:
+  SEC-CANARY:
+    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def generate_canary", after: 9,
+       caption: "Per-investigation canary token minted and embedded in the system context; its later appearance on any outbound surface is the prompt-leak tripwire."}
+    - {file: analytics/llm_hunter/orchestrator.py, anchor: "canary = CognitiveSanitizer.generate_canary()", before: 0, after: 0,
+       caption: "Orchestrator mints the canary at swarm start…"}
+    - {file: analytics/llm_hunter/orchestrator.py, anchor: "OWASP LLM01: verify the canary did not leak", before: 0, after: 3,
+       caption: "…and verifies it never leaked into any outbound surface before the verdict is released."}
+
+  SEC-SANITIZER:
+    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def neutralize_string", after: 24,
+       caption: "Untrusted text is stripped of control characters and prompt-injection delimiters before it can reach an LLM context."}
+    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def wrap_untrusted", after: 8,
+       caption: "All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions."}
+
+  SEC-DUCKDB-SANDBOX:
+    - {file: analytics/llm_hunter/tools/duckdb_query.py, anchor: "def _run(self, reasoning: str, query: str)", after: 26,
+       caption: "The data-lake query tool rejects anything but read-only SELECT and runs against a read-only connection — the agent cannot mutate the lake."}
+
+  SEC-OUTPUT-SCHEMA:
+    - {file: analytics/llm_hunter/state.py, anchor: "class SoarExecutionSchema", after: 35,
+       caption: "SOAR actions must satisfy a strict Pydantic contract (enumerated action, validated targets) before any response is dispatched."}
+
+  SEC-SUPPLY-CHAIN:
+    - {file: mlops/serve_vllm.sh, anchor: "verify_integrity() {", after: 18,
+       caption: "Every model is SHA-384-verified against a signed integrity manifest before it is served; a mismatch aborts the launch."}
+
+  SEC-REGRESSION-GATE:
+    - {file: mlops/scripts/03_eval_model.py, anchor: "def run_regression_suite", after: 26,
+       caption: "Deterministic regression suite gates promotion: a candidate that regresses against the locked thresholds cannot be deployed."}
+
+  AI-REVIEW-BOARD:
+    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def aggregate_board", after: 28,
+       caption: "Adversarial board aggregation is a pure, deterministic decision rule over per-expert counterpart rebuttals — no model can unilaterally confirm a verdict."}
+
+  AI-GROUNDING:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def enforce_grounding", after: 30,
+       caption: "Every cited artifact in a verdict must trace to the assembled evidence corpus; ungrounded (confabulated) claims are flagged and the verdict is demoted."}
+
+  AI-MEMORY-TTL:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def memory_is_actionable", after: 28,
+       caption: "Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions."}
+
+  AI-PROVENANCE:
+    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def stamp_ai_provenance", after: 14,
+       caption: "Machine-generated narrative is stamped with an explicit AI-origin disclosure before it leaves the system."}
+
+  NC-1-BIAS-AUDIT:
+    - {file: analytics/llm_hunter/agents/bias_audit.py, anchor: "def run_bias_audit", after: 22,
+       caption: "Scheduled audit computes per-dimension disparity and memory-homogenization metrics over the immunity store to detect bias/monoculture drift."}
+
+  NC-2-CALIBRATION:
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def record_disposition", after: 12,
+       caption: "Each verdict's stated confidence is recorded against the operator's ground-truth disposition…"}
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def brier_trend", after: 22,
+       caption: "…and the Brier-score trend is computed so miscalibration is measurable and trackable over time."}
+
+  NC-3-FRONTIER-PIN:
+    - {file: analytics/llm_hunter/agents/llm_providers.py, anchor: "def frontier_pin_allowed", after: 13,
+       caption: "A frontier (hosted) model with a floating/unpinned version is rejected at boot unless an explicit override is set — no silent model drift."}
+
+  SIEM-TOOL-GUARD:
+    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def validate_readonly", after: 18,
+       caption: "Only read-only search verbs are permitted; any mutating/command pipeline is rejected."}
+    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def validate_indexes", after: 12,
+       caption: "Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data."}
+    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def enforce_bounds", after: 18,
+       caption: "Every query is force-bounded by a time window and a max-row cap before execution."}
+
+  SIEM-CONFIG-CONTRACT:
+    - {file: analytics/llm_hunter/tools/nexus_config.py, anchor: "def get_siem_config", after: 30,
+       caption: "SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist."}
+
+  SIEM-COUNTERPART-DISPROOF:
+    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def build_prevalence_query", after: 10,
+       caption: "The counterpart builds a prevalence query over allowlisted indexes…"}
+    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def _counterpart_siem_lookup", after: 28,
+       caption: "…and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates."}
+
+  SIEM-E2E:
+    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, anchor: "def test_fanned_out_event_is_retrievable_via_swarm_pivot", after: 6,
+       caption: "Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production."}
+    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, anchor: "def test_fanned_out_event_retrievable_via_esql", after: 5,
+       caption: "Same conservation guarantee on the Elastic (ECS) path via ES|QL."}
+
+  ING-ZERO-TRUST:
+    - {file: services/core_ingress/src/integrity.rs, anchor: "fn compute_hmac", after: 12,
+       caption: "Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage."}
+    - {file: services/core_ingress/src/integrity.rs, anchor: "fn constant_time_eq", after: 10,
+       caption: "HMAC comparison is constant-time, closing the timing-oracle side channel."}
+    - {file: services/core_ingress/src/integrity.rs, anchor: "fn record_sequence", after: 18,
+       caption: "A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense."}
+
+  ING-DLQ-BREAKER:
+    - {file: libs/lib_siem_core/src/lib.rs, anchor: "fn adaptive_deadline", after: 16,
+       caption: "Workers adapt their batch deadline to observed queue depth; combined with the circuit-breaker pause and dead-letter prefix below, a failing downstream is isolated rather than amplified."}
+    - {file: libs/lib_siem_core/src/lib.rs, anchor: "dlq_prefix: \"nexus.dlq\".into()", before: 2, after: 4,
+       caption: "Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-lettered and the worker backs off instead of hot-looping."}
+
+  IAC-HARDENING:
+    - {file: hardening/tasks/main.yml, anchor: "Apply kernel and sysctl hardening", before: 1, after: 1,
+       caption: "Ansible baseline applies kernel/sysctl hardening…"}
+    - {file: hardening/tasks/main.yml, anchor: "Apply firewall configuration", before: 0, after: 2,
+       caption: "…a default-deny firewall…"}
+    - {file: hardening/tasks/main.yml, anchor: "Apply audit rules", before: 0, after: 1,
+       caption: "…and host audit rules — declaratively and idempotently across the fleet."}
+
+  SEC-MODEL-DOS:
+    - {file: analytics/llm_hunter/orchestrator.py, anchor: "MAX_CONCURRENT_INVESTIGATIONS = int", after: 0,
+       caption: "A hard concurrency ceiling on simultaneous investigations…"}
+    - {file: analytics/llm_hunter/orchestrator.py, anchor: "_investigation_sema = asyncio.Semaphore", after: 0,
+       caption: "…enforced by a semaphore acquired before any LLM work — bounding model-denial-of-service blast."}
+    - {file: analytics/llm_hunter/orchestrator.py, anchor: "async with _investigation_sema", after: 1,
+       caption: "The semaphore gates every investigation entry point."}
+
+  SEC-RLHF-QUARANTINE:
+    - {file: services/worker_rlhf/src/main.rs, anchor: "nexus_rlhf_operator_quarantined_total", before: 22, after: 4,
+       caption: "Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the RLHF corpus."}
+
+  SEC-DLP-EGRESS:
+    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def scrub_outbound_dlp", after: 14,
+       caption: "Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing sovereign data isolation."}
+
+  SEC-TRAINING-HYGIENE:
+    - {file: mlops/scripts/01_spool_datasets.py, anchor: "def _vault_secret", before: 2, after: 9,
+       caption: "Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code."}
+
+  SEC-BLAST-RADIUS:
+    - {file: analytics/llm_hunter/state.py, anchor: "def merge_entities", after: 30,
+       caption: "Entity state is a monotonic, conflict-resolving state machine; containment status only escalates, capping the blast radius of any single action."}
+
+  SEC-FAILOVER:
+    - {file: analytics/llm_hunter/agents/llm_providers.py, anchor: "def build_failover_chain", after: 25,
+       caption: "Providers are composed into a cascading failover chain that degrades toward the sovereign on-prem model rather than failing open."}
+
+  SEC-IDEMPOTENT-SOAR:
+    - {file: analytics/llm_hunter/agents/response.py, anchor: "idempotency_key", before: 2, after: 1,
+       caption: "Each SOAR dispatch carries a deterministic idempotency key (target + quantised window) so a retried response cannot double-execute."}
+
+  SEC-VECTOR-DIM:
+    - {file: analytics/llm_hunter/tools/qdrant_search.py, anchor: "dim_map = {", after: 14,
+       caption: "Vector searches are validated against the expected per-collection dimensionality; a wrong-dimension probe is rejected before it hits the store."}
+
+  SEC-ENDPOINT-ID:
+    - {file: libs/lib_siem_core/src/models.rs, anchor: "pub struct DynamicUebaVector", after: 6,
+       caption: "Endpoint identifiers are validated against a strict regex at the type boundary, defeating identity-injection via malformed endpoint_id."}

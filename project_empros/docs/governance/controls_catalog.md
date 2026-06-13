@@ -128,6 +128,26 @@ Five lenses on one register — locating a control via any framework surfaces it
 | RS Respond | AI-REVIEW-BOARD, SEC-BLAST-RADIUS, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA |
 | RC Recover | ING-DLQ-BREAKER, SEC-FAILOVER |
 
+### NIST CSF 2.0 Category
+
+| Category · title | Controls |
+|---|---|
+| GV.OV · Oversight | NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-6-ENERGY |
+| GV.PO · Policy | NC-4-RETENTION |
+| GV.RR · Roles, Responsibilities & Authorities | AI-PROVENANCE |
+| GV.SC · Cybersecurity Supply Chain Risk Mgmt | NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN |
+| ID.AM · Asset Management | NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT |
+| ID.IM · Improvement | NC-2-CALIBRATION, SEC-REGRESSION-GATE |
+| PR.AA · Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD |
+| PR.DS · Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM |
+| PR.IR · Technology Infrastructure Resilience | SEC-BLAST-RADIUS, SEC-FAILOVER, SEC-MODEL-DOS |
+| PR.PS · Platform Security | IAC-HARDENING, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-SANITIZER, SEC-SUPPLY-CHAIN |
+| DE.AE · Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, SIEM-COUNTERPART-DISPROOF |
+| DE.CM · Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD |
+| RS.AN · Incident Analysis | AI-REVIEW-BOARD |
+| RS.MI · Incident Mitigation | SEC-BLAST-RADIUS, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA |
+| RC.RP · Incident Recovery Plan Execution | ING-DLQ-BREAKER, SEC-FAILOVER |
+
 ### NIST SP 800-53 Rev. 5
 
 | Control · OSCAL title | Controls |
@@ -170,6 +190,9 @@ Five lenses on one register — locating a control via any framework surfaces it
 
 ## Control Detail
 
+Each implemented control's *proving code* is extracted verbatim (cited by `file:line`) into the **Control Evidence Dossier** (`control_evidence.pdf`) and, per control, under `artifacts/`.
+
+
 ### AI Security
 
 **SEC-BLAST-RADIUS — Blast-radius cap & entity state machine** *(status: implemented; owner: Platform Engineering)*
@@ -178,6 +201,7 @@ MAX_ENTITIES cap (in-node), GLOBAL_DO_NOT_PIVOT drop at reduce, severity-monoton
 
 - Implementation: `analytics/llm_hunter/state.py`
 - Tests: `tests/lab_analytics_hunter/test_hunter_contracts.py`
+- Code evidence: `artifacts/SEC-BLAST-RADIUS.md` (extracted snippets)
 
 **SEC-CANARY — Canary token prompt-leak tripwire** *(status: implemented; owner: Platform Engineering)*
 
@@ -185,6 +209,7 @@ UUID canary injected into agent prompts; a leak in any output halts the SOAR pip
 
 - Implementation: `analytics/llm_hunter/tools/sanitizer.py`
 - Tests: `tests/lab_agentic_swarm/test_agentic_swarm_contracts.py`
+- Code evidence: `artifacts/SEC-CANARY.md` (extracted snippets)
 
 **SEC-DLP-EGRESS — Outbound DLP / sovereign data isolation** *(status: implemented; owner: Platform Engineering)*
 
@@ -192,6 +217,7 @@ CognitiveSanitizer scrubs RFC-1918 ranges + high-entropy credentials from any pa
 
 - Implementation: `analytics/llm_hunter/tools/sanitizer.py`
 - Tests: `tests/lab_redteam/test_cognitive_bypass.py`
+- Code evidence: `artifacts/SEC-DLP-EGRESS.md` (extracted snippets)
 
 **SEC-DUCKDB-SANDBOX — Read-only data-lake query sandbox** *(status: implemented; owner: Platform Engineering)*
 
@@ -199,6 +225,7 @@ Ephemeral in-memory DuckDB, destructive-keyword + local-FS block, auto LIMIT, pe
 
 - Implementation: `analytics/llm_hunter/tools/duckdb_query.py`
 - Tests: `tests/lab_analytics_hunter/test_query_cookbook.py`
+- Code evidence: `artifacts/SEC-DUCKDB-SANDBOX.md` (extracted snippets)
 
 **SEC-FAILOVER — Cascading LLM failover & sovereign degradation** *(status: implemented; owner: Platform Engineering)*
 
@@ -206,6 +233,7 @@ Per-node provider failover chain; total failure emits a safe default verdict (mo
 
 - Implementation: `analytics/llm_hunter/agents/llm_providers.py`
 - Tests: `tests/test_worker_contracts.py`
+- Code evidence: `artifacts/SEC-FAILOVER.md` (extracted snippets)
 
 **SEC-IDEMPOTENT-SOAR — Idempotent SOAR execution & deduplication** *(status: implemented; owner: Platform Engineering)*
 
@@ -213,6 +241,7 @@ Per-node provider failover chain; total failure emits a safe default verdict (mo
 
 - Implementation: `analytics/llm_hunter/agents/response.py`
 - Tests: `tests/lab_agentic_swarm/test_agentic_swarm_contracts.py`
+- Code evidence: `artifacts/SEC-IDEMPOTENT-SOAR.md` (extracted snippets)
 
 **SEC-MODEL-DOS — Model denial-of-service bounding** *(status: implemented; owner: Platform Engineering)*
 
@@ -220,6 +249,7 @@ LangGraph recursion_limit + absolute asyncio timeouts bound execution; neutraliz
 
 - Implementation: `analytics/llm_hunter/orchestrator.py`
 - Tests: `tests/lab_agentic_swarm/test_agentic_swarm_contracts.py`
+- Code evidence: `artifacts/SEC-MODEL-DOS.md` (extracted snippets)
 
 **SEC-OUTPUT-SCHEMA — Strict SOAR output-contract enforcement** *(status: implemented; owner: Platform Engineering)*
 
@@ -227,6 +257,7 @@ All execution plans validated against SoarExecutionSchema (blast-radius cap, enu
 
 - Implementation: `analytics/llm_hunter/state.py`
 - Tests: `tests/lab_agentic_swarm/test_agentic_swarm_contracts.py`
+- Code evidence: `artifacts/SEC-OUTPUT-SCHEMA.md` (extracted snippets)
 
 **SEC-REGRESSION-GATE — Deterministic regression / deploy gate** *(status: implemented; owner: MLOps)*
 
@@ -234,6 +265,7 @@ All execution plans validated against SoarExecutionSchema (blast-radius cap, enu
 
 - Implementation: `mlops/scripts/03_eval_model.py`
 - Tests: `tests/lab_mlops_serving/test_mlops_serving.py`
+- Code evidence: `artifacts/SEC-REGRESSION-GATE.md` (extracted snippets)
 
 **SEC-RLHF-QUARANTINE — Sybil RLHF poisoning quarantine** *(status: implemented; owner: MLOps)*
 
@@ -241,6 +273,7 @@ worker_rlhf monitors operator-override velocity; coordinated malicious dismissal
 
 - Implementation: `services/worker_rlhf/src/main.rs`
 - Tests: `tests/test_worker_contracts.py`
+- Code evidence: `artifacts/SEC-RLHF-QUARANTINE.md` (extracted snippets)
 
 **SEC-SANITIZER — Cognitive boundary isolation & untrusted-payload wrapping** *(status: implemented; owner: Platform Engineering)*
 
@@ -248,6 +281,7 @@ Adversary-controlled telemetry wrapped in dynamic XML boundaries, control tokens
 
 - Implementation: `analytics/llm_hunter/tools/sanitizer.py`
 - Tests: `tests/lab_redteam/test_cognitive_bypass.py`
+- Code evidence: `artifacts/SEC-SANITIZER.md` (extracted snippets)
 
 **SEC-SUPPLY-CHAIN — Cryptographic model supply-chain integrity (SHA-384)** *(status: implemented; owner: MLOps)*
 
@@ -255,6 +289,7 @@ Boot verifies SHA-384 of model weights against build-time digests; mismatch refu
 
 - Implementation: `mlops/serve_vllm.sh`
 - Tests: `tests/lab_mlops_serving/test_mlops_serving.py`
+- Code evidence: `artifacts/SEC-SUPPLY-CHAIN.md` (extracted snippets)
 
 **SEC-TRAINING-HYGIENE — Training-data hygiene & credential scrubbing** *(status: implemented; owner: MLOps)*
 
@@ -262,6 +297,7 @@ Regex credential sanitization on every telemetry payload before it enters the co
 
 - Implementation: `mlops/scripts/01_spool_datasets.py`
 - Tests: `tests/lab_mlops_serving/test_mlops_serving.py`
+- Code evidence: `artifacts/SEC-TRAINING-HYGIENE.md` (extracted snippets)
 
 **SEC-VECTOR-DIM — Vector dimensionality validation** *(status: implemented; owner: Platform Engineering)*
 
@@ -269,6 +305,7 @@ QdrantVectorSearchTool validates target vector dimensionality per named space be
 
 - Implementation: `analytics/llm_hunter/tools/qdrant_search.py`
 - Tests: `tests/lab_analytics_hunter/test_hunter_contracts.py`
+- Code evidence: `artifacts/SEC-VECTOR-DIM.md` (extracted snippets)
 
 
 ### Infrastructure Hardening
@@ -279,6 +316,7 @@ sysctl (ASLR, rp_filter, syncookies, no source-routing), mount hardening (noexec
 
 - Implementation: `hardening/tasks/main.yml`
 - Tests: `infrastructure/tests/test_infrastructure.py`
+- Code evidence: `artifacts/IAC-HARDENING.md` (extracted snippets)
 
 
 ### Ingestion Integrity
@@ -289,6 +327,7 @@ Exponential-backoff retry, circuit breaker, poison-message DLQ with metrics; gra
 
 - Implementation: `libs/lib_siem_core/src/lib.rs`
 - Tests: `tests/test_worker_contracts.py`
+- Code evidence: `artifacts/ING-DLQ-BREAKER.md` (extracted snippets)
 
 **ING-ZERO-TRUST — Zero-Trust ingestion gateway (HMAC + 3-tier replay defense)** *(status: implemented; owner: Platform Engineering)*
 
@@ -296,6 +335,7 @@ TLS+JWT; HMAC-SHA256 canonical lineage stamp; temporal-drift, monotonic-sequence
 
 - Implementation: `services/core_ingress/src/integrity.rs`
 - Tests: `tests/test_worker_contracts.py`
+- Code evidence: `artifacts/ING-ZERO-TRUST.md` (extracted snippets)
 
 **SEC-ENDPOINT-ID — Endpoint identity injection defense** *(status: implemented; owner: Platform Engineering)*
 
@@ -303,6 +343,7 @@ Sensor endpoint_id regex-validated in the Rust ingestion layer before reaching Q
 
 - Implementation: `libs/lib_siem_core/src/models.rs`
 - Tests: `tests/test_worker_contracts.py`
+- Code evidence: `artifacts/SEC-ENDPOINT-ID.md` (extracted snippets)
 
 
 ### NIST AI 600-1
@@ -313,6 +354,7 @@ A confirmed TP citing an artifact never retrieved is demoted to monitor (fail-cl
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
 - Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestGroundingEnforcement`
+- Code evidence: `artifacts/AI-GROUNDING.md` (extracted snippets)
 
 **AI-MEMORY-TTL — Immunity-memory TTL / expiry** *(status: implemented; owner: AI Governance)*
 
@@ -320,6 +362,7 @@ Stored FP signatures expire (default 30 d) so a stale/wrong FP cannot entrench a
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
 - Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestMemoryTTL`
+- Code evidence: `artifacts/AI-MEMORY-TTL.md` (extracted snippets)
 
 **AI-PROVENANCE — AI-origin provenance disclosure** *(status: implemented; owner: AI Governance)*
 
@@ -327,6 +370,7 @@ Every incident report is stamped AI-generated so consumers are never misled.
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
 - Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestProvenanceDisclosure`
+- Code evidence: `artifacts/AI-PROVENANCE.md` (extracted snippets)
 
 **AI-REVIEW-BOARD — Adversarial review board (per-expert counterparts)** *(status: implemented; owner: AI Governance)*
 
@@ -334,6 +378,7 @@ Each expert has a counterpart that tries to disprove the finding; TP only if non
 
 - Implementation: `analytics/llm_hunter/agents/review_board.py`
 - Tests: `tests/lab_analytics_hunter/test_review_board.py`, `tests/lab_analytics_hunter/test_review_board_simulation.py`
+- Code evidence: `artifacts/AI-REVIEW-BOARD.md` (extracted snippets)
 
 **NC-1-BIAS-AUDIT — Bias/disparity + homogenization scheduled audit** *(status: implemented; owner: AI Governance)*
 
@@ -341,6 +386,7 @@ Job scrolls verdict/immunity memory; disaggregated containment-disparity + model
 
 - Implementation: `analytics/llm_hunter/agents/bias_audit.py`
 - Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestBiasAudit`
+- Code evidence: `artifacts/NC-1-BIAS-AUDIT.md` (extracted snippets)
 
 **NC-2-CALIBRATION — Confidence-calibration ledger** *(status: implemented; owner: AI Governance)*
 
@@ -348,6 +394,7 @@ Pairs operator dispositions with predicted confidence into a Brier/over-confiden
 
 - Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`
 - Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestCalibrationLedger`
+- Code evidence: `artifacts/NC-2-CALIBRATION.md` (extracted snippets)
 
 **NC-3-FRONTIER-PIN — Frontier model boot-time version-pin enforcement** *(status: implemented; owner: AI Governance)*
 
@@ -355,6 +402,7 @@ build_failover_chain refuses a frontier provider on a floating alias unless expl
 
 - Implementation: `analytics/llm_hunter/agents/llm_providers.py`
 - Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestFrontierPinEnforcement`
+- Code evidence: `artifacts/NC-3-FRONTIER-PIN.md` (extracted snippets)
 
 **NC-4-RETENTION — Data retention & decommissioning policy** *(status: documented; owner: AI Governance)*
 
@@ -379,6 +427,7 @@ Sovereign-by-default [siem] config; the swarm's queryable indexes are contract-t
 
 - Implementation: `analytics/llm_hunter/tools/nexus_config.py`
 - Tests: `tests/lab_analytics_hunter/test_siem_config.py`
+- Code evidence: `artifacts/SIEM-CONFIG-CONTRACT.md` (extracted snippets)
 
 **SIEM-COUNTERPART-DISPROOF — Review-board counterpart SIEM disproof** *(status: implemented; owner: AI Governance)*
 
@@ -386,6 +435,7 @@ Counterparts run a cross-source prevalence query to disprove a finding; fails to
 
 - Implementation: `analytics/llm_hunter/agents/review_board.py`
 - Tests: `tests/lab_analytics_hunter/test_siem_review_board.py`
+- Code evidence: `artifacts/SIEM-COUNTERPART-DISPROOF.md` (extracted snippets)
 
 **SIEM-E2E — SIEM federation end-to-end conservation** *(status: implemented; owner: Platform Engineering)*
 
@@ -393,6 +443,7 @@ Fanout (real CIM/ECS mappings) → mock SIEM → swarm pivot; write↔read conse
 
 - Implementation: `tests/lab_siem_federation/test_siem_federation_e2e.py`
 - Tests: `tests/lab_siem_federation/test_siem_federation_e2e.py`
+- Code evidence: `artifacts/SIEM-E2E.md` (extracted snippets)
 
 **SIEM-TOOL-GUARD — SIEM query tool — read-only / bounded / allowlist** *(status: implemented; owner: Platform Engineering)*
 
@@ -400,3 +451,4 @@ Splunk SPL / Elastic ES|QL pivot; rejects generating/destructive commands, force
 
 - Implementation: `analytics/llm_hunter/tools/siem_query.py`
 - Tests: `tests/lab_analytics_hunter/test_siem_query.py`
+- Code evidence: `artifacts/SIEM-TOOL-GUARD.md` (extracted snippets)

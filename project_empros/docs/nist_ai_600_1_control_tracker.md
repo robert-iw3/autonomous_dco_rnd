@@ -42,6 +42,23 @@ membership-inference review (POA&M-4). The control *logic and jobs* are implemen
 Regression: the hunter/swarm/worker suites + the new control + wave-2 suites run green together
 (SIEM-plan sweep `435 passed`; wave-2 controls `40 passed`).
 
+### Wave 3 — GRC-as-code: manifest, authoritative catalogs, code evidence (12 Jun 2026)
+
+The governance layer is now **generated and drift-guarded** from a single control register,
+keeping these docs in sync with the code as it changes:
+
+| Item | What | Status | Source / proof |
+|---|---|---|---|
+| **GRC-1** Consolidated control manifest (OWASP · ATLAS · AI 600-1 · 800-53 · CSF 2.0) | 31 controls, cross-correlated; renders `controls_catalog` + `applicability_matrix` | ✅ | [governance/controls_manifest.yaml](governance/controls_manifest.yaml), `gen_governance.py` |
+| **GRC-2** Authoritative **SP 800-53 Rev. 5** titles (NIST OSCAL v1.4.0) | every `sp_800_53` ref validated against the catalog | ✅ | `governance/_oscal_sp800-53_rev5.json` |
+| **GRC-3** Authoritative **NIST CSF 2.0** catalog (NIST OSCAL v1.4.0) | 6 functions · 22 categories · 103 active subcategories; function/category coverage self-assessment (15 technical · 7 process-layer) | ✅ Implemented & tested | `governance/_oscal_csf_v2.0.json`, `csf_category_map.yaml` |
+| **GRC-4** **Control Evidence Dossier** — actual code answering each control | per-control snippets extracted + cited `file:line`; SSP **Annex B** index | ✅ Implemented & tested | `governance/evidence_map.yaml`, `gen_evidence.py`, `artifacts/` |
+
+Proof: [tests/lab_analytics_hunter/test_governance_manifest.py](../tests/lab_analytics_hunter/test_governance_manifest.py)
+(**26 passed**) — fails CI if a generated doc is stale, a referenced impl/test path is missing,
+an SP 800-53 / CSF 2.0 reference is not a real OSCAL control, or a cited code-evidence anchor no
+longer resolves.
+
 ---
 
 ## 1. Coverage summary

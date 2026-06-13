@@ -1,0 +1,6 @@
+% Portrait prose docs (SSP, policies) embed long monospace identifiers / file paths
+% (e.g. nist_ai_600_1_control_tracker.md, services/core_ingress) in narrow table cells
+% and paragraphs. Allow the line-breaker to hyphenate inside typewriter text so those
+% tokens wrap instead of overrunning the margin. This is robust (no token scanning), so
+% code spans with braces/math ($, {}) — e.g. the endpoint_id regex — are unaffected.
+\usepackage[htt]{hyphenat}
