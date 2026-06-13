@@ -14,7 +14,7 @@
 
 ## 0. Remediation tracker (live status)
 
-Engineering fixes from the gap analysis (§3), with their implementing module and proving tests. All `agents/controls.py` logic is pure/stdlib-only and unit-tested in [tests/lab_analytics_hunter/test_ai_controls.py](../tests/lab_analytics_hunter/test_ai_controls.py); node wiring is proven by the integration tests noted.
+Engineering fixes from the gap analysis (§3), with their implementing module and proving tests. All `agents/controls.py` logic is pure/stdlib-only and unit-tested in [tests/lab_governance/test_ai_controls.py](../tests/lab_governance/test_ai_controls.py); node wiring is proven by the integration tests noted.
 
 | Item | NIST action | Status | Implementation | Tests |
 |---|---|---|---|---|
@@ -52,9 +52,9 @@ keeping these docs in sync with the code as it changes:
 | **GRC-1** Consolidated control manifest (OWASP · ATLAS · AI 600-1 · 800-53 · CSF 2.0) | 31 controls, cross-correlated; renders `controls_catalog` + `applicability_matrix` | ✅ | [governance/controls_manifest.yaml](governance/controls_manifest.yaml), `gen_governance.py` |
 | **GRC-2** Authoritative **SP 800-53 Rev. 5** titles (NIST OSCAL v1.4.0) | every `sp_800_53` ref validated against the catalog | ✅ | `governance/_oscal_sp800-53_rev5.json` |
 | **GRC-3** Authoritative **NIST CSF 2.0** catalog (NIST OSCAL v1.4.0) | 6 functions · 22 categories · 103 active subcategories; function/category coverage self-assessment (15 technical · 7 process-layer) | ✅ Implemented & tested | `governance/_oscal_csf_v2.0.json`, `csf_category_map.yaml` |
-| **GRC-4** **Control Evidence Dossier** — actual code answering each control | per-control snippets extracted + cited `file:line`; SSP **Annex B** index | ✅ Implemented & tested | `governance/evidence_map.yaml`, `gen_evidence.py`, `artifacts/` |
+| **GRC-4** **Control Evidence Dossier** — actual code answering each control as its **execution chain** (invocation → logic → execution, not a lone snippet) | per-control chain extracted + cited `file:line` with an `Execution chain:` breadcrumb; SSP **Annex B** index | ✅ Implemented & tested | `governance/evidence_map.yaml`, `gen_evidence.py`, `artifacts/` |
 
-Proof: [tests/lab_analytics_hunter/test_governance_manifest.py](../tests/lab_analytics_hunter/test_governance_manifest.py)
+Proof: [tests/lab_governance/test_governance_manifest.py](../tests/lab_governance/test_governance_manifest.py)
 (**26 passed**) — fails CI if a generated doc is stale, a referenced impl/test path is missing,
 an SP 800-53 / CSF 2.0 reference is not a real OSCAL control, or a cited code-evidence anchor no
 longer resolves.
@@ -63,8 +63,8 @@ longer resolves.
 
 The remaining 🟡 risks that had a *code* remedy (not just policy) are now implemented + tested.
 All logic is pure/stdlib in [agents/controls.py](../analytics/llm_hunter/agents/controls.py) with thin
-durable-ledger wrappers; proven in [test_ai_controls.py](../tests/lab_analytics_hunter/test_ai_controls.py)
-(pure) + [test_nist_controls_wave4.py](../tests/lab_analytics_hunter/test_nist_controls_wave4.py) (jobs).
+durable-ledger wrappers; proven in [test_ai_controls.py](../tests/lab_governance/test_ai_controls.py)
+(pure) + [test_nist_controls_wave4.py](../tests/lab_governance/test_nist_controls_wave4.py) (jobs).
 
 | Item | NIST action | Risk | Status | Implementation | Tests |
 |---|---|---|---|---|---|
@@ -79,6 +79,25 @@ All four are registered in the GRC manifest (`governance/controls_manifest.yaml`
 (POA&M), not code: frontier model cards + SBOM + vendor SLAs (2.12), periodic membership-inference
 review (2.4, POA&M-4), cron scheduling of the audit/calibration/reliance jobs (POA&M-1), and the
 red-team cadence (2.9).
+
+### Wave 5 — runtime wiring of the per-run ledgers (13 Jun 2026)
+
+Wave 4 landed NC-9/10/11 as tested modules, but a review found they were imported only by
+their unit tests — the **durable ledgers were never invoked from the live LangGraph workflow**, so
+no investigation actually produced a lineage/energy/failure record at runtime. They are now wired
+into the swarm's single terminal node, `response_agent`:
+
+| Item | Wired at | Behaviour |
+|---|---|---|
+| **NC-10** verdict lineage | `response._record_run_controls` (per run, before the verdict branches) | every investigation appends its verdict to the tamper-evident hash chain |
+| **NC-11** inference energy | `response._record_run_controls` | every investigation records a per-run energy/carbon estimate (response-phase duration × `NEXUS_AVG_POWER_W`) |
+| **NC-9** active-learning | `review_board_node` surfaces grounding violations into `state["grounding_violations"]`; `response._record_run_controls` captures them | a confabulated (ungrounded) verdict is written to the hard-example corpus |
+
+All three writes are **fail-soft** (isolated try/except) so a ledger I/O error can never block or alter
+a containment decision. Ledger paths resolve from env at call time. Proven end-to-end (real nodes,
+network/LLM seams stubbed) by
+[tests/lab_governance/test_nist_controls_wiring.py](../tests/lab_governance/test_nist_controls_wiring.py)
+(**8 passed**), which fails on a tree where the ledgers are defined but never called.
 
 ---
 

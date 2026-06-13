@@ -232,6 +232,11 @@ class InvestigativeState(TypedDict):
     verdict: Optional[Dict[str, Any]]
     action_payload: Optional[Dict[str, Any]]
     incident_report: Optional[str]
+    # Forensic artifacts the review board's grounding check found cited in a
+    # confirmed verdict but absent from the evidence corpus (NIST MS-2.5-003).
+    # Surfaced so the response agent can capture an active-learning hard example
+    # (NC-9) for the confabulation. Empty/absent when the verdict was grounded.
+    grounding_violations: Optional[List[str]]
     canary: Optional[str]  # OWASP LLM01 prompt-leak tripwire (injected into agent system prompts)
     # ── Deep-analysis loop bookkeeping ──
     # Number of times the supervisor's deterministic thoroughness gate rejected a

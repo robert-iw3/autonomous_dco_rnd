@@ -1,5 +1,6 @@
 # SECTION: analytics
-# Tests:   lab_analytics_hunter/, lab_agentic_swarm/, lab_redteam/
+# Tests:   lab_analytics_hunter/ (hunter + SIEM tools/contracts), lab_agentic_swarm/, lab_redteam/
+#          NOTE: the NIST AI 600-1 control / GRC suite moved to lab_governance/ (Dockerfile.governance).
 # Deps:    pytest, pydantic, PyYAML, numpy, duckdb/pandas/pyarrow
 #          (langchain_core / nats / redis / prometheus are stubbed in each test)
 #   docker build -f project_empros/tests/Dockerfile.analytics -t nexus-test-analytics .
@@ -19,7 +20,6 @@ RUN pip install --no-cache-dir \
     "pyarrow>=16.0.0"
 
 COPY project_empros/analytics/llm_hunter/       /repo/project_empros/analytics/llm_hunter/
-COPY project_empros/docs/governance/            /repo/project_empros/docs/governance/
 COPY project_empros/tests/lab_analytics_hunter/ /repo/project_empros/tests/lab_analytics_hunter/
 COPY project_empros/tests/lab_agentic_swarm/    /repo/project_empros/tests/lab_agentic_swarm/
 COPY project_empros/tests/lab_redteam/          /repo/project_empros/tests/lab_redteam/

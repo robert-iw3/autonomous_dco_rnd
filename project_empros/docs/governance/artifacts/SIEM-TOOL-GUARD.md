@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/tools/siem_query.py`*
 
-Only read-only search verbs are permitted; any mutating/command pipeline is rejected.
+**Execution chain:** Logic → Logic → Logic → Execution
+
+**1. Logic** — Only read-only search verbs are permitted; any mutating/command pipeline is rejected.
 
 `analytics/llm_hunter/tools/siem_query.py:L110-L128`
 
@@ -28,7 +30,7 @@ def validate_readonly(query: str, dialect: str) -> Tuple[bool, str]:
 
 ```
 
-Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data.
+**2. Logic** — Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data.
 
 `analytics/llm_hunter/tools/siem_query.py:L142-L154`
 
@@ -48,7 +50,7 @@ def validate_indexes(query: str, dialect: str, allowed: List[str]) -> Tuple[bool
 
 ```
 
-Every query is force-bounded by a time window and a max-row cap before execution.
+**3. Logic** — Every query is force-bounded by a time window and a max-row cap before execution.
 
 `analytics/llm_hunter/tools/siem_query.py:L155-L173`
 
@@ -72,4 +74,20 @@ def enforce_bounds(query: str, dialect: str, window_hours: int, max_rows: int) -
 
 
 # -- Query builders (generic entity pivot; the cookbook adds richer patterns) -
+```
+
+**4. Execution** — Wired into the tool's _run: a query is rejected unless it passes read-only + index-allowlist checks, then is force-bounded before any adapter runs it.
+
+`analytics/llm_hunter/tools/siem_query.py:L348-L356`
+
+```python
+        ok, reason = validate_readonly(query, dialect)
+        if not ok:
+            return f"SIEM_QUERY_REJECTED: {reason}"
+        ok, reason = validate_indexes(query, dialect, b.get("allowed_indexes", []))
+        if not ok:
+            return f"SIEM_QUERY_REJECTED: {reason}"
+
+        bounded = enforce_bounds(query, dialect, siem.get("default_window_hours", 6),
+                                 siem.get("max_rows", 200))
 ```

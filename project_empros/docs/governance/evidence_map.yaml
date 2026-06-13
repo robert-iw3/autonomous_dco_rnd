@@ -1,190 +1,270 @@
 # Control → code-evidence map.
 #
-# Each control points at the *actual* source that satisfies it. gen_evidence.py
-# extracts a snippet anchored on a unique substring (so the evidence tracks the
-# code: if the anchor moves or is renamed, the drift test fails and the artifact
-# must be regenerated). A control may cite several snippets across several files —
-# the "culmination" that together answers the control.
+# Each control points at the *actual* source that satisfies it, ordered as the
+# control's **execution chain** — from invocation (where the live graph / worker
+# calls in) through the decision logic to the execution / side-effect. A single
+# logic snippet only shows *what* a control computes; the chain shows that it is
+# actually *reached and acted on* at runtime. gen_evidence.py extracts each
+# snippet anchored on a unique substring (so the evidence tracks the code: if the
+# anchor moves or is renamed, the drift test fails and the artifact must be
+# regenerated) and renders the per-control chain as an "Execution chain:"
+# breadcrumb followed by the numbered steps.
 #
 # entry fields:
 #   file    – path relative to project_empros/
 #   anchor  – a unique substring on the first line of the snippet
+#   step    – the chain role of this snippet (Invocation / Routing / Node /
+#             Logic / Effect / Execution / Persistence / Boot / Proof)
 #   before  – context lines to include *above* the anchor line (default 0)
 #   after   – lines to include *below* the anchor line (default 0)
 #   caption – how this snippet answers the control
 #
-# Validated by tests/lab_analytics_hunter/test_governance_manifest.py
+# Validated by tests/lab_governance/test_governance_manifest.py
 # (anchor must resolve; file must exist; every cited control must be in the manifest).
 # Pure-documentation controls (no code) are intentionally absent and rendered as
 # "documentation control" pointing at their governance artifact.
 
 evidence:
   SEC-CANARY:
-    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def generate_canary", after: 9,
-       caption: "Per-investigation canary token minted and embedded in the system context; its later appearance on any outbound surface is the prompt-leak tripwire."}
-    - {file: analytics/llm_hunter/orchestrator.py, anchor: "canary = CognitiveSanitizer.generate_canary()", before: 0, after: 0,
-       caption: "Orchestrator mints the canary at swarm start…"}
-    - {file: analytics/llm_hunter/orchestrator.py, anchor: "OWASP LLM01: verify the canary did not leak", before: 0, after: 3,
-       caption: "…and verifies it never leaked into any outbound surface before the verdict is released."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Invocation, anchor: "canary = CognitiveSanitizer.generate_canary()", after: 0,
+       caption: "At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context."}
+    - {file: analytics/llm_hunter/tools/sanitizer.py, step: Logic, anchor: "def generate_canary", after: 9,
+       caption: "The canary is a unique UUID tripwire — its only legitimate place is the system prompt, so any later appearance downstream is proof of a prompt leak."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Execution, anchor: "OWASP LLM01: verify the canary did not leak", before: 0, after: 3,
+       caption: "Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline."}
 
   SEC-SANITIZER:
-    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def neutralize_string", after: 24,
-       caption: "Untrusted text is stripped of control characters and prompt-injection delimiters before it can reach an LLM context."}
-    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def wrap_untrusted", after: 8,
+    - {file: analytics/llm_hunter/tools/sanitizer.py, step: Logic, anchor: "def neutralize_string", after: 24,
+       caption: "Untrusted text is stripped of control characters and prompt-injection delimiters and HTML-escaped before it can reach an LLM context."}
+    - {file: analytics/llm_hunter/tools/sanitizer.py, step: Logic, anchor: "def wrap_untrusted", after: 8,
        caption: "All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions."}
+    - {file: analytics/llm_hunter/agents/expert_base.py, step: Execution, anchor: "safe_notes = CognitiveSanitizer.neutralize_string", before: 0, after: 1,
+       caption: "Wired into every expert: entity notes pulled into the shared board are neutralised before being rendered into the agent prompt."}
 
   SEC-DUCKDB-SANDBOX:
-    - {file: analytics/llm_hunter/tools/duckdb_query.py, anchor: "def _run(self, reasoning: str, query: str)", after: 26,
-       caption: "The data-lake query tool rejects anything but read-only SELECT and runs against a read-only connection — the agent cannot mutate the lake."}
+    - {file: analytics/llm_hunter/tools/duckdb_query.py, step: Invocation, anchor: "class DuckDBQueryTool", after: 3,
+       caption: "The agent-facing data-lake tool — the only path by which an LLM can query cold storage."}
+    - {file: analytics/llm_hunter/tools/duckdb_query.py, step: Execution, anchor: "def _run(self, reasoning: str, query: str)", after: 26,
+       caption: "Every call rejects anything but read-only SELECT and runs against a read-only connection with an auto LIMIT — the agent cannot mutate or exfiltrate the lake."}
 
   SEC-OUTPUT-SCHEMA:
-    - {file: analytics/llm_hunter/state.py, anchor: "class SoarExecutionSchema", after: 35,
-       caption: "SOAR actions must satisfy a strict Pydantic contract (enumerated action, validated targets) before any response is dispatched."}
+    - {file: analytics/llm_hunter/state.py, step: Logic, anchor: "class SoarExecutionSchema", after: 35,
+       caption: "SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets)."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Invocation, anchor: "async def _dispatch_soar", after: 1,
+       caption: "The dispatch path is the single egress for any containment action."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Execution, anchor: "validated = SoarExecutionSchema(", after: 7,
+       caption: "Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed."}
 
   SEC-SUPPLY-CHAIN:
-    - {file: mlops/serve_vllm.sh, anchor: "verify_integrity() {", after: 18,
-       caption: "Every model is SHA-384-verified against a signed integrity manifest before it is served; a mismatch aborts the launch."}
+    - {file: mlops/serve_vllm.sh, step: Logic, anchor: "verify_integrity() {", after: 18,
+       caption: "SHA-384-verifies model weights against a signed integrity manifest; a mismatch aborts the launch."}
+    - {file: mlops/serve_vllm.sh, step: Execution, anchor: "verify_integrity \"${MODEL_PATH}\"", before: 1, after: 0,
+       caption: "The check is invoked on the resolved model path at every server launch — no model is ever served unverified."}
 
   SEC-REGRESSION-GATE:
-    - {file: mlops/scripts/03_eval_model.py, anchor: "def run_regression_suite", after: 26,
-       caption: "Deterministic regression suite gates promotion: a candidate that regresses against the locked thresholds cannot be deployed."}
+    - {file: mlops/scripts/03_eval_model.py, step: Logic, anchor: "def run_regression_suite", after: 26,
+       caption: "Deterministic regression gauntlet (OS-context, schema, injection, spatial, SIEM-pivot validity) over a locked corpus."}
+    - {file: mlops/scripts/03_eval_model.py, step: Execution, anchor: "if accuracy < 99.0", after: 2,
+       caption: "Hard go/no-go: a candidate below the 99% zero-hallucination floor halts deployment (exit 1)."}
 
   AI-REVIEW-BOARD:
-    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def aggregate_board", after: 28,
-       caption: "Adversarial board aggregation is a pure, deterministic decision rule over per-expert counterpart rebuttals — no model can unilaterally confirm a verdict."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Invocation, anchor: "builder.add_node(\"review_board\"", before: 0, after: 0,
+       caption: "The board is wired into the graph as a mandatory node on the path to any response."}
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Node, anchor: "async def review_board_node", after: 9,
+       caption: "The node runs every implicated expert's counterpart concurrently against the supervisor verdict."}
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Logic, anchor: "def aggregate_board", after: 28,
+       caption: "A pure, deterministic decision rule aggregates the rebuttals: a TP survives only if no implicated counterpart can disprove it — no model unilaterally confirms a verdict. Fails closed."}
 
   AI-GROUNDING:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def enforce_grounding", after: 30,
-       caption: "Every cited artifact in a verdict must trace to the assembled evidence corpus; ungrounded (confabulated) claims are flagged and the verdict is demoted."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def build_evidence_corpus", after: 16,
+       caption: "Assembles the ground-truth corpus — the union of every artifact the investigation actually observed (entities, message contents, raw alert)."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def enforce_grounding", after: 30,
+       caption: "Every artifact cited in a confirmed verdict must resolve to that corpus; an ungrounded (confabulated) citation fails the verdict closed to monitor."}
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Execution, anchor: "result, violations = enforce_grounding", before: 3, after: 7,
+       caption: "Wired into the live board node: the aggregated verdict is re-grounded, an ungrounded TP is demoted, and the violations are surfaced into state to feed active-learning (NC-9)."}
 
   AI-MEMORY-TTL:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def memory_is_actionable", after: 28,
-       caption: "Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def memory_is_actionable", after: 28,
+       caption: "A recalled immunity memory is actionable only if it is an eligible False Positive still within its TTL (default 30 d)."}
+    - {file: analytics/llm_hunter/agents/supervisor.py, step: Execution, anchor: "if hits and memory_is_actionable", after: 4,
+       caption: "Wired into recall: a high-similarity historical FP may short-circuit the swarm only while its memory has not expired."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Persistence, anchor: '"created_at": time.time()', before: 2, after: 0,
+       caption: "The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity."}
 
   AI-PROVENANCE:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def stamp_ai_provenance", after: 14,
-       caption: "Machine-generated narrative is stamped with an explicit AI-origin disclosure before it leaves the system."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def stamp_ai_provenance", after: 14,
+       caption: "Idempotently prepends an explicit AI-origin disclosure banner to a report."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Execution, anchor: "incident_report = stamp_ai_provenance", before: 2, after: 0,
+       caption: "Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted."}
 
   NC-1-BIAS-AUDIT:
-    - {file: analytics/llm_hunter/agents/bias_audit.py, anchor: "def run_bias_audit", after: 22,
-       caption: "Scheduled audit computes per-dimension disparity and memory-homogenization metrics over the immunity store to detect bias/monoculture drift."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def fairness_report", after: 10,
+       caption: "Pure disaggregated disparity analytic: per-subgroup containment/TP rates vs the fleet baseline, flagging any group beyond the disparity tolerance."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def memory_homogenization", after: 12,
+       caption: "Pure model-collapse monitor: flags when the immunity store over-concentrates on one signature (top-share / low entropy)."}
+    - {file: analytics/llm_hunter/agents/bias_audit.py, step: Execution, anchor: "def run_bias_audit", after: 22,
+       caption: "The scheduled audit job runs both analytics over the verdict/immunity history and writes a flagged report."}
 
   NC-2-CALIBRATION:
-    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def record_disposition", after: 12,
-       caption: "Each verdict's stated confidence is recorded against the operator's ground-truth disposition…"}
-    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def brier_trend", after: 22,
-       caption: "…and the Brier-score trend is computed so miscalibration is measurable and trackable over time."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def calibration_record", after: 14,
+       caption: "Pure calibration point: the verdict's predicted confidence vs the operator's realized disposition, scored by Brier error."}
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, step: Execution, anchor: "def record_disposition", after: 12,
+       caption: "Each operator disposition is appended to a durable calibration ledger."}
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, step: Effect, anchor: "def brier_trend", after: 22,
+       caption: "The Brier-score trend is computed over the ledger so miscalibration is measurable and trackable over time."}
 
   NC-3-FRONTIER-PIN:
-    - {file: analytics/llm_hunter/agents/llm_providers.py, anchor: "def frontier_pin_allowed", after: 13,
-       caption: "A frontier (hosted) model with a floating/unpinned version is rejected at boot unless an explicit override is set — no silent model drift."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def is_floating_model", after: 6,
+       caption: "Classifies a model id as 'floating' (empty, or a moving alias such as *-latest)."}
+    - {file: analytics/llm_hunter/agents/llm_providers.py, step: Boot, anchor: "ok, reason = frontier_pin_allowed", before: 0, after: 3,
+       caption: "Wired into chain construction: as the failover chain is built each frontier provider is pin-checked and a floating alias is refused unless explicitly opted in — no silent model drift."}
 
   SIEM-TOOL-GUARD:
-    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def validate_readonly", after: 18,
+    - {file: analytics/llm_hunter/tools/siem_query.py, step: Logic, anchor: "def validate_readonly", after: 18,
        caption: "Only read-only search verbs are permitted; any mutating/command pipeline is rejected."}
-    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def validate_indexes", after: 12,
+    - {file: analytics/llm_hunter/tools/siem_query.py, step: Logic, anchor: "def validate_indexes", after: 12,
        caption: "Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data."}
-    - {file: analytics/llm_hunter/tools/siem_query.py, anchor: "def enforce_bounds", after: 18,
+    - {file: analytics/llm_hunter/tools/siem_query.py, step: Logic, anchor: "def enforce_bounds", after: 18,
        caption: "Every query is force-bounded by a time window and a max-row cap before execution."}
+    - {file: analytics/llm_hunter/tools/siem_query.py, step: Execution, anchor: "ok, reason = validate_readonly(query, dialect)", before: 0, after: 8,
+       caption: "Wired into the tool's _run: a query is rejected unless it passes read-only + index-allowlist checks, then is force-bounded before any adapter runs it."}
 
   SIEM-CONFIG-CONTRACT:
-    - {file: analytics/llm_hunter/tools/nexus_config.py, anchor: "def get_siem_config", after: 30,
+    - {file: analytics/llm_hunter/tools/nexus_config.py, step: Logic, anchor: "def get_siem_config", after: 30,
        caption: "SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist."}
 
   SIEM-COUNTERPART-DISPROOF:
-    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def build_prevalence_query", after: 10,
-       caption: "The counterpart builds a prevalence query over allowlisted indexes…"}
-    - {file: analytics/llm_hunter/agents/review_board.py, anchor: "def _counterpart_siem_lookup", after: 28,
-       caption: "…and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates."}
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Logic, anchor: "def build_prevalence_query", after: 10,
+       caption: "The counterpart builds a cross-source prevalence query over allowlisted indexes…"}
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Execution, anchor: "def _counterpart_siem_lookup", after: 28,
+       caption: "…and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates; falls back to transcript-only when no SIEM is configured."}
 
   SIEM-E2E:
-    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, anchor: "def test_fanned_out_event_is_retrievable_via_swarm_pivot", after: 6,
+    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, step: Proof, anchor: "def test_fanned_out_event_is_retrievable_via_swarm_pivot", after: 6,
        caption: "Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production."}
-    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, anchor: "def test_fanned_out_event_retrievable_via_esql", after: 5,
+    - {file: tests/lab_siem_federation/test_siem_federation_e2e.py, step: Proof, anchor: "def test_fanned_out_event_retrievable_via_esql", after: 5,
        caption: "Same conservation guarantee on the Elastic (ECS) path via ES|QL."}
 
   ING-ZERO-TRUST:
-    - {file: services/core_ingress/src/integrity.rs, anchor: "fn compute_hmac", after: 12,
+    - {file: services/core_ingress/src/integrity.rs, step: Invocation, anchor: "pub fn verify_batch(", after: 2,
+       caption: "The ingestion gateway's batch-verification entry point — every inbound batch passes through here before it is accepted."}
+    - {file: services/core_ingress/src/integrity.rs, step: Logic, anchor: "fn compute_hmac", after: 12,
        caption: "Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage."}
-    - {file: services/core_ingress/src/integrity.rs, anchor: "fn constant_time_eq", after: 10,
+    - {file: services/core_ingress/src/integrity.rs, step: Logic, anchor: "fn constant_time_eq", after: 10,
        caption: "HMAC comparison is constant-time, closing the timing-oracle side channel."}
-    - {file: services/core_ingress/src/integrity.rs, anchor: "fn record_sequence", after: 18,
+    - {file: services/core_ingress/src/integrity.rs, step: Execution, anchor: "fn record_sequence", after: 18,
        caption: "A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense."}
 
   ING-DLQ-BREAKER:
-    - {file: libs/lib_siem_core/src/lib.rs, anchor: "fn adaptive_deadline", after: 16,
-       caption: "Workers adapt their batch deadline to observed queue depth; combined with the circuit-breaker pause and dead-letter prefix below, a failing downstream is isolated rather than amplified."}
-    - {file: libs/lib_siem_core/src/lib.rs, anchor: "dlq_prefix: \"nexus.dlq\".into()", before: 2, after: 4,
-       caption: "Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-lettered and the worker backs off instead of hot-looping."}
+    - {file: libs/lib_siem_core/src/lib.rs, step: Logic, anchor: "fn adaptive_deadline", after: 16,
+       caption: "Workers adapt their batch deadline to observed queue depth."}
+    - {file: libs/lib_siem_core/src/lib.rs, step: Effect, anchor: "dlq_prefix: \"nexus.dlq\".into()", before: 2, after: 4,
+       caption: "Default DLQ routing + circuit-breaker pause config: poisoned/failed batches are dead-lettered."}
+    - {file: libs/lib_siem_core/src/lib.rs, step: Execution, anchor: "if circuit_open {", before: 1, after: 6,
+       caption: "In the consume loop a tripped breaker pauses consumption (metric + backoff) instead of hot-looping a failing downstream."}
 
   IAC-HARDENING:
-    - {file: hardening/tasks/main.yml, anchor: "Apply kernel and sysctl hardening", before: 1, after: 1,
+    - {file: hardening/tasks/main.yml, step: Execution, anchor: "Apply kernel and sysctl hardening", before: 1, after: 1,
        caption: "Ansible baseline applies kernel/sysctl hardening…"}
-    - {file: hardening/tasks/main.yml, anchor: "Apply firewall configuration", before: 0, after: 2,
+    - {file: hardening/tasks/main.yml, step: Execution, anchor: "Apply firewall configuration", before: 0, after: 2,
        caption: "…a default-deny firewall…"}
-    - {file: hardening/tasks/main.yml, anchor: "Apply audit rules", before: 0, after: 1,
+    - {file: hardening/tasks/main.yml, step: Execution, anchor: "Apply audit rules", before: 0, after: 1,
        caption: "…and host audit rules — declaratively and idempotently across the fleet."}
 
   SEC-MODEL-DOS:
-    - {file: analytics/llm_hunter/orchestrator.py, anchor: "MAX_CONCURRENT_INVESTIGATIONS = int", after: 0,
-       caption: "A hard concurrency ceiling on simultaneous investigations…"}
-    - {file: analytics/llm_hunter/orchestrator.py, anchor: "_investigation_sema = asyncio.Semaphore", after: 0,
-       caption: "…enforced by a semaphore acquired before any LLM work — bounding model-denial-of-service blast."}
-    - {file: analytics/llm_hunter/orchestrator.py, anchor: "async with _investigation_sema", after: 1,
-       caption: "The semaphore gates every investigation entry point."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Invocation, anchor: "MAX_CONCURRENT_INVESTIGATIONS = int", after: 0,
+       caption: "A hard ceiling on simultaneous investigations…"}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Effect, anchor: "_investigation_sema = asyncio.Semaphore", after: 0,
+       caption: "…realised as a semaphore…"}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Effect, anchor: "async with _investigation_sema", after: 1,
+       caption: "…acquired before any LLM work, bounding model-DoS blast at the investigation entry point."}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Execution, anchor: "recursion_limit\": RECURSION_LIMIT", after: 0,
+       caption: "Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…"}
+    - {file: analytics/llm_hunter/orchestrator.py, step: Execution, anchor: "final_state = await asyncio.wait_for", after: 2,
+       caption: "…and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm."}
 
   SEC-RLHF-QUARANTINE:
-    - {file: services/worker_rlhf/src/main.rs, anchor: "nexus_rlhf_operator_quarantined_total", before: 22, after: 4,
-       caption: "Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the RLHF corpus."}
+    - {file: services/worker_rlhf/src/main.rs, step: Invocation, anchor: "async fn transmit_batch", after: 1,
+       caption: "Operator feedback is ingested batch-by-batch by the RLHF worker."}
+    - {file: services/worker_rlhf/src/main.rs, step: Logic, anchor: "if global_count > self.global_circuit_breaker_threshold", before: 1, after: 5,
+       caption: "Coordinated override velocity past the global threshold trips an atomic circuit breaker that halts RLHF intake."}
+    - {file: services/worker_rlhf/src/main.rs, step: Execution, anchor: "nexus_rlhf_operator_quarantined_total", before: 22, after: 4,
+       caption: "Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the reward corpus."}
 
   SEC-DLP-EGRESS:
-    - {file: analytics/llm_hunter/tools/sanitizer.py, anchor: "def scrub_outbound_dlp", after: 14,
-       caption: "Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing sovereign data isolation."}
+    - {file: analytics/llm_hunter/tools/sanitizer.py, step: Logic, anchor: "def scrub_outbound_dlp", after: 14,
+       caption: "Scrubs RFC-1918 ranges + high-entropy credentials/secrets from text."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Execution, anchor: "reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)", after: 0,
+       caption: "Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation."}
 
   SEC-TRAINING-HYGIENE:
-    - {file: mlops/scripts/01_spool_datasets.py, anchor: "def _vault_secret", before: 2, after: 9,
+    - {file: mlops/scripts/01_spool_datasets.py, step: Logic, anchor: "def _vault_secret", before: 2, after: 9,
        caption: "Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code."}
 
   SEC-BLAST-RADIUS:
-    - {file: analytics/llm_hunter/state.py, anchor: "def merge_entities", after: 30,
-       caption: "Entity state is a monotonic, conflict-resolving state machine; containment status only escalates, capping the blast radius of any single action."}
+    - {file: analytics/llm_hunter/state.py, step: Logic, anchor: "def merge_entities", after: 30,
+       caption: "Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates."}
+    - {file: analytics/llm_hunter/agents/supervisor.py, step: Effect, anchor: "if len(entities) > MAX_ENTITIES", after: 3,
+       caption: "In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Execution, anchor: "if av >= 0.9", before: 1, after: 1,
+       caption: "At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts."}
 
   SEC-FAILOVER:
-    - {file: analytics/llm_hunter/agents/llm_providers.py, anchor: "def build_failover_chain", after: 25,
-       caption: "Providers are composed into a cascading failover chain that degrades toward the sovereign on-prem model rather than failing open."}
+    - {file: analytics/llm_hunter/agents/expert_base.py, step: Invocation, anchor: "build_failover_chain(temperature)", before: 0, after: 0,
+       caption: "Every expert (and the supervisor / response / board) is constructed over the failover chain, so degradation is uniform across the swarm."}
+    - {file: analytics/llm_hunter/agents/llm_providers.py, step: Logic, anchor: "def build_failover_chain", after: 25,
+       caption: "Providers are composed into a cascading chain that degrades toward the sovereign on-prem model rather than failing open."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Execution, anchor: "for provider_name, llm_instance in LLM_FAILOVER_CHAIN", after: 1,
+       caption: "At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing."}
 
   SEC-IDEMPOTENT-SOAR:
-    - {file: analytics/llm_hunter/agents/response.py, anchor: "idempotency_key", before: 2, after: 1,
-       caption: "Each SOAR dispatch carries a deterministic idempotency key (target + quantised window) so a retried response cannot double-execute."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Logic, anchor: "idempotency_key", before: 2, after: 1,
+       caption: "Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute."}
+    - {file: services/worker_soar/src/main.rs, step: Execution, anchor: "if dedup.is_duplicate(&dedup_key)", before: 1, after: 2,
+       caption: "The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor."}
 
   SEC-VECTOR-DIM:
-    - {file: analytics/llm_hunter/tools/qdrant_search.py, anchor: "dim_map = {", after: 14,
-       caption: "Vector searches are validated against the expected per-collection dimensionality; a wrong-dimension probe is rejected before it hits the store."}
+    - {file: analytics/llm_hunter/tools/qdrant_search.py, step: Invocation, anchor: "def _run(self, reasoning: str, vector_name", after: 0,
+       caption: "The agent-facing vector-search tool entry point."}
+    - {file: analytics/llm_hunter/tools/qdrant_search.py, step: Execution, anchor: "dim_map = {", after: 14,
+       caption: "Each search is validated against the expected per-collection dimensionality; a wrong-dimension (malformed/adversarial) probe is rejected before it hits the store."}
 
   SEC-ENDPOINT-ID:
-    - {file: libs/lib_siem_core/src/models.rs, anchor: "pub struct DynamicUebaVector", after: 6,
-       caption: "Endpoint identifiers are validated against a strict regex at the type boundary, defeating identity-injection via malformed endpoint_id."}
+    - {file: libs/lib_siem_core/src/models.rs, step: Logic, anchor: "pub struct DynamicUebaVector", after: 6,
+       caption: "Endpoint identifiers are regex-validated at the Rust type boundary before reaching Qdrant/Parquet, defeating identity-injection / path-traversal via a malformed endpoint_id."}
 
   NC-8-OVER-RELIANCE:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def over_reliance_report", after: 22,
-       caption: "Measures the human side of HitL: automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band."}
-    - {file: analytics/llm_hunter/agents/calibration_ledger.py, anchor: "def record_reliance", after: 10,
-       caption: "Each operator decision is logged as an accept-vs-override reliance point against the eventual ground truth."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def reliance_record", after: 14,
+       caption: "Pure reliance point: the AI verdict, whether the operator accepted or overrode it, and the eventual ground truth."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def over_reliance_report", after: 22,
+       caption: "automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band."}
+    - {file: analytics/llm_hunter/agents/calibration_ledger.py, step: Execution, anchor: "def record_reliance", after: 10,
+       caption: "Each operator decision is logged as a durable accept-vs-override reliance point against the eventual ground truth."}
 
   NC-9-ACTIVE-LEARNING:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def is_model_failure", after: 9,
+    - {file: analytics/llm_hunter/agents/response.py, step: Invocation, anchor: "active_learning.capture", before: 1, after: 4,
+       caption: "Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft)."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def is_model_failure", after: 9,
        caption: "A verdict is a captured failure when it cites ungrounded evidence or its class contradicts operator ground truth."}
-    - {file: analytics/llm_hunter/agents/active_learning.py, anchor: "def capture", after: 12,
-       caption: "Failures are appended to a hard-example corpus the MLOps plane consumes for continuous improvement; correct verdicts are a no-op."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def failure_record", after: 14,
+       caption: "Builds the structured hard-example record (predicted vs realized, reason, artifacts) — or None for a correct verdict."}
+    - {file: analytics/llm_hunter/agents/active_learning.py, step: Execution, anchor: "def capture", after: 12,
+       caption: "Appends the failure to the hard-example corpus the MLOps plane consumes; a correct verdict is a no-op."}
 
   NC-10-VERDICT-LINEAGE:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def verify_lineage", after: 10,
-       caption: "SHA-256 hash chain over verdict records: each entry binds the previous hash, so any edit, deletion, or reorder is detected and the first broken index returned."}
-    - {file: analytics/llm_hunter/agents/verdict_ledger.py, anchor: "def append_verdict", after: 9,
-       caption: "Durable append: every verdict is chained onto the prior entry's hash, giving autonomous-containment decisions a tamper-evident trail."}
+    - {file: analytics/llm_hunter/agents/response.py, step: Invocation, anchor: "verdict_ledger.append_verdict", before: 1, after: 9,
+       caption: "Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft)."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def lineage_entry", after: 3,
+       caption: "Builds one chain entry binding a record to the previous entry's hash."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def verify_lineage", after: 10,
+       caption: "Verifies the SHA-256 chain end to end; any edit, deletion, or reorder is detected and the first broken index returned."}
+    - {file: analytics/llm_hunter/agents/verdict_ledger.py, step: Execution, anchor: "def append_verdict", after: 9,
+       caption: "Durable append: every verdict is chained onto the prior entry's hash on disk."}
 
   NC-11-ENERGY-ACCOUNTING:
-    - {file: analytics/llm_hunter/agents/controls.py, anchor: "def estimate_inference_energy", after: 11,
+    - {file: analytics/llm_hunter/agents/response.py, step: Invocation, anchor: "energy_accounting.record_run", before: 1, after: 3,
+       caption: "Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft)."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def estimate_inference_energy", after: 11,
        caption: "Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor."}
-    - {file: analytics/llm_hunter/agents/energy_accounting.py, anchor: "def record_run", after: 10,
+    - {file: analytics/llm_hunter/agents/energy_accounting.py, step: Execution, anchor: "def record_run", after: 10,
        caption: "Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals()."}

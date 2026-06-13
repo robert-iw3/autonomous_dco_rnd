@@ -2,23 +2,29 @@
 
 *Implementation: `analytics/llm_hunter/agents/llm_providers.py`*
 
-A frontier (hosted) model with a floating/unpinned version is rejected at boot unless an explicit override is set — no silent model drift.
+**Execution chain:** Logic → Boot
 
-`analytics/llm_hunter/agents/llm_providers.py:L148-L161`
+**1. Logic** — Classifies a model id as 'floating' (empty, or a moving alias such as *-latest).
+
+`analytics/llm_hunter/agents/controls.py:L195-L201`
 
 ```python
-def frontier_pin_allowed(name: str, cfg: dict, allow_floating: bool = None):
-    """(ok, reason). Internal/sovereign providers and non-frontier api types are
-    out of scope (their weights are hash-verified by the supply-chain control)."""
-    from agents.controls import is_floating_model
-    if allow_floating is None:
-        allow_floating = os.getenv("NEXUS_ALLOW_FLOATING_FRONTIER", "").lower() in ("1", "true", "yes")
-    cfg = cfg or {}
-    if str(name).startswith("internal_") or cfg.get("api_type") not in _FRONTIER_API:
-        return True, ""
-    if is_floating_model(cfg.get("model", "")) and not allow_floating:
-        return False, (f"frontier provider '{name}' has floating model '{cfg.get('model', '')}' "
-                       f"-- pin a version or set NEXUS_ALLOW_FLOATING_FRONTIER=1 (NIST MP-4.1-007)")
-    return True, ""
+def is_floating_model(model: str) -> bool:
+    """A model id is 'floating' if empty or it resolves to a moving target
+    (e.g. an alias ending in '-latest')."""
+    if not model:
+        return True
+    return "latest" in str(model).strip().lower()
 
+```
+
+**2. Boot** — Wired into chain construction: as the failover chain is built each frontier provider is pin-checked and a floating alias is refused unless explicitly opted in — no silent model drift.
+
+`analytics/llm_hunter/agents/llm_providers.py:L175-L178`
+
+```python
+        ok, reason = frontier_pin_allowed(name, cfg)
+        if not ok:
+            logger.error("Refusing LLM provider: %s", reason)
+            continue
 ```

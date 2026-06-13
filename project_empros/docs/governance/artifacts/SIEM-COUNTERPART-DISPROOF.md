@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/agents/review_board.py`*
 
-The counterpart builds a prevalence query over allowlisted indexes…
+**Execution chain:** Logic → Execution
+
+**1. Logic** — The counterpart builds a cross-source prevalence query over allowlisted indexes…
 
 `analytics/llm_hunter/agents/review_board.py:L117-L127`
 
@@ -20,7 +22,7 @@ def build_prevalence_query(entity: str, dialect: str, allowed_indexes: list) -> 
 
 ```
 
-…and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates.
+**2. Execution** — …and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates; falls back to transcript-only when no SIEM is configured.
 
 `analytics/llm_hunter/agents/review_board.py:L128-L156`
 

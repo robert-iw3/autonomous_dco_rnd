@@ -67,7 +67,7 @@ access mode, integrity control, and known issues / oversight.
 |---|---|
 | Role | Layer-3 LangGraph DAG: supervisor + 4 experts + adversarial review board + response |
 | Models used | Sovereign failover chain (internal vLLM/Ollama → optional frontier) |
-| Controls | Canary leak tripwire, cognitive sanitizer, read-only tool sandboxes, RBAC tool kits, review-board grounding, HitL circuit breaker, RAG-memory immunity with TTL |
+| Controls | Canary leak tripwire, cognitive sanitizer, read-only tool sandboxes, RBAC tool kits, review-board grounding, HitL circuit breaker, RAG-memory immunity with TTL; per-run tamper-evident verdict lineage (NC-10), active-learning failure capture (NC-9), and inference energy accounting (NC-11) wired into the response node |
 | Access mode | NATS-triggered; governed SOAR dispatch only — never touches live endpoints except via SOAR / Det Chamber |
 
 ### Frontier models (optional, deployer role)

@@ -48,7 +48,7 @@ The following manifest is currently the base controls implemented pertaining to 
 
 ---
 
-**NIST AI 600-1 remediation controls** (status tracked in [nist_ai_600_1_control_tracker.md](nist_ai_600_1_control_tracker.md); pure logic in `agents/controls.py`, proven by `tests/lab_analytics_hunter/test_ai_controls.py`):
+**NIST AI 600-1 remediation controls** (status tracked in [nist_ai_600_1_control_tracker.md](nist_ai_600_1_control_tracker.md); pure logic in `agents/controls.py`, proven by `tests/lab_governance/test_ai_controls.py`):
 
 * **Confabulated-Evidence Grounding (NIST MS-2.5-003 -- Confabulation):** Before the Review Board's CONFIRMED True Positive is allowed to stand, `enforce_grounding` re-resolves every high-confidence artifact cited in the supervisor's finding (IPv4, file hashes, PIDs, AWS ARNs) against the union of all evidence the investigation actually retrieved -- entity ids/notes, message contents, and the raw alert. A verdict that names an artifact the swarm never saw is treated as a confabulation and **failed closed to `monitor`**, never autonomous containment on fabricated evidence.
 

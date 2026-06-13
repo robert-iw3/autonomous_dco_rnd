@@ -2,7 +2,9 @@
 
 *Implementation: `mlops/scripts/03_eval_model.py`*
 
-Deterministic regression suite gates promotion: a candidate that regresses against the locked thresholds cannot be deployed.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — Deterministic regression gauntlet (OS-context, schema, injection, spatial, SIEM-pivot validity) over a locked corpus.
 
 `mlops/scripts/03_eval_model.py:L312-L338`
 
@@ -34,4 +36,14 @@ def run_regression_suite():
 
 if __name__ == "__main__":
     run_regression_suite()
+```
+
+**2. Execution** — Hard go/no-go: a candidate below the 99% zero-hallucination floor halts deployment (exit 1).
+
+`mlops/scripts/03_eval_model.py:L198-L200`
+
+```python
+    if accuracy < 99.0:
+        logging.critical("Model failed 'Zero-Hallucination' threshold. Deployment halted.")
+        exit(1)
 ```

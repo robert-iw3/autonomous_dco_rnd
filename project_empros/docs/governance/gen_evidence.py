@@ -74,9 +74,18 @@ def render_control(cid, entries, titles):
     if impl:
         impl = [impl] if isinstance(impl, str) else impl
         L += ["*Implementation: " + ", ".join(f"`{p}`" for p in impl) + "*", ""]
-    for entry in entries:
+    # When entries carry `step` labels they describe the control's *execution
+    # chain* (invocation → … → execution); surface that as a breadcrumb so the
+    # artifact proves the whole path, not just an isolated logic snippet.
+    steps = [e.get("step") for e in entries if e.get("step")]
+    if steps:
+        L += ["**Execution chain:** " + " → ".join(steps), ""]
+    for i, entry in enumerate(entries, 1):
         lang, citation, snippet = extract_snippet(entry)
-        L += [entry.get("caption", "").strip(), "", f"`{citation}`", "",
+        caption = entry.get("caption", "").strip()
+        step = entry.get("step")
+        head = f"**{i}. {step}** — {caption}" if step else caption
+        L += [head, "", f"`{citation}`", "",
               "```" + lang, snippet, "```", ""]
     return L
 
@@ -92,8 +101,13 @@ def render_dossier(evidence, titles):
          "This dossier answers each control with the **actual source code** that satisfies "
          "it — extracted directly from the repository and cited by `file:line`. Each snippet "
          "is anchored to a symbol, not a line number, so the dossier cannot silently drift "
-         "from the code (CI fails if an anchor moves). Several controls are answered by the "
-         "*culmination* of snippets across multiple files.", "", "\\newpage", ""]
+         "from the code (CI fails if an anchor moves).", "",
+         "Crucially, each control is presented as its **execution chain** — an ordered "
+         "sequence from *invocation* (where the live graph or worker actually calls in), "
+         "through the decision *logic*, to the *execution* / side-effect — shown as an "
+         "`Execution chain:` breadcrumb above the numbered steps. A lone logic snippet only "
+         "shows *what* a control computes; the chain proves it is genuinely reached and acted "
+         "on at runtime, not merely defined.", "", "\\newpage", ""]
     for cid in sorted(evidence):
         L += render_control(cid, evidence[cid], titles)
         L += ["\\newpage", ""]

@@ -42,7 +42,8 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | `offline` | `Dockerfile.offline` | TurboVec, RSI loop (107 tests, ~0.3s) | Alpine 3.23 |
 | `sensors` | `Dockerfile.sensors` | 14 sensor pipeline contracts + HMAC transmission + e2e sensor pipeline | Alpine 3.23 |
 | `mlops` | `Dockerfile.mlops` | Data flow, Track 6 dry-run, TI ingest, eval minilab, s3 parquet worker | Debian slim |
-| `analytics` | `Dockerfile.analytics` | LLM hunter (incl. review board + AI controls), agentic swarm, redteam bypass | Alpine 3.23 |
+| `analytics` | `Dockerfile.analytics` | LLM hunter (review board, SIEM tools/contracts), agentic swarm, redteam bypass | Alpine 3.23 |
+| `governance` | `Dockerfile.governance` | NIST AI 600-1 control suite + GRC manifest/evidence-chain/wiring (`lab_governance/`) | Debian slim |
 | `services` | `Dockerfile.services` | Worker/infra/orchestration source contracts (255 tests) | Alpine 3.23 |
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
 | `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
@@ -57,7 +58,9 @@ The script maps changed file paths to sections automatically:
 | Changed path | Sections triggered |
 |---|---|
 | `mlops/scripts/` | offline, mlops, pipeline |
-| `analytics/llm_hunter/` | analytics, services |
+| `analytics/llm_hunter/` | analytics, services, governance |
+| `analytics/llm_hunter/agents/controls` + ledger modules | governance |
+| `docs/governance/` | governance |
 | `services/` | services |
 | `services/worker_ti_ingest/` | mlops |
 | `windows/` | pipeline, sensors |
@@ -65,6 +68,7 @@ The script maps changed file paths to sections automatically:
 | `tests/sensors/` | sensors |
 | `tests/test_phase*` | pipeline |
 | `tests/lab_analytics_*`, `tests/lab_redteam/` | analytics |
+| `tests/lab_governance/` | governance |
 
 ### Reports
 
@@ -75,7 +79,7 @@ The script maps changed file paths to sections automatically:
    Actions / GitLab CI) and persist after the ephemeral containers are removed.
 2. **Any other invocation** (host `pytest`, a single-file ad-hoc run) gets a report auto-assigned
    by [`conftest.py`](conftest.py), named from the selected path(s) — e.g.
-   `pytest tests/lab_analytics_hunter/test_ai_controls.py` writes
+   `pytest tests/lab_governance/test_ai_controls.py` writes
    `tests/reports/test_ai_controls.xml`. These ad-hoc reports are **gitignored** (see
    [`reports/.gitignore`](reports/.gitignore)) so they never clutter commits; the canonical
    section reports are the only ones tracked.
@@ -86,6 +90,7 @@ tests/reports/
 ├── sensors.xml      │
 ├── mlops.xml        │  canonical per-section reports (committed)
 ├── analytics.xml    │
+├── governance.xml   │
 ├── services.xml     │
 ├── pipeline.xml     │
 ├── detchamber.xml   │
@@ -273,7 +278,20 @@ Offline. Stubs NATS, LangGraph, and Prometheus; imports `orchestrator.py`, `stat
 
 ### Lab 10: Analytics LLM Hunter Contracts (`lab_analytics_hunter/`)
 
-Offline. Validates `analytics/llm_hunter`: schemas, routing logic, sanitization, entity reducers, security controls. `langchain_core` is stubbed so tests run without the package.
+Offline. Validates `analytics/llm_hunter`: schemas, routing logic, sanitization, entity reducers, the review board, and the SIEM query tools/contracts. `langchain_core` is stubbed so tests run without the package. (The NIST AI 600-1 control / GRC suite lives in `lab_governance/`, below.)
+
+### Lab 10g: NIST AI 600-1 Controls & GRC (`lab_governance/`)
+
+Offline; **section `governance`** (`Dockerfile.governance` → `reports/governance.xml`). The control / GRC assurance suite, separated from the functional hunter tests:
+
+| File | Proves |
+|---|---|
+| `test_governance_manifest.py` | the controls manifest ↔ OSCAL (SP 800-53 / CSF 2.0) ↔ **evidence-chain** stay in sync; every cited impl/test path resolves; generated docs are not stale (26 tests) |
+| `test_ai_controls.py` | pure control logic in `agents/controls.py` (grounding, memory-TTL, provenance, fairness, calibration, over-reliance, failure capture, lineage, energy) |
+| `test_nist_controls_wave2.py` / `_wave4.py` | the durable-ledger control jobs (bias audit, calibration, frontier-pin, reliance, active-learning, verdict-lineage, energy accounting) |
+| `test_nist_controls_wiring.py` | NC-9/10/11 are actually **wired into the live `response_agent` / `review_board_node`** (the chain runs end to end), not just defined |
+
+`langchain_core` / `qdrant` / `redis` are stubbed; depends only on `pydantic` + `PyYAML`.
 
 ### Lab 11: Operations Contracts (`lab_operations_contracts/`)
 

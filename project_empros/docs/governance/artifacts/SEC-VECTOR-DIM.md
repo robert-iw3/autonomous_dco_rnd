@@ -2,7 +2,17 @@
 
 *Implementation: `analytics/llm_hunter/tools/qdrant_search.py`*
 
-Vector searches are validated against the expected per-collection dimensionality; a wrong-dimension probe is rejected before it hits the store.
+**Execution chain:** Invocation → Execution
+
+**1. Invocation** — The agent-facing vector-search tool entry point.
+
+`analytics/llm_hunter/tools/qdrant_search.py:L50-L50`
+
+```python
+    def _run(self, reasoning: str, vector_name: str, target_vector: List[float], limit: int = 5, target_sensor_id: Optional[str] = None) -> str:
+```
+
+**2. Execution** — Each search is validated against the expected per-collection dimensionality; a wrong-dimension (malformed/adversarial) probe is rejected before it hits the store.
 
 `analytics/llm_hunter/tools/qdrant_search.py:L58-L72`
 

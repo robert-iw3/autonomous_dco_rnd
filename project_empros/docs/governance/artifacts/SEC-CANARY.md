@@ -2,7 +2,17 @@
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Per-investigation canary token minted and embedded in the system context; its later appearance on any outbound surface is the prompt-leak tripwire.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
+
+`analytics/llm_hunter/orchestrator.py:L197-L197`
+
+```python
+            canary = CognitiveSanitizer.generate_canary()
+```
+
+**2. Logic** — The canary is a unique UUID tripwire — its only legitimate place is the system prompt, so any later appearance downstream is proof of a prompt leak.
 
 `analytics/llm_hunter/tools/sanitizer.py:L49-L58`
 
@@ -19,15 +29,7 @@ Per-investigation canary token minted and embedded in the system context; its la
     @staticmethod
 ```
 
-Orchestrator mints the canary at swarm start…
-
-`analytics/llm_hunter/orchestrator.py:L197-L197`
-
-```python
-            canary = CognitiveSanitizer.generate_canary()
-```
-
-…and verifies it never leaked into any outbound surface before the verdict is released.
+**3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
 `analytics/llm_hunter/orchestrator.py:L258-L261`
 

@@ -361,7 +361,7 @@ Sensor endpoint_id regex-validated in the Rust ingestion layer before reaching Q
 A confirmed TP citing an artifact never retrieved is demoted to monitor (fail-closed).
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestGroundingEnforcement`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestGroundingEnforcement`
 - Code evidence: `artifacts/AI-GROUNDING.md` (extracted snippets)
 
 **AI-MEMORY-TTL — Immunity-memory TTL / expiry** *(status: implemented; owner: AI Governance)*
@@ -369,7 +369,7 @@ A confirmed TP citing an artifact never retrieved is demoted to monitor (fail-cl
 Stored FP signatures expire (default 30 d) so a stale/wrong FP cannot entrench a permanent blind spot.
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestMemoryTTL`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestMemoryTTL`
 - Code evidence: `artifacts/AI-MEMORY-TTL.md` (extracted snippets)
 
 **AI-PROVENANCE — AI-origin provenance disclosure** *(status: implemented; owner: AI Governance)*
@@ -377,7 +377,7 @@ Stored FP signatures expire (default 30 d) so a stale/wrong FP cannot entrench a
 Every incident report is stamped AI-generated so consumers are never misled.
 
 - Implementation: `analytics/llm_hunter/agents/controls.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestProvenanceDisclosure`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestProvenanceDisclosure`
 - Code evidence: `artifacts/AI-PROVENANCE.md` (extracted snippets)
 
 **AI-REVIEW-BOARD — Adversarial review board (per-expert counterparts)** *(status: implemented; owner: AI Governance)*
@@ -393,7 +393,7 @@ Each expert has a counterpart that tries to disprove the finding; TP only if non
 Job scrolls verdict/immunity memory; disaggregated containment-disparity + model-collapse monitor; writes a flagged report.
 
 - Implementation: `analytics/llm_hunter/agents/bias_audit.py`
-- Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestBiasAudit`
+- Tests: `tests/lab_governance/test_nist_controls_wave2.py::TestBiasAudit`
 - Code evidence: `artifacts/NC-1-BIAS-AUDIT.md` (extracted snippets)
 
 **NC-10-VERDICT-LINEAGE — Tamper-evident verdict lineage** *(status: implemented; owner: AI Governance)*
@@ -401,7 +401,7 @@ Job scrolls verdict/immunity memory; disaggregated containment-disparity + model
 Append-only SHA-256 hash chain over verdict/audit records; any post-hoc edit, deletion, or reorder breaks verification — a tamper-evident trail for autonomous decisions.
 
 - Implementation: `analytics/llm_hunter/agents/verdict_ledger.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestVerdictLineage`, `tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestVerdictLedger`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestVerdictLineage`, `tests/lab_governance/test_nist_controls_wave4.py::TestVerdictLedger`
 - Code evidence: `artifacts/NC-10-VERDICT-LINEAGE.md` (extracted snippets)
 
 **NC-11-ENERGY-ACCOUNTING — Per-run inference energy accounting** *(status: implemented; owner: AI Governance)*
@@ -409,7 +409,7 @@ Append-only SHA-256 hash chain over verdict/audit records; any post-hoc edit, de
 Folds the one-time footprint estimate (NC-6) into a per-run energy (Wh) + carbon (gCO2e) measurement the MLOps metric plane rolls up.
 
 - Implementation: `analytics/llm_hunter/agents/energy_accounting.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestInferenceEnergy`, `tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestEnergyAccounting`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestInferenceEnergy`, `tests/lab_governance/test_nist_controls_wave4.py::TestEnergyAccounting`
 - Code evidence: `artifacts/NC-11-ENERGY-ACCOUNTING.md` (extracted snippets)
 
 **NC-2-CALIBRATION — Confidence-calibration ledger** *(status: implemented; owner: AI Governance)*
@@ -417,7 +417,7 @@ Folds the one-time footprint estimate (NC-6) into a per-run energy (Wh) + carbon
 Pairs operator dispositions with predicted confidence into a Brier/over-confidence trend.
 
 - Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`
-- Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestCalibrationLedger`
+- Tests: `tests/lab_governance/test_nist_controls_wave2.py::TestCalibrationLedger`
 - Code evidence: `artifacts/NC-2-CALIBRATION.md` (extracted snippets)
 
 **NC-3-FRONTIER-PIN — Frontier model boot-time version-pin enforcement** *(status: implemented; owner: AI Governance)*
@@ -425,7 +425,7 @@ Pairs operator dispositions with predicted confidence into a Brier/over-confiden
 build_failover_chain refuses a frontier provider on a floating alias unless explicitly opted in.
 
 - Implementation: `analytics/llm_hunter/agents/llm_providers.py`
-- Tests: `tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestFrontierPinEnforcement`
+- Tests: `tests/lab_governance/test_nist_controls_wave2.py::TestFrontierPinEnforcement`
 - Code evidence: `artifacts/NC-3-FRONTIER-PIN.md` (extracted snippets)
 
 **NC-4-RETENTION — Data retention & decommissioning policy** *(status: documented; owner: AI Governance)*
@@ -447,7 +447,7 @@ Training/inference footprint estimate + tracking approach.
 Measures the human side of HitL — accept-vs-override and how often a wrong AI call is rubber-stamped (automation bias), by AI-confidence band, over operator dispositions.
 
 - Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestOverReliance`, `tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestRelianceLedger`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestOverReliance`, `tests/lab_governance/test_nist_controls_wave4.py::TestRelianceLedger`
 - Code evidence: `artifacts/NC-8-OVER-RELIANCE.md` (extracted snippets)
 
 **NC-9-ACTIVE-LEARNING — Active-learning failure capture** *(status: implemented; owner: AI Governance)*
@@ -455,7 +455,7 @@ Measures the human side of HitL — accept-vs-override and how often a wrong AI 
 Captures the swarm's misclassifications + ungrounded-evidence verdicts as a structured hard-example corpus for MLOps continuous improvement.
 
 - Implementation: `analytics/llm_hunter/agents/active_learning.py`
-- Tests: `tests/lab_analytics_hunter/test_ai_controls.py::TestActiveLearningFailure`, `tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestActiveLearning`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestActiveLearningFailure`, `tests/lab_governance/test_nist_controls_wave4.py::TestActiveLearning`
 - Code evidence: `artifacts/NC-9-ACTIVE-LEARNING.md` (extracted snippets)
 
 

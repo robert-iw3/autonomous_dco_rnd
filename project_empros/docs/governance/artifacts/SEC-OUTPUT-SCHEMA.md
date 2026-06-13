@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-SOAR actions must satisfy a strict Pydantic contract (enumerated action, validated targets) before any response is dispatched.
+**Execution chain:** Logic → Invocation → Execution
+
+**1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
 `analytics/llm_hunter/state.py:L94-L129`
 
@@ -43,4 +45,28 @@ class SoarExecutionSchema(BaseModel):
     reason: constr(max_length=200) = Field(description="Brief justification for the audit log.")
 
     @field_validator("targets")
+```
+
+**2. Invocation** — The dispatch path is the single egress for any containment action.
+
+`analytics/llm_hunter/orchestrator.py:L294-L295`
+
+```python
+async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
+    """Validate the field-aligned SOAR payload and publish it to JetStream."""
+```
+
+**3. Execution** — Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed.
+
+`analytics/llm_hunter/orchestrator.py:L324-L331`
+
+```python
+        validated = SoarExecutionSchema(
+            incident_id=action.get("incident_id", alert.event_id),
+            action_type=action_type,
+            target_sensor=action.get("target_sensor", alert.sensor_id),
+            targets=action.get("targets", []),
+            confidence=float(action.get("confidence", 0.0)),
+            reason=action.get("reason", "")[:200],
+        )
 ```

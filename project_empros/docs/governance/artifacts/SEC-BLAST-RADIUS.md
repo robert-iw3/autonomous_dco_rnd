@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-Entity state is a monotonic, conflict-resolving state machine; containment status only escalates, capping the blast radius of any single action.
+**Execution chain:** Logic → Effect → Execution
+
+**1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
 `analytics/llm_hunter/state.py:L181-L211`
 
@@ -38,4 +40,25 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
     return merged
 
 # ─── Context Window Manager ────────────────────────────────────────
+```
+
+**2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
+
+`analytics/llm_hunter/agents/supervisor.py:L196-L199`
+
+```python
+    if len(entities) > MAX_ENTITIES:
+        logger.warning(
+            f"[BLAST RADIUS] {len(entities)} entities exceeds MAX_ENTITIES={MAX_ENTITIES}. "
+            f"Forcing FINISH with conservative verdict to prevent mass action."
+```
+
+**3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
+
+`analytics/llm_hunter/agents/response.py:L76-L78`
+
+```python
+        av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
+        if av >= 0.9:
+            return True, f"Critical infrastructure targeted: {target} (AssetValue={av})"
 ```

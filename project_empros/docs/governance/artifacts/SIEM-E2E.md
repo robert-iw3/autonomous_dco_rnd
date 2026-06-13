@@ -2,7 +2,9 @@
 
 *Implementation: `tests/lab_siem_federation/test_siem_federation_e2e.py`*
 
-Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production.
+**Execution chain:** Proof → Proof
+
+**1. Proof** — Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production.
 
 `tests/lab_siem_federation/test_siem_federation_e2e.py:L189-L195`
 
@@ -16,7 +18,7 @@ Conservation test: an event fanned out to Splunk (CIM) must be retrievable via t
         assert "returned 1 row" in out and DST in out, "conservation broken: fanned-out event not retrieved"
 ```
 
-Same conservation guarantee on the Elastic (ECS) path via ES|QL.
+**2. Proof** — Same conservation guarantee on the Elastic (ECS) path via ES|QL.
 
 `tests/lab_siem_federation/test_siem_federation_e2e.py:L222-L227`
 

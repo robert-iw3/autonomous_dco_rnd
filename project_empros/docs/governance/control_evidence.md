@@ -12,7 +12,9 @@ version: "1.0"
 
 ## Purpose
 
-This dossier answers each control with the **actual source code** that satisfies it — extracted directly from the repository and cited by `file:line`. Each snippet is anchored to a symbol, not a line number, so the dossier cannot silently drift from the code (CI fails if an anchor moves). Several controls are answered by the *culmination* of snippets across multiple files.
+This dossier answers each control with the **actual source code** that satisfies it — extracted directly from the repository and cited by `file:line`. Each snippet is anchored to a symbol, not a line number, so the dossier cannot silently drift from the code (CI fails if an anchor moves).
+
+Crucially, each control is presented as its **execution chain** — an ordered sequence from *invocation* (where the live graph or worker actually calls in), through the decision *logic*, to the *execution* / side-effect — shown as an `Execution chain:` breadcrumb above the numbered steps. A lone logic snippet only shows *what* a control computes; the chain proves it is genuinely reached and acted on at runtime, not merely defined.
 
 \newpage
 
@@ -20,7 +22,33 @@ This dossier answers each control with the **actual source code** that satisfies
 
 *Implementation: `analytics/llm_hunter/agents/controls.py`*
 
-Every cited artifact in a verdict must trace to the assembled evidence corpus; ungrounded (confabulated) claims are flagged and the verdict is demoted.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Assembles the ground-truth corpus — the union of every artifact the investigation actually observed (entities, message contents, raw alert).
+
+`analytics/llm_hunter/agents/controls.py:L58-L74`
+
+```python
+def build_evidence_corpus(state: dict) -> set:
+    """Union of every artifact the investigation actually observed: entity ids +
+    notes, message contents, and the raw alert. This is the ground truth a
+    confirmed verdict's citations must resolve against."""
+    state = state or {}
+    corpus: set = set()
+    for eid, edata in (state.get("entities_of_interest", {}) or {}).items():
+        corpus.add(str(eid))
+        corpus |= extract_artifacts(eid)
+        corpus |= extract_artifacts((edata or {}).get("notes", ""))
+    for m in state.get("messages", []) or []:
+        corpus |= extract_artifacts(getattr(m, "content", "") or "")
+    alert = state.get("alert", {}) or {}
+    corpus |= extract_artifacts(alert.get("raw_event", ""))
+    if alert.get("sensor_id"):
+        corpus.add(str(alert["sensor_id"]))
+    return {c for c in corpus if c}
+```
+
+**2. Logic** — Every artifact cited in a confirmed verdict must resolve to that corpus; an ungrounded (confabulated) citation fails the verdict closed to monitor.
 
 `analytics/llm_hunter/agents/controls.py:L84-L114`
 
@@ -58,13 +86,33 @@ def enforce_grounding(board_result: dict, state: dict):
 # ---------------------------------------------------------------------------
 ```
 
+**3. Execution** — Wired into the live board node: the aggregated verdict is re-grounded, an ungrounded TP is demoted, and the violations are surfaced into state to feed active-learning (NC-9).
+
+`analytics/llm_hunter/agents/review_board.py:L279-L289`
+
+```python
+    # Confabulated-evidence grounding (NIST MS-2.5-003): a CONFIRMED TP whose
+    # finding cites artifacts the swarm never retrieved is a fabrication -- fail
+    # it closed to monitor rather than autonomously containing on phantom evidence.
+    result, violations = enforce_grounding(result, state)
+    if violations:
+        logger.warning("GROUNDING OVERRIDE: confirmed TP cited ungrounded artifacts %s "
+                       "-- demoted to monitor.", violations)
+    # Surface the violations into state so the response agent can capture them as
+    # an active-learning hard example (NC-9); empty list keeps the contract stable
+    # for grounded verdicts.
+    result["grounding_violations"] = violations
+```
+
 \newpage
 
 ### AI-MEMORY-TTL — Immunity-memory TTL / expiry
 
 *Implementation: `analytics/llm_hunter/agents/controls.py`*
 
-Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions.
+**Execution chain:** Logic → Execution → Persistence
+
+**1. Logic** — A recalled immunity memory is actionable only if it is an eligible False Positive still within its TTL (default 30 d).
 
 `analytics/llm_hunter/agents/controls.py:L147-L175`
 
@@ -100,13 +148,37 @@ AI_PROVENANCE_BANNER = (
 )
 ```
 
+**2. Execution** — Wired into recall: a high-similarity historical FP may short-circuit the swarm only while its memory has not expired.
+
+`analytics/llm_hunter/agents/supervisor.py:L235-L239`
+
+```python
+            if hits and memory_is_actionable(hits[0].payload, time.time()):
+                m = hits[0]
+                logger.warning(
+                    f"RAG IMMUNITY TRIGGERED: match with historical False Positive "
+                    f"(score={m.score:.3f} ≥ {IMMUNITY_THRESHOLD}). Short-circuiting Swarm."
+```
+
+**3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
+
+`analytics/llm_hunter/agents/response.py:L139-L141`
+
+```python
+                    # NIST GV-1.3-005: timestamp so the supervisor's recall can
+                    # expire stale immunity rather than entrenching a blind spot.
+                    "created_at": time.time(),
+```
+
 \newpage
 
 ### AI-PROVENANCE — AI-origin provenance disclosure
 
 *Implementation: `analytics/llm_hunter/agents/controls.py`*
 
-Machine-generated narrative is stamped with an explicit AI-origin disclosure before it leaves the system.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — Idempotently prepends an explicit AI-origin disclosure banner to a report.
 
 `analytics/llm_hunter/agents/controls.py:L178-L192`
 
@@ -128,13 +200,50 @@ def stamp_ai_provenance(report: str) -> str:
 _FRONTIER_API_TYPES = {"anthropic", "openai"}
 ```
 
+**2. Execution** — Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted.
+
+`analytics/llm_hunter/agents/response.py:L235-L237`
+
+```python
+    # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
+    # AI-generated so a human consumer is never misled about its source.
+    incident_report = stamp_ai_provenance(incident_report)
+```
+
 \newpage
 
 ### AI-REVIEW-BOARD — Adversarial review board (per-expert counterparts)
 
 *Implementation: `analytics/llm_hunter/agents/review_board.py`*
 
-Adversarial board aggregation is a pure, deterministic decision rule over per-expert counterpart rebuttals — no model can unilaterally confirm a verdict.
+**Execution chain:** Invocation → Node → Logic
+
+**1. Invocation** — The board is wired into the graph as a mandatory node on the path to any response.
+
+`analytics/llm_hunter/orchestrator.py:L136-L136`
+
+```python
+    builder.add_node("review_board", review_board_node)
+```
+
+**2. Node** — The node runs every implicated expert's counterpart concurrently against the supervisor verdict.
+
+`analytics/llm_hunter/agents/review_board.py:L266-L275`
+
+```python
+async def review_board_node(state: InvestigativeState):
+    """Run every counterpart against the supervisor's verdict and aggregate."""
+    verdict = state.get("verdict") or {}
+    logger.info("Review board convening: %d counterparts vs supervisor verdict (tp=%s)",
+                len(COUNTERPARTS), verdict.get("is_true_positive"))
+
+    rebuttals = await asyncio.gather(
+        *[_run_counterpart(domain, state, verdict) for domain in COUNTERPARTS],
+        return_exceptions=False,
+    )
+```
+
+**3. Logic** — A pure, deterministic decision rule aggregates the rebuttals: a TP survives only if no implicated counterpart can disprove it — no model unilaterally confirms a verdict. Fails closed.
 
 `analytics/llm_hunter/agents/review_board.py:L189-L217`
 
@@ -176,7 +285,9 @@ def aggregate_board(supervisor_verdict: dict, rebuttals: list) -> dict:
 
 *Implementation: `hardening/tasks/main.yml`*
 
-Ansible baseline applies kernel/sysctl hardening…
+**Execution chain:** Execution → Execution → Execution
+
+**1. Execution** — Ansible baseline applies kernel/sysctl hardening…
 
 `hardening/tasks/main.yml:L20-L22`
 
@@ -186,7 +297,7 @@ Ansible baseline applies kernel/sysctl hardening…
   ansible.builtin.include_tasks: kernel.yml
 ```
 
-…a default-deny firewall…
+**2. Execution** — …a default-deny firewall…
 
 `hardening/tasks/main.yml:L30-L32`
 
@@ -196,7 +307,7 @@ Ansible baseline applies kernel/sysctl hardening…
   when: hardening_firewall_enabled
 ```
 
-…and host audit rules — declaratively and idempotently across the fleet.
+**3. Execution** — …and host audit rules — declaratively and idempotently across the fleet.
 
 `hardening/tasks/main.yml:L34-L35`
 
@@ -211,7 +322,9 @@ Ansible baseline applies kernel/sysctl hardening…
 
 *Implementation: `libs/lib_siem_core/src/lib.rs`*
 
-Workers adapt their batch deadline to observed queue depth; combined with the circuit-breaker pause and dead-letter prefix below, a failing downstream is isolated rather than amplified.
+**Execution chain:** Logic → Effect → Execution
+
+**1. Logic** — Workers adapt their batch deadline to observed queue depth.
 
 `libs/lib_siem_core/src/lib.rs:L44-L60`
 
@@ -235,7 +348,7 @@ fn adaptive_deadline(current_ms: u64, messages_fetched: usize, batch_limit: usiz
 // must authenticate with the per-role user provisioned in its env file
 ```
 
-Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-lettered and the worker backs off instead of hot-looping.
+**2. Effect** — Default DLQ routing + circuit-breaker pause config: poisoned/failed batches are dead-lettered.
 
 `libs/lib_siem_core/src/lib.rs:L104-L110`
 
@@ -249,13 +362,40 @@ Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-le
             // Batch deadline: how long to accumulate messages before processing.
 ```
 
+**3. Execution** — In the consume loop a tripped breaker pauses consumption (metric + backoff) instead of hot-looping a failing downstream.
+
+`libs/lib_siem_core/src/lib.rs:L262-L269`
+
+```rust
+        // ── Circuit breaker cooldown ─────────────────────────────────────
+        if circuit_open {
+            warn!(
+                pause_secs = cfg.circuit_breaker_pause_secs,
+                "Circuit breaker active. Pausing consumption."
+            );
+            counter!("nexus_worker_circuit_breaker_trips_total").increment(1);
+            tokio::time::sleep(Duration::from_secs(cfg.circuit_breaker_pause_secs)).await;
+```
+
 \newpage
 
 ### ING-ZERO-TRUST — Zero-Trust ingestion gateway (HMAC + 3-tier replay defense)
 
 *Implementation: `services/core_ingress/src/integrity.rs`*
 
-Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage.
+**Execution chain:** Invocation → Logic → Logic → Execution
+
+**1. Invocation** — The ingestion gateway's batch-verification entry point — every inbound batch passes through here before it is accepted.
+
+`services/core_ingress/src/integrity.rs:L211-L213`
+
+```rust
+    pub fn verify_batch(
+        &self,
+        parquet_bytes: &[u8],
+```
+
+**2. Logic** — Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage.
 
 `services/core_ingress/src/integrity.rs:L29-L41`
 
@@ -275,7 +415,7 @@ fn compute_hmac(
     mac.update(&timestamp.to_be_bytes());
 ```
 
-HMAC comparison is constant-time, closing the timing-oracle side channel.
+**3. Logic** — HMAC comparison is constant-time, closing the timing-oracle side channel.
 
 `services/core_ingress/src/integrity.rs:L46-L56`
 
@@ -293,7 +433,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 ```
 
-A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense.
+**4. Execution** — A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense.
 
 `services/core_ingress/src/integrity.rs:L127-L145`
 
@@ -325,7 +465,47 @@ A bounded replay window + monotonic sequence rejects replayed/out-of-order batch
 
 *Implementation: `analytics/llm_hunter/agents/bias_audit.py`*
 
-Scheduled audit computes per-dimension disparity and memory-homogenization metrics over the immunity store to detect bias/monoculture drift.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Pure disaggregated disparity analytic: per-subgroup containment/TP rates vs the fleet baseline, flagging any group beyond the disparity tolerance.
+
+`analytics/llm_hunter/agents/controls.py:L239-L249`
+
+```python
+def fairness_report(records, dimension: str = "source_type",
+                    min_support: int = 5, max_disparity: float = 0.2) -> dict:
+    """Disaggregated fairness audit over historical verdict records.
+
+    Each record is a dict carrying the grouping `dimension` plus either an
+    `action` string or a `contained` bool, and (optionally) `is_true_positive`.
+    A subgroup with at least `min_support` samples whose containment rate differs
+    from the overall baseline by more than `max_disparity` (absolute) is flagged.
+    """
+    records = list(records or [])
+    total = len(records)
+```
+
+**2. Logic** — Pure model-collapse monitor: flags when the immunity store over-concentrates on one signature (top-share / low entropy).
+
+`analytics/llm_hunter/agents/controls.py:L301-L313`
+
+```python
+def memory_homogenization(signatures, top_share_threshold: float = 0.5,
+                          min_entropy: float = 0.5) -> dict:
+    """Distribution health of the immunity memory. Accepts a list of signatures
+    or a {signature: count} mapping. Flags `homogenized` when one signature owns
+    more than `top_share_threshold` of the memory, or normalized Shannon entropy
+    drops below `min_entropy`."""
+    if isinstance(signatures, dict):
+        counts = {k: int(v) for k, v in signatures.items() if int(v) > 0}
+    else:
+        counts = {}
+        for s in (signatures or []):
+            counts[s] = counts.get(s, 0) + 1
+
+```
+
+**3. Execution** — The scheduled audit job runs both analytics over the verdict/immunity history and writes a flagged report.
 
 `analytics/llm_hunter/agents/bias_audit.py:L41-L63`
 
@@ -361,7 +541,38 @@ def run_bias_audit(records: List[Dict[str, Any]], dimension: str = "source_type"
 
 *Implementation: `analytics/llm_hunter/agents/verdict_ledger.py`*
 
-SHA-256 hash chain over verdict records: each entry binds the previous hash, so any edit, deletion, or reorder is detected and the first broken index returned.
+**Execution chain:** Invocation → Logic → Logic → Execution
+
+**1. Invocation** — Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft).
+
+`analytics/llm_hunter/agents/response.py:L167-L177`
+
+```python
+    try:
+        verdict_ledger.append_verdict(
+            {
+                "event_id": event_id,
+                "is_true_positive": bool(verdict.get("is_true_positive")),
+                "confidence": float(verdict.get("confidence", 0.0) or 0.0),
+                "recommended_action": verdict.get("recommended_action", "monitor"),
+                "report_sha256": hashlib.sha256((incident_report or "").encode("utf-8")).hexdigest(),
+            },
+            ledger_path=os.getenv("NEXUS_VERDICT_LEDGER", verdict_ledger.DEFAULT_LEDGER),
+        )
+```
+
+**2. Logic** — Builds one chain entry binding a record to the previous entry's hash.
+
+`analytics/llm_hunter/agents/controls.py:L480-L483`
+
+```python
+def lineage_entry(prev_hash, record) -> dict:
+    """Build one chain entry linking `record` to `prev_hash` (genesis if None)."""
+    prev = prev_hash or GENESIS_HASH
+    return {"record": record, "prev_hash": prev, "entry_hash": _entry_hash(prev, record)}
+```
+
+**3. Logic** — Verifies the SHA-256 chain end to end; any edit, deletion, or reorder is detected and the first broken index returned.
 
 `analytics/llm_hunter/agents/controls.py:L486-L496`
 
@@ -379,7 +590,7 @@ def verify_lineage(entries) -> dict:
 
 ```
 
-Durable append: every verdict is chained onto the prior entry's hash, giving autonomous-containment decisions a tamper-evident trail.
+**4. Execution** — Durable append: every verdict is chained onto the prior entry's hash on disk.
 
 `analytics/llm_hunter/agents/verdict_ledger.py:L37-L46`
 
@@ -402,7 +613,21 @@ def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
 
 *Implementation: `analytics/llm_hunter/agents/energy_accounting.py`*
 
-Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft).
+
+`analytics/llm_hunter/agents/response.py:L182-L186`
+
+```python
+    try:
+        energy_accounting.record_run(
+            inference_s, NEXUS_AVG_POWER_W, event_id=event_id,
+            ledger_path=os.getenv("NEXUS_ENERGY_LEDGER", energy_accounting.DEFAULT_LEDGER),
+        )
+```
+
+**2. Logic** — Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor.
 
 `analytics/llm_hunter/agents/controls.py:L506-L517`
 
@@ -421,7 +646,7 @@ def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,
         "duration_s": duration_s,
 ```
 
-Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals().
+**3. Execution** — Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals().
 
 `analytics/llm_hunter/agents/energy_accounting.py:L23-L33`
 
@@ -445,7 +670,31 @@ def record_run(duration_s, avg_power_w, event_id: str = "", pue: float = 1.5,
 
 *Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
 
-Each verdict's stated confidence is recorded against the operator's ground-truth disposition…
+**Execution chain:** Logic → Execution → Effect
+
+**1. Logic** — Pure calibration point: the verdict's predicted confidence vs the operator's realized disposition, scored by Brier error.
+
+`analytics/llm_hunter/agents/controls.py:L119-L133`
+
+```python
+def calibration_record(verdict: dict, operator_disposition: str) -> dict:
+    """Build one calibration data point. `brier` is the squared error of the
+    predicted probability of the realized class (lower is better-calibrated)."""
+    v = verdict or {}
+    predicted_tp = bool(v.get("is_true_positive"))
+    confidence = float(v.get("confidence", 0.0) or 0.0)
+    realized_tp = str(operator_disposition).strip().lower() in _REALIZED_TP
+    p_tp = confidence if predicted_tp else (1.0 - confidence)
+    actual = 1.0 if realized_tp else 0.0
+    return {
+        "predicted_tp": predicted_tp,
+        "predicted_confidence": confidence,
+        "realized_tp": realized_tp,
+        "correct": predicted_tp == realized_tp,
+        "brier": (p_tp - actual) ** 2,
+```
+
+**2. Execution** — Each operator disposition is appended to a durable calibration ledger.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L27-L39`
 
@@ -465,7 +714,7 @@ def record_disposition(verdict: dict, operator_disposition: str, event_id: str =
 
 ```
 
-…and the Brier-score trend is computed so miscalibration is measurable and trackable over time.
+**3. Effect** — The Brier-score trend is computed over the ledger so miscalibration is measurable and trackable over time.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L81-L103`
 
@@ -501,25 +750,31 @@ def brier_trend(records: List[Dict[str, Any]], last_n: int = 0) -> dict:
 
 *Implementation: `analytics/llm_hunter/agents/llm_providers.py`*
 
-A frontier (hosted) model with a floating/unpinned version is rejected at boot unless an explicit override is set — no silent model drift.
+**Execution chain:** Logic → Boot
 
-`analytics/llm_hunter/agents/llm_providers.py:L148-L161`
+**1. Logic** — Classifies a model id as 'floating' (empty, or a moving alias such as *-latest).
+
+`analytics/llm_hunter/agents/controls.py:L195-L201`
 
 ```python
-def frontier_pin_allowed(name: str, cfg: dict, allow_floating: bool = None):
-    """(ok, reason). Internal/sovereign providers and non-frontier api types are
-    out of scope (their weights are hash-verified by the supply-chain control)."""
-    from agents.controls import is_floating_model
-    if allow_floating is None:
-        allow_floating = os.getenv("NEXUS_ALLOW_FLOATING_FRONTIER", "").lower() in ("1", "true", "yes")
-    cfg = cfg or {}
-    if str(name).startswith("internal_") or cfg.get("api_type") not in _FRONTIER_API:
-        return True, ""
-    if is_floating_model(cfg.get("model", "")) and not allow_floating:
-        return False, (f"frontier provider '{name}' has floating model '{cfg.get('model', '')}' "
-                       f"-- pin a version or set NEXUS_ALLOW_FLOATING_FRONTIER=1 (NIST MP-4.1-007)")
-    return True, ""
+def is_floating_model(model: str) -> bool:
+    """A model id is 'floating' if empty or it resolves to a moving target
+    (e.g. an alias ending in '-latest')."""
+    if not model:
+        return True
+    return "latest" in str(model).strip().lower()
 
+```
+
+**2. Boot** — Wired into chain construction: as the failover chain is built each frontier provider is pin-checked and a floating alias is refused unless explicitly opted in — no silent model drift.
+
+`analytics/llm_hunter/agents/llm_providers.py:L175-L178`
+
+```python
+        ok, reason = frontier_pin_allowed(name, cfg)
+        if not ok:
+            logger.error("Refusing LLM provider: %s", reason)
+            continue
 ```
 
 \newpage
@@ -528,7 +783,31 @@ def frontier_pin_allowed(name: str, cfg: dict, allow_floating: bool = None):
 
 *Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
 
-Measures the human side of HitL: automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Pure reliance point: the AI verdict, whether the operator accepted or overrode it, and the eventual ground truth.
+
+`analytics/llm_hunter/agents/controls.py:L351-L365`
+
+```python
+def reliance_record(verdict: dict, operator_action: str,
+                    ground_truth_disposition=None) -> dict:
+    """One human-AI reliance data point: the AI verdict, whether the operator
+    accepted or overrode it, and (optionally) the eventual ground truth. Anything
+    not an explicit override counts as acceptance (the default, riskier posture)."""
+    v = verdict or {}
+    act = str(operator_action).strip().lower()
+    rec = {
+        "ai_tp": bool(v.get("is_true_positive")),
+        "ai_confidence": float(v.get("confidence", 0.0) or 0.0),
+        "accepted": act not in _OVERRIDE_ACTIONS,
+    }
+    if ground_truth_disposition is not None:
+        truth_tp = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+        rec["ground_truth_tp"] = truth_tp
+```
+
+**2. Logic** — automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band.
 
 `analytics/llm_hunter/agents/controls.py:L370-L392`
 
@@ -558,7 +837,7 @@ def over_reliance_report(records, high_conf: float = 0.8, min_support: int = 5,
     base["override_rate"] = round((n - accepts) / n, 4)
 ```
 
-Each operator decision is logged as an accept-vs-override reliance point against the eventual ground truth.
+**3. Execution** — Each operator decision is logged as a durable accept-vs-override reliance point against the eventual ground truth.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L46-L56`
 
@@ -582,7 +861,22 @@ def record_reliance(verdict: dict, operator_action: str,
 
 *Implementation: `analytics/llm_hunter/agents/active_learning.py`*
 
-A verdict is a captured failure when it cites ungrounded evidence or its class contradicts operator ground truth.
+**Execution chain:** Invocation → Logic → Logic → Execution
+
+**1. Invocation** — Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft).
+
+`analytics/llm_hunter/agents/response.py:L193-L198`
+
+```python
+        if grounding_violations:
+            active_learning.capture(
+                verdict, grounding_violation=True, event_id=event_id,
+                artifacts=list(grounding_violations),
+                corpus_path=os.getenv("NEXUS_FAILURE_CORPUS", active_learning.DEFAULT_CORPUS),
+            )
+```
+
+**2. Logic** — A verdict is a captured failure when it cites ungrounded evidence or its class contradicts operator ground truth.
 
 `analytics/llm_hunter/agents/controls.py:L429-L438`
 
@@ -599,7 +893,29 @@ def is_model_failure(verdict: dict, ground_truth_disposition=None,
     return bool((verdict or {}).get("is_true_positive")) != truth_tp
 ```
 
-Failures are appended to a hard-example corpus the MLOps plane consumes for continuous improvement; correct verdicts are a no-op.
+**3. Logic** — Builds the structured hard-example record (predicted vs realized, reason, artifacts) — or None for a correct verdict.
+
+`analytics/llm_hunter/agents/controls.py:L441-L455`
+
+```python
+def failure_record(verdict: dict, ground_truth_disposition=None,
+                   grounding_violation: bool = False, event_id: str = "",
+                   artifacts=None) -> dict | None:
+    """Structured hard-example record, or None if the verdict was not a failure."""
+    if not is_model_failure(verdict, ground_truth_disposition, grounding_violation):
+        return None
+    v = verdict or {}
+    realized = None
+    if ground_truth_disposition is not None:
+        realized = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+    return {
+        "event_id": event_id,
+        "predicted_tp": bool(v.get("is_true_positive")),
+        "predicted_confidence": float(v.get("confidence", 0.0) or 0.0),
+        "realized_tp": realized,
+```
+
+**4. Execution** — Appends the failure to the hard-example corpus the MLOps plane consumes; a correct verdict is a no-op.
 
 `analytics/llm_hunter/agents/active_learning.py:L23-L35`
 
@@ -625,7 +941,9 @@ def capture(verdict: dict, operator_disposition: Optional[str] = None,
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-Entity state is a monotonic, conflict-resolving state machine; containment status only escalates, capping the blast radius of any single action.
+**Execution chain:** Logic → Effect → Execution
+
+**1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
 `analytics/llm_hunter/state.py:L181-L211`
 
@@ -663,13 +981,44 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 # ─── Context Window Manager ────────────────────────────────────────
 ```
 
+**2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
+
+`analytics/llm_hunter/agents/supervisor.py:L196-L199`
+
+```python
+    if len(entities) > MAX_ENTITIES:
+        logger.warning(
+            f"[BLAST RADIUS] {len(entities)} entities exceeds MAX_ENTITIES={MAX_ENTITIES}. "
+            f"Forcing FINISH with conservative verdict to prevent mass action."
+```
+
+**3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
+
+`analytics/llm_hunter/agents/response.py:L76-L78`
+
+```python
+        av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
+        if av >= 0.9:
+            return True, f"Critical infrastructure targeted: {target} (AssetValue={av})"
+```
+
 \newpage
 
 ### SEC-CANARY — Canary token prompt-leak tripwire
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Per-investigation canary token minted and embedded in the system context; its later appearance on any outbound surface is the prompt-leak tripwire.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
+
+`analytics/llm_hunter/orchestrator.py:L197-L197`
+
+```python
+            canary = CognitiveSanitizer.generate_canary()
+```
+
+**2. Logic** — The canary is a unique UUID tripwire — its only legitimate place is the system prompt, so any later appearance downstream is proof of a prompt leak.
 
 `analytics/llm_hunter/tools/sanitizer.py:L49-L58`
 
@@ -686,15 +1035,7 @@ Per-investigation canary token minted and embedded in the system context; its la
     @staticmethod
 ```
 
-Orchestrator mints the canary at swarm start…
-
-`analytics/llm_hunter/orchestrator.py:L197-L197`
-
-```python
-            canary = CognitiveSanitizer.generate_canary()
-```
-
-…and verifies it never leaked into any outbound surface before the verdict is released.
+**3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
 `analytics/llm_hunter/orchestrator.py:L258-L261`
 
@@ -711,7 +1052,9 @@ Orchestrator mints the canary at swarm start…
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing sovereign data isolation.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — Scrubs RFC-1918 ranges + high-entropy credentials/secrets from text.
 
 `analytics/llm_hunter/tools/sanitizer.py:L59-L73`
 
@@ -733,13 +1076,34 @@ Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing so
     @classmethod
 ```
 
+**2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
+
+`analytics/llm_hunter/agents/response.py:L312-L312`
+
+```python
+    reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
+```
+
 \newpage
 
 ### SEC-DUCKDB-SANDBOX — Read-only data-lake query sandbox
 
 *Implementation: `analytics/llm_hunter/tools/duckdb_query.py`*
 
-The data-lake query tool rejects anything but read-only SELECT and runs against a read-only connection — the agent cannot mutate the lake.
+**Execution chain:** Invocation → Execution
+
+**1. Invocation** — The agent-facing data-lake tool — the only path by which an LLM can query cold storage.
+
+`analytics/llm_hunter/tools/duckdb_query.py:L27-L30`
+
+```python
+class DuckDBQueryTool(BaseTool):
+    name: str = "query_parquet_data_lake"
+    description: str = (
+        "Executes a read-only DuckDB SQL query against the S3 cold storage data lake. "
+```
+
+**2. Execution** — Every call rejects anything but read-only SELECT and runs against a read-only connection with an auto LIMIT — the agent cannot mutate or exfiltrate the lake.
 
 `analytics/llm_hunter/tools/duckdb_query.py:L78-L104`
 
@@ -779,7 +1143,9 @@ The data-lake query tool rejects anything but read-only SELECT and runs against 
 
 *Implementation: `libs/lib_siem_core/src/models.rs`*
 
-Endpoint identifiers are validated against a strict regex at the type boundary, defeating identity-injection via malformed endpoint_id.
+**Execution chain:** Logic
+
+**1. Logic** — Endpoint identifiers are regex-validated at the Rust type boundary before reaching Qdrant/Parquet, defeating identity-injection / path-traversal via a malformed endpoint_id.
 
 `libs/lib_siem_core/src/models.rs:L14-L20`
 
@@ -799,7 +1165,17 @@ pub struct DynamicUebaVector {
 
 *Implementation: `analytics/llm_hunter/agents/llm_providers.py`*
 
-Providers are composed into a cascading failover chain that degrades toward the sovereign on-prem model rather than failing open.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — Every expert (and the supervisor / response / board) is constructed over the failover chain, so degradation is uniform across the swarm.
+
+`analytics/llm_hunter/agents/expert_base.py:L25-L25`
+
+```python
+    return [(name, create_react_agent(llm, tools)) for name, llm in build_failover_chain(temperature)]
+```
+
+**2. Logic** — Providers are composed into a cascading chain that degrades toward the sovereign on-prem model rather than failing open.
 
 `analytics/llm_hunter/agents/llm_providers.py:L163-L188`
 
@@ -832,15 +1208,26 @@ def build_failover_chain(temperature: float = 0.0):
 @lru_cache(maxsize=1)
 ```
 
+**3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
+
+`analytics/llm_hunter/agents/response.py:L215-L216`
+
+```python
+    for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
+        if not circuit_is_callable(provider_name):
+```
+
 \newpage
 
 ### SEC-IDEMPOTENT-SOAR — Idempotent SOAR execution & deduplication
 
 *Implementation: `analytics/llm_hunter/agents/response.py`*
 
-Each SOAR dispatch carries a deterministic idempotency key (target + quantised window) so a retried response cannot double-execute.
+**Execution chain:** Logic → Execution
 
-`analytics/llm_hunter/agents/response.py:L252-L255`
+**1. Logic** — Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute.
+
+`analytics/llm_hunter/agents/response.py:L320-L323`
 
 ```python
         "reason": reason,
@@ -849,13 +1236,26 @@ Each SOAR dispatch carries a deterministic idempotency key (target + quantised w
         "source_type": alert.get("source_type", ""),
 ```
 
+**2. Execution** — The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor.
+
+`services/worker_soar/src/main.rs:L270-L273`
+
+```rust
+                let mut dedup = self.dedup.write().await;
+                if dedup.is_duplicate(&dedup_key) {
+                    warn!(key = %dedup_key, "Duplicate containment suppressed");
+                    continue;
+```
+
 \newpage
 
 ### SEC-MODEL-DOS — Model denial-of-service bounding
 
 *Implementation: `analytics/llm_hunter/orchestrator.py`*
 
-A hard concurrency ceiling on simultaneous investigations…
+**Execution chain:** Invocation → Effect → Effect → Execution → Execution
+
+**1. Invocation** — A hard ceiling on simultaneous investigations…
 
 `analytics/llm_hunter/orchestrator.py:L55-L55`
 
@@ -863,7 +1263,7 @@ A hard concurrency ceiling on simultaneous investigations…
 MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
 ```
 
-…enforced by a semaphore acquired before any LLM work — bounding model-denial-of-service blast.
+**2. Effect** — …realised as a semaphore…
 
 `analytics/llm_hunter/orchestrator.py:L66-L66`
 
@@ -871,7 +1271,7 @@ MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
 _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 ```
 
-The semaphore gates every investigation entry point.
+**3. Effect** — …acquired before any LLM work, bounding model-DoS blast at the investigation entry point.
 
 `analytics/llm_hunter/orchestrator.py:L186-L187`
 
@@ -880,13 +1280,33 @@ The semaphore gates every investigation entry point.
         await _broadcast_hud(alert, nc_client)
 ```
 
+**4. Execution** — Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…
+
+`analytics/llm_hunter/orchestrator.py:L213-L213`
+
+```python
+            config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
+```
+
+**5. Execution** — …and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm.
+
+`analytics/llm_hunter/orchestrator.py:L217-L219`
+
+```python
+                final_state = await asyncio.wait_for(
+                    graph.ainvoke(initial_state, config=config_opts),
+                    timeout=INVESTIGATION_TIMEOUT_S,
+```
+
 \newpage
 
 ### SEC-OUTPUT-SCHEMA — Strict SOAR output-contract enforcement
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-SOAR actions must satisfy a strict Pydantic contract (enumerated action, validated targets) before any response is dispatched.
+**Execution chain:** Logic → Invocation → Execution
+
+**1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
 `analytics/llm_hunter/state.py:L94-L129`
 
@@ -929,13 +1349,39 @@ class SoarExecutionSchema(BaseModel):
     @field_validator("targets")
 ```
 
+**2. Invocation** — The dispatch path is the single egress for any containment action.
+
+`analytics/llm_hunter/orchestrator.py:L294-L295`
+
+```python
+async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
+    """Validate the field-aligned SOAR payload and publish it to JetStream."""
+```
+
+**3. Execution** — Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed.
+
+`analytics/llm_hunter/orchestrator.py:L324-L331`
+
+```python
+        validated = SoarExecutionSchema(
+            incident_id=action.get("incident_id", alert.event_id),
+            action_type=action_type,
+            target_sensor=action.get("target_sensor", alert.sensor_id),
+            targets=action.get("targets", []),
+            confidence=float(action.get("confidence", 0.0)),
+            reason=action.get("reason", "")[:200],
+        )
+```
+
 \newpage
 
 ### SEC-REGRESSION-GATE — Deterministic regression / deploy gate
 
 *Implementation: `mlops/scripts/03_eval_model.py`*
 
-Deterministic regression suite gates promotion: a candidate that regresses against the locked thresholds cannot be deployed.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — Deterministic regression gauntlet (OS-context, schema, injection, spatial, SIEM-pivot validity) over a locked corpus.
 
 `mlops/scripts/03_eval_model.py:L312-L338`
 
@@ -969,13 +1415,48 @@ if __name__ == "__main__":
     run_regression_suite()
 ```
 
+**2. Execution** — Hard go/no-go: a candidate below the 99% zero-hallucination floor halts deployment (exit 1).
+
+`mlops/scripts/03_eval_model.py:L198-L200`
+
+```python
+    if accuracy < 99.0:
+        logging.critical("Model failed 'Zero-Hallucination' threshold. Deployment halted.")
+        exit(1)
+```
+
 \newpage
 
 ### SEC-RLHF-QUARANTINE — Sybil RLHF poisoning quarantine
 
 *Implementation: `services/worker_rlhf/src/main.rs`*
 
-Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the RLHF corpus.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — Operator feedback is ingested batch-by-batch by the RLHF worker.
+
+`services/worker_rlhf/src/main.rs:L90-L91`
+
+```rust
+    async fn transmit_batch(
+        &self,
+```
+
+**2. Logic** — Coordinated override velocity past the global threshold trips an atomic circuit breaker that halts RLHF intake.
+
+`services/worker_rlhf/src/main.rs:L135-L141`
+
+```rust
+                let global_count = GLOBAL_OVERRIDE_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+                if global_count > self.global_circuit_breaker_threshold {
+                    error!(
+                        count = global_count,
+                        threshold = self.global_circuit_breaker_threshold,
+                        "GLOBAL CIRCUIT BREAKER: override threshold exceeded. Halting RLHF."
+                    );
+```
+
+**3. Execution** — Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the reward corpus.
 
 `services/worker_rlhf/src/main.rs:L132-L158`
 
@@ -1015,7 +1496,9 @@ Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their 
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Untrusted text is stripped of control characters and prompt-injection delimiters before it can reach an LLM context.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Untrusted text is stripped of control characters and prompt-injection delimiters and HTML-escaped before it can reach an LLM context.
 
 `analytics/llm_hunter/tools/sanitizer.py:L24-L48`
 
@@ -1047,7 +1530,7 @@ Untrusted text is stripped of control characters and prompt-injection delimiters
     @staticmethod
 ```
 
-All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions.
+**2. Logic** — All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions.
 
 `analytics/llm_hunter/tools/sanitizer.py:L88-L96`
 
@@ -1063,13 +1546,24 @@ All untrusted payloads are wrapped inside an explicit, randomised cognitive boun
         """
 ```
 
+**3. Execution** — Wired into every expert: entity notes pulled into the shared board are neutralised before being rendered into the agent prompt.
+
+`analytics/llm_hunter/agents/expert_base.py:L83-L84`
+
+```python
+            safe_notes = CognitiveSanitizer.neutralize_string(str(data.get("notes", "")))[:160]
+            unresolved_lines.append(f"- {entity_id} [{status}]: {safe_notes}")
+```
+
 \newpage
 
 ### SEC-SUPPLY-CHAIN — Cryptographic model supply-chain integrity (SHA-384)
 
 *Implementation: `mlops/serve_vllm.sh`*
 
-Every model is SHA-384-verified against a signed integrity manifest before it is served; a mismatch aborts the launch.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — SHA-384-verifies model weights against a signed integrity manifest; a mismatch aborts the launch.
 
 `mlops/serve_vllm.sh:L48-L66`
 
@@ -1095,13 +1589,24 @@ case "${MODEL_TYPE}" in
   model_a)
 ```
 
+**2. Execution** — The check is invoked on the resolved model path at every server launch — no model is ever served unverified.
+
+`mlops/serve_vllm.sh:L68-L69`
+
+```bash
+    MODEL_PATH=${MODEL_PATH:-"${MLOPS_BASE}/models/baseline"}
+    verify_integrity "${MODEL_PATH}"
+```
+
 \newpage
 
 ### SEC-TRAINING-HYGIENE — Training-data hygiene & credential scrubbing
 
 *Implementation: `mlops/scripts/01_spool_datasets.py`*
 
-Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code.
+**Execution chain:** Logic
+
+**1. Logic** — Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code.
 
 `mlops/scripts/01_spool_datasets.py:L47-L58`
 
@@ -1126,7 +1631,17 @@ S3_SECRET_KEY    = _vault_secret("nexus/s3/secret_key",     "S3_SECRET_KEY",    
 
 *Implementation: `analytics/llm_hunter/tools/qdrant_search.py`*
 
-Vector searches are validated against the expected per-collection dimensionality; a wrong-dimension probe is rejected before it hits the store.
+**Execution chain:** Invocation → Execution
+
+**1. Invocation** — The agent-facing vector-search tool entry point.
+
+`analytics/llm_hunter/tools/qdrant_search.py:L50-L50`
+
+```python
+    def _run(self, reasoning: str, vector_name: str, target_vector: List[float], limit: int = 5, target_sensor_id: Optional[str] = None) -> str:
+```
+
+**2. Execution** — Each search is validated against the expected per-collection dimensionality; a wrong-dimension (malformed/adversarial) probe is rejected before it hits the store.
 
 `analytics/llm_hunter/tools/qdrant_search.py:L58-L72`
 
@@ -1154,7 +1669,9 @@ Vector searches are validated against the expected per-collection dimensionality
 
 *Implementation: `analytics/llm_hunter/tools/nexus_config.py`*
 
-SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
+**Execution chain:** Logic
+
+**1. Logic** — SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
 
 `analytics/llm_hunter/tools/nexus_config.py:L118-L148`
 
@@ -1198,7 +1715,9 @@ def get_siem_config(config: dict = None) -> dict:
 
 *Implementation: `analytics/llm_hunter/agents/review_board.py`*
 
-The counterpart builds a prevalence query over allowlisted indexes…
+**Execution chain:** Logic → Execution
+
+**1. Logic** — The counterpart builds a cross-source prevalence query over allowlisted indexes…
 
 `analytics/llm_hunter/agents/review_board.py:L117-L127`
 
@@ -1216,7 +1735,7 @@ def build_prevalence_query(entity: str, dialect: str, allowed_indexes: list) -> 
 
 ```
 
-…and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates.
+**2. Execution** — …and runs an independent SIEM lookup to try to *disprove* the swarm's proposed evidence before the board aggregates; falls back to transcript-only when no SIEM is configured.
 
 `analytics/llm_hunter/agents/review_board.py:L128-L156`
 
@@ -1258,7 +1777,9 @@ def _counterpart_siem_lookup(domain: str, state: dict, verdict: dict,
 
 *Implementation: `tests/lab_siem_federation/test_siem_federation_e2e.py`*
 
-Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production.
+**Execution chain:** Proof → Proof
+
+**1. Proof** — Conservation test: an event fanned out to Splunk (CIM) must be retrievable via the swarm's SPL pivot — a write↔read contract break surfaces here, not in production.
 
 `tests/lab_siem_federation/test_siem_federation_e2e.py:L189-L195`
 
@@ -1272,7 +1793,7 @@ Conservation test: an event fanned out to Splunk (CIM) must be retrievable via t
         assert "returned 1 row" in out and DST in out, "conservation broken: fanned-out event not retrieved"
 ```
 
-Same conservation guarantee on the Elastic (ECS) path via ES|QL.
+**2. Proof** — Same conservation guarantee on the Elastic (ECS) path via ES|QL.
 
 `tests/lab_siem_federation/test_siem_federation_e2e.py:L222-L227`
 
@@ -1291,7 +1812,9 @@ Same conservation guarantee on the Elastic (ECS) path via ES|QL.
 
 *Implementation: `analytics/llm_hunter/tools/siem_query.py`*
 
-Only read-only search verbs are permitted; any mutating/command pipeline is rejected.
+**Execution chain:** Logic → Logic → Logic → Execution
+
+**1. Logic** — Only read-only search verbs are permitted; any mutating/command pipeline is rejected.
 
 `analytics/llm_hunter/tools/siem_query.py:L110-L128`
 
@@ -1317,7 +1840,7 @@ def validate_readonly(query: str, dialect: str) -> Tuple[bool, str]:
 
 ```
 
-Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data.
+**2. Logic** — Queries may only touch allowlisted indexes (fnmatch) — the agent cannot exfiltrate from arbitrary SIEM data.
 
 `analytics/llm_hunter/tools/siem_query.py:L142-L154`
 
@@ -1337,7 +1860,7 @@ def validate_indexes(query: str, dialect: str, allowed: List[str]) -> Tuple[bool
 
 ```
 
-Every query is force-bounded by a time window and a max-row cap before execution.
+**3. Logic** — Every query is force-bounded by a time window and a max-row cap before execution.
 
 `analytics/llm_hunter/tools/siem_query.py:L155-L173`
 
@@ -1361,6 +1884,22 @@ def enforce_bounds(query: str, dialect: str, window_hours: int, max_rows: int) -
 
 
 # -- Query builders (generic entity pivot; the cookbook adds richer patterns) -
+```
+
+**4. Execution** — Wired into the tool's _run: a query is rejected unless it passes read-only + index-allowlist checks, then is force-bounded before any adapter runs it.
+
+`analytics/llm_hunter/tools/siem_query.py:L348-L356`
+
+```python
+        ok, reason = validate_readonly(query, dialect)
+        if not ok:
+            return f"SIEM_QUERY_REJECTED: {reason}"
+        ok, reason = validate_indexes(query, dialect, b.get("allowed_indexes", []))
+        if not ok:
+            return f"SIEM_QUERY_REJECTED: {reason}"
+
+        bounded = enforce_bounds(query, dialect, siem.get("default_window_hours", 6),
+                                 siem.get("max_rows", 200))
 ```
 
 \newpage

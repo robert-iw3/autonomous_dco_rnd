@@ -2,7 +2,31 @@
 
 *Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
 
-Measures the human side of HitL: automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Pure reliance point: the AI verdict, whether the operator accepted or overrode it, and the eventual ground truth.
+
+`analytics/llm_hunter/agents/controls.py:L351-L365`
+
+```python
+def reliance_record(verdict: dict, operator_action: str,
+                    ground_truth_disposition=None) -> dict:
+    """One human-AI reliance data point: the AI verdict, whether the operator
+    accepted or overrode it, and (optionally) the eventual ground truth. Anything
+    not an explicit override counts as acceptance (the default, riskier posture)."""
+    v = verdict or {}
+    act = str(operator_action).strip().lower()
+    rec = {
+        "ai_tp": bool(v.get("is_true_positive")),
+        "ai_confidence": float(v.get("confidence", 0.0) or 0.0),
+        "accepted": act not in _OVERRIDE_ACTIONS,
+    }
+    if ground_truth_disposition is not None:
+        truth_tp = str(ground_truth_disposition).strip().lower() in _REALIZED_TP
+        rec["ground_truth_tp"] = truth_tp
+```
+
+**2. Logic** — automation_bias = P(operator accepted | the AI was wrong) — the share of the swarm's mistakes a human rubber-stamped — split by AI-confidence band.
 
 `analytics/llm_hunter/agents/controls.py:L370-L392`
 
@@ -32,7 +56,7 @@ def over_reliance_report(records, high_conf: float = 0.8, min_support: int = 5,
     base["override_rate"] = round((n - accepts) / n, 4)
 ```
 
-Each operator decision is logged as an accept-vs-override reliance point against the eventual ground truth.
+**3. Execution** — Each operator decision is logged as a durable accept-vs-override reliance point against the eventual ground truth.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L46-L56`
 

@@ -29,8 +29,10 @@ Machine-readable inputs drive the generated docs:
   (6 functions · 22 categories · 103 active subcategories; withdrawn v1.1 items filtered).
 - **`csf_category_map.yaml`** — control → CSF 2.0 *category* mapping (validated against the
   catalog), used for the function/category coverage self-assessment.
-- **`evidence_map.yaml`** — control → *actual source* (`file` + unique `anchor`), from which
-  `gen_evidence.py` extracts the proving code (cited `file:line`).
+- **`evidence_map.yaml`** — control → its **execution chain** of *actual source* snippets
+  (each `file` + unique `anchor` + `step` role), ordered invocation → logic → execution, from
+  which `gen_evidence.py` extracts the proving code (cited `file:line`) and an `Execution chain:`
+  breadcrumb. The chain proves a control is *reached and acted on at runtime*, not just defined.
 
 `gen_governance.py` renders `controls_catalog.md` (consolidated, cross-correlated catalog)
 and `applicability_matrix.md` (what is **Covered / a GAP / N-A** per framework, plus the
@@ -41,7 +43,7 @@ snippets, and refreshes **Annex B** of the System Security Plan.
 **Workflow to keep docs current:** edit `controls_manifest.yaml` (and, as needed,
 `frameworks_reference.yaml` / `csf_category_map.yaml` / `evidence_map.yaml`) →
 run `./gen_governance.py && ./gen_evidence.py` → run `./build_pdfs.sh`. CI enforces this:
-`tests/lab_analytics_hunter/test_governance_manifest.py` (26 tests) fails if a generated doc
+`tests/lab_governance/test_governance_manifest.py` (26 tests) fails if a generated doc
 is stale, if a control references a missing implementation/test path, if an SP 800-53 /
 CSF 2.0 reference is not a real OSCAL control, or if a cited code-evidence anchor no longer
 resolves.
@@ -60,7 +62,7 @@ resolves.
 |---|---|---|
 | **Control Catalog** (generated) | `controls_catalog.pdf` | Consolidated cross-correlation: OWASP · ATLAS · AI 600-1 · 800-53 · CSF (incl. CSF 2.0 category cross-ref) |
 | **Applicability & Gap Matrix** (generated) | `applicability_matrix.pdf` | Covered / GAP / N-A per framework; CSF 2.0 function & category coverage; outstanding addressable gaps + remediation |
-| **Control Evidence Dossier** (generated) | `control_evidence.pdf` | The *actual source code* answering each control, extracted + cited `file:line` (per-control under `artifacts/`) |
+| **Control Evidence Dossier** (generated) | `control_evidence.pdf` | The *actual source code* answering each control as its **execution chain** (invocation → logic → execution), extracted + cited `file:line` (per-control under `artifacts/`) |
 | System Security Plan | `system_security_plan.pdf` | SP 800-53 families · CSF 2.0 functions · AI RMF; IaC hardening; secure ingestion/transmission path; **Annex B** code-evidence index |
 | AI System Inventory | `ai_system_inventory.pdf` | GV-1.6 (Models A–D + swarm + frontier) |
 | GAI Risk-Tier Statement | `gai_risk_tier_statement.pdf` | GV-1.3 (Tier 1 — autonomous/consequential) |

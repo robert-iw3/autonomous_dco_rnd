@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing sovereign data isolation.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — Scrubs RFC-1918 ranges + high-entropy credentials/secrets from text.
 
 `analytics/llm_hunter/tools/sanitizer.py:L59-L73`
 
@@ -22,4 +24,12 @@ Outbound text is DLP-scrubbed (secrets/PII patterns) before egress, enforcing so
         return text
 
     @classmethod
+```
+
+**2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
+
+`analytics/llm_hunter/agents/response.py:L312-L312`
+
+```python
+    reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
 ```

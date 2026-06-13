@@ -2,7 +2,31 @@
 
 *Implementation: `analytics/llm_hunter/agents/calibration_ledger.py`*
 
-Each verdict's stated confidence is recorded against the operator's ground-truth disposition…
+**Execution chain:** Logic → Execution → Effect
+
+**1. Logic** — Pure calibration point: the verdict's predicted confidence vs the operator's realized disposition, scored by Brier error.
+
+`analytics/llm_hunter/agents/controls.py:L119-L133`
+
+```python
+def calibration_record(verdict: dict, operator_disposition: str) -> dict:
+    """Build one calibration data point. `brier` is the squared error of the
+    predicted probability of the realized class (lower is better-calibrated)."""
+    v = verdict or {}
+    predicted_tp = bool(v.get("is_true_positive"))
+    confidence = float(v.get("confidence", 0.0) or 0.0)
+    realized_tp = str(operator_disposition).strip().lower() in _REALIZED_TP
+    p_tp = confidence if predicted_tp else (1.0 - confidence)
+    actual = 1.0 if realized_tp else 0.0
+    return {
+        "predicted_tp": predicted_tp,
+        "predicted_confidence": confidence,
+        "realized_tp": realized_tp,
+        "correct": predicted_tp == realized_tp,
+        "brier": (p_tp - actual) ** 2,
+```
+
+**2. Execution** — Each operator disposition is appended to a durable calibration ledger.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L27-L39`
 
@@ -22,7 +46,7 @@ def record_disposition(verdict: dict, operator_disposition: str, event_id: str =
 
 ```
 
-…and the Brier-score trend is computed so miscalibration is measurable and trackable over time.
+**3. Effect** — The Brier-score trend is computed over the ledger so miscalibration is measurable and trackable over time.
 
 `analytics/llm_hunter/agents/calibration_ledger.py:L81-L103`
 

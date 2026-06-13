@@ -2,7 +2,9 @@
 
 *Implementation: `mlops/serve_vllm.sh`*
 
-Every model is SHA-384-verified against a signed integrity manifest before it is served; a mismatch aborts the launch.
+**Execution chain:** Logic → Execution
+
+**1. Logic** — SHA-384-verifies model weights against a signed integrity manifest; a mismatch aborts the launch.
 
 `mlops/serve_vllm.sh:L48-L66`
 
@@ -26,4 +28,13 @@ verify_integrity() {
 case "${MODEL_TYPE}" in
 
   model_a)
+```
+
+**2. Execution** — The check is invoked on the resolved model path at every server launch — no model is ever served unverified.
+
+`mlops/serve_vllm.sh:L68-L69`
+
+```bash
+    MODEL_PATH=${MODEL_PATH:-"${MLOPS_BASE}/models/baseline"}
+    verify_integrity "${MODEL_PATH}"
 ```

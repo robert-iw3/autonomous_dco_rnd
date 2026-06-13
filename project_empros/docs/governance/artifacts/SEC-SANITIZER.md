@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/tools/sanitizer.py`*
 
-Untrusted text is stripped of control characters and prompt-injection delimiters before it can reach an LLM context.
+**Execution chain:** Logic → Logic → Execution
+
+**1. Logic** — Untrusted text is stripped of control characters and prompt-injection delimiters and HTML-escaped before it can reach an LLM context.
 
 `analytics/llm_hunter/tools/sanitizer.py:L24-L48`
 
@@ -34,7 +36,7 @@ Untrusted text is stripped of control characters and prompt-injection delimiters
     @staticmethod
 ```
 
-All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions.
+**2. Logic** — All untrusted payloads are wrapped inside an explicit, randomised cognitive boundary so the model treats them as data, not instructions.
 
 `analytics/llm_hunter/tools/sanitizer.py:L88-L96`
 
@@ -48,4 +50,13 @@ All untrusted payloads are wrapped inside an explicit, randomised cognitive boun
         Qdrant historical payloads, external Threat-Intel responses) so every
         data path uses the SAME hardened neutralizer rather than ad-hoc wrapping.
         """
+```
+
+**3. Execution** — Wired into every expert: entity notes pulled into the shared board are neutralised before being rendered into the agent prompt.
+
+`analytics/llm_hunter/agents/expert_base.py:L83-L84`
+
+```python
+            safe_notes = CognitiveSanitizer.neutralize_string(str(data.get("notes", "")))[:160]
+            unresolved_lines.append(f"- {entity_id} [{status}]: {safe_notes}")
 ```

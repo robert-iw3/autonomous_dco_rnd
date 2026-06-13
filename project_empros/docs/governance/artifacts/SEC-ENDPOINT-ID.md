@@ -2,7 +2,9 @@
 
 *Implementation: `libs/lib_siem_core/src/models.rs`*
 
-Endpoint identifiers are validated against a strict regex at the type boundary, defeating identity-injection via malformed endpoint_id.
+**Execution chain:** Logic
+
+**1. Logic** — Endpoint identifiers are regex-validated at the Rust type boundary before reaching Qdrant/Parquet, defeating identity-injection / path-traversal via a malformed endpoint_id.
 
 `libs/lib_siem_core/src/models.rs:L14-L20`
 

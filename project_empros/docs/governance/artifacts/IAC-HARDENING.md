@@ -2,7 +2,9 @@
 
 *Implementation: `hardening/tasks/main.yml`*
 
-Ansible baseline applies kernel/sysctl hardening…
+**Execution chain:** Execution → Execution → Execution
+
+**1. Execution** — Ansible baseline applies kernel/sysctl hardening…
 
 `hardening/tasks/main.yml:L20-L22`
 
@@ -12,7 +14,7 @@ Ansible baseline applies kernel/sysctl hardening…
   ansible.builtin.include_tasks: kernel.yml
 ```
 
-…a default-deny firewall…
+**2. Execution** — …a default-deny firewall…
 
 `hardening/tasks/main.yml:L30-L32`
 
@@ -22,7 +24,7 @@ Ansible baseline applies kernel/sysctl hardening…
   when: hardening_firewall_enabled
 ```
 
-…and host audit rules — declaratively and idempotently across the fleet.
+**3. Execution** — …and host audit rules — declaratively and idempotently across the fleet.
 
 `hardening/tasks/main.yml:L34-L35`
 

@@ -2,7 +2,9 @@
 
 *Implementation: `libs/lib_siem_core/src/lib.rs`*
 
-Workers adapt their batch deadline to observed queue depth; combined with the circuit-breaker pause and dead-letter prefix below, a failing downstream is isolated rather than amplified.
+**Execution chain:** Logic → Effect → Execution
+
+**1. Logic** — Workers adapt their batch deadline to observed queue depth.
 
 `libs/lib_siem_core/src/lib.rs:L44-L60`
 
@@ -26,7 +28,7 @@ fn adaptive_deadline(current_ms: u64, messages_fetched: usize, batch_limit: usiz
 // must authenticate with the per-role user provisioned in its env file
 ```
 
-Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-lettered and the worker backs off instead of hot-looping.
+**2. Effect** — Default DLQ routing + circuit-breaker pause config: poisoned/failed batches are dead-lettered.
 
 `libs/lib_siem_core/src/lib.rs:L104-L110`
 
@@ -38,4 +40,19 @@ Default DLQ routing + circuit-breaker pause: poisoned/failed batches are dead-le
             max_deliver: std::env::var("WORKER_MAX_DELIVER")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
             // Batch deadline: how long to accumulate messages before processing.
+```
+
+**3. Execution** — In the consume loop a tripped breaker pauses consumption (metric + backoff) instead of hot-looping a failing downstream.
+
+`libs/lib_siem_core/src/lib.rs:L262-L269`
+
+```rust
+        // ── Circuit breaker cooldown ─────────────────────────────────────
+        if circuit_open {
+            warn!(
+                pause_secs = cfg.circuit_breaker_pause_secs,
+                "Circuit breaker active. Pausing consumption."
+            );
+            counter!("nexus_worker_circuit_breaker_trips_total").increment(1);
+            tokio::time::sleep(Duration::from_secs(cfg.circuit_breaker_pause_secs)).await;
 ```

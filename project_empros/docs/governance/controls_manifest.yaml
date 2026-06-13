@@ -123,7 +123,7 @@ controls:
     status: implemented
     description: A confirmed TP citing an artifact never retrieved is demoted to monitor (fail-closed).
     implementation: analytics/llm_hunter/agents/controls.py
-    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestGroundingEnforcement"]
+    tests: ["tests/lab_governance/test_ai_controls.py::TestGroundingEnforcement"]
     frameworks:
       nist_ai_600_1: [MS-2.5-003]
       sp_800_53: [SI-7]
@@ -136,7 +136,7 @@ controls:
     status: implemented
     description: Stored FP signatures expire (default 30 d) so a stale/wrong FP cannot entrench a permanent blind spot.
     implementation: analytics/llm_hunter/agents/controls.py
-    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestMemoryTTL"]
+    tests: ["tests/lab_governance/test_ai_controls.py::TestMemoryTTL"]
     frameworks:
       nist_ai_600_1: [GV-1.3-005]
       sp_800_53: [SC-28, AU-9]
@@ -149,7 +149,7 @@ controls:
     status: implemented
     description: Every incident report is stamped AI-generated so consumers are never misled.
     implementation: analytics/llm_hunter/agents/controls.py
-    tests: ["tests/lab_analytics_hunter/test_ai_controls.py::TestProvenanceDisclosure"]
+    tests: ["tests/lab_governance/test_ai_controls.py::TestProvenanceDisclosure"]
     frameworks:
       nist_ai_600_1: [MP-5.1-003]
       sp_800_53: [AU-3]
@@ -162,7 +162,7 @@ controls:
     status: implemented
     description: Job scrolls verdict/immunity memory; disaggregated containment-disparity + model-collapse monitor; writes a flagged report.
     implementation: analytics/llm_hunter/agents/bias_audit.py
-    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestBiasAudit"]
+    tests: ["tests/lab_governance/test_nist_controls_wave2.py::TestBiasAudit"]
     frameworks:
       nist_ai_600_1: [MS-2.11-002, GV-1.3-005, MS-2.11-005]
       sp_800_53: [AU-6, RA-3]
@@ -175,7 +175,7 @@ controls:
     status: implemented
     description: Pairs operator dispositions with predicted confidence into a Brier/over-confidence trend.
     implementation: analytics/llm_hunter/agents/calibration_ledger.py
-    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestCalibrationLedger"]
+    tests: ["tests/lab_governance/test_nist_controls_wave2.py::TestCalibrationLedger"]
     frameworks:
       nist_ai_600_1: [MS-2.13-001]
       sp_800_53: [AU-6, CA-7]
@@ -188,7 +188,7 @@ controls:
     status: implemented
     description: build_failover_chain refuses a frontier provider on a floating alias unless explicitly opted in.
     implementation: analytics/llm_hunter/agents/llm_providers.py
-    tests: ["tests/lab_analytics_hunter/test_nist_controls_wave2.py::TestFrontierPinEnforcement"]
+    tests: ["tests/lab_governance/test_nist_controls_wave2.py::TestFrontierPinEnforcement"]
     frameworks:
       nist_ai_600_1: [MP-4.1-007]
       sp_800_53: [SR-3, CM-2]
@@ -229,8 +229,8 @@ controls:
       call is rubber-stamped (automation bias), by AI-confidence band, over operator dispositions.
     implementation: analytics/llm_hunter/agents/calibration_ledger.py
     tests:
-    - tests/lab_analytics_hunter/test_ai_controls.py::TestOverReliance
-    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestRelianceLedger
+    - tests/lab_governance/test_ai_controls.py::TestOverReliance
+    - tests/lab_governance/test_nist_controls_wave4.py::TestRelianceLedger
     frameworks:
       nist_ai_600_1: [MG-1.3-002, MP-3.4-005]
       sp_800_53: [AU-6, CA-7]
@@ -245,8 +245,8 @@ controls:
       structured hard-example corpus for MLOps continuous improvement.
     implementation: analytics/llm_hunter/agents/active_learning.py
     tests:
-    - tests/lab_analytics_hunter/test_ai_controls.py::TestActiveLearningFailure
-    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestActiveLearning
+    - tests/lab_governance/test_ai_controls.py::TestActiveLearningFailure
+    - tests/lab_governance/test_nist_controls_wave4.py::TestActiveLearning
     frameworks:
       nist_ai_600_1: [MG-4.1-004]
       sp_800_53: [CA-7, SI-4]
@@ -261,8 +261,8 @@ controls:
       deletion, or reorder breaks verification — a tamper-evident trail for autonomous decisions.
     implementation: analytics/llm_hunter/agents/verdict_ledger.py
     tests:
-    - tests/lab_analytics_hunter/test_ai_controls.py::TestVerdictLineage
-    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestVerdictLedger
+    - tests/lab_governance/test_ai_controls.py::TestVerdictLineage
+    - tests/lab_governance/test_nist_controls_wave4.py::TestVerdictLedger
     frameworks:
       nist_ai_600_1: [MS-2.8-003]
       sp_800_53: [AU-9, AU-10, SI-7]
@@ -277,8 +277,8 @@ controls:
       (gCO2e) measurement the MLOps metric plane rolls up.
     implementation: analytics/llm_hunter/agents/energy_accounting.py
     tests:
-    - tests/lab_analytics_hunter/test_ai_controls.py::TestInferenceEnergy
-    - tests/lab_analytics_hunter/test_nist_controls_wave4.py::TestEnergyAccounting
+    - tests/lab_governance/test_ai_controls.py::TestInferenceEnergy
+    - tests/lab_governance/test_nist_controls_wave4.py::TestEnergyAccounting
     frameworks:
       nist_ai_600_1: [MS-2.12-003]
       csf_2_0: [GV]

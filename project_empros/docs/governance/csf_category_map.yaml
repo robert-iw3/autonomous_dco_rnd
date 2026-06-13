@@ -5,7 +5,7 @@
 # technical platform; subcategory-level mapping is left to the SSP narrative.
 #
 # Authoritative category ids/titles: _oscal_csf_v2.0.json (NIST OSCAL v1.4.0).
-# Validated by tests/lab_analytics_hunter/test_governance_manifest.py:
+# Validated by tests/lab_governance/test_governance_manifest.py:
 #   * every category id here must exist in the CSF 2.0 catalog;
 #   * every control id here must exist in controls_manifest.yaml (and vice-versa).
 #

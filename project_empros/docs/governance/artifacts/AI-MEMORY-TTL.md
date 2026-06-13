@@ -2,7 +2,9 @@
 
 *Implementation: `analytics/llm_hunter/agents/controls.py`*
 
-Immunity-memory entries expire: a recalled memory older than its TTL is non-actionable, preventing stale precedent from driving live decisions.
+**Execution chain:** Logic → Execution → Persistence
+
+**1. Logic** — A recalled immunity memory is actionable only if it is an eligible False Positive still within its TTL (default 30 d).
 
 `analytics/llm_hunter/agents/controls.py:L147-L175`
 
@@ -36,4 +38,26 @@ AI_PROVENANCE_BANNER = (
     "> 🤖 **AI-GENERATED** — produced by the Sentinel Nexus agentic swarm. "
     "Verify forensic claims against source telemetry before acting."
 )
+```
+
+**2. Execution** — Wired into recall: a high-similarity historical FP may short-circuit the swarm only while its memory has not expired.
+
+`analytics/llm_hunter/agents/supervisor.py:L235-L239`
+
+```python
+            if hits and memory_is_actionable(hits[0].payload, time.time()):
+                m = hits[0]
+                logger.warning(
+                    f"RAG IMMUNITY TRIGGERED: match with historical False Positive "
+                    f"(score={m.score:.3f} ≥ {IMMUNITY_THRESHOLD}). Short-circuiting Swarm."
+```
+
+**3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
+
+`analytics/llm_hunter/agents/response.py:L139-L141`
+
+```python
+                    # NIST GV-1.3-005: timestamp so the supervisor's recall can
+                    # expire stale immunity rather than entrenching a blind spot.
+                    "created_at": time.time(),
 ```

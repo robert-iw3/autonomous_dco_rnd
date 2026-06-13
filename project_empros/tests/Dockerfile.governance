@@ -1,0 +1,33 @@
+# SECTION: governance
+# Tests:   lab_governance/  (NIST AI 600-1 control suite + GRC manifest/evidence/wiring)
+#   - test_governance_manifest.py  (manifest ↔ OSCAL ↔ evidence-chain drift guard)
+#   - test_ai_controls.py          (pure control logic)
+#   - test_nist_controls_wave2.py / _wave4.py  (durable-ledger control jobs)
+#   - test_nist_controls_wiring.py (controls wired into the live response/board nodes)
+# Deps:    pytest, pydantic (state schemas), PyYAML (manifest/evidence_map)
+#          (langchain_core / qdrant / nats / redis are stubbed in each test)
+#   docker build -f project_empros/tests/Dockerfile.governance -t nexus-test-governance .
+FROM docker.io/python:3.12-slim
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN pip install --no-cache-dir \
+    "pytest>=7.4.0" \
+    "pydantic>=2.7.1" \
+    "PyYAML>=6.0"
+
+# The control code under test + the governance register/evidence the manifest guard reads.
+COPY project_empros/analytics/llm_hunter/       /repo/project_empros/analytics/llm_hunter/
+COPY project_empros/docs/governance/            /repo/project_empros/docs/governance/
+COPY project_empros/tests/lab_governance/       /repo/project_empros/tests/lab_governance/
+COPY project_empros/tests/pytest.ini            /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py           /repo/project_empros/tests/
+
+ENV PYTHONPATH=/repo/project_empros/analytics/llm_hunter:/repo/project_empros/analytics:/repo/project_empros
+WORKDIR /repo/project_empros
+
+CMD ["python3", "-m", "pytest", \
+     "tests/lab_governance/", \
+     "-v", "--tb=short", "--junit-xml=/reports/governance.xml"]

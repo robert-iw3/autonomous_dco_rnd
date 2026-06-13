@@ -283,6 +283,10 @@ async def review_board_node(state: InvestigativeState):
     if violations:
         logger.warning("GROUNDING OVERRIDE: confirmed TP cited ungrounded artifacts %s "
                        "-- demoted to monitor.", violations)
+    # Surface the violations into state so the response agent can capture them as
+    # an active-learning hard example (NC-9); empty list keeps the contract stable
+    # for grounded verdicts.
+    result["grounding_violations"] = violations
 
     if verdict.get("is_true_positive") and not result["verdict"]["is_true_positive"]:
         logger.warning("REVIEW BOARD OVERRIDE: supervisor TP did not survive adversarial review.")

@@ -2,7 +2,20 @@
 
 *Implementation: `analytics/llm_hunter/tools/duckdb_query.py`*
 
-The data-lake query tool rejects anything but read-only SELECT and runs against a read-only connection — the agent cannot mutate the lake.
+**Execution chain:** Invocation → Execution
+
+**1. Invocation** — The agent-facing data-lake tool — the only path by which an LLM can query cold storage.
+
+`analytics/llm_hunter/tools/duckdb_query.py:L27-L30`
+
+```python
+class DuckDBQueryTool(BaseTool):
+    name: str = "query_parquet_data_lake"
+    description: str = (
+        "Executes a read-only DuckDB SQL query against the S3 cold storage data lake. "
+```
+
+**2. Execution** — Every call rejects anything but read-only SELECT and runs against a read-only connection with an auto LIMIT — the agent cannot mutate or exfiltrate the lake.
 
 `analytics/llm_hunter/tools/duckdb_query.py:L78-L104`
 

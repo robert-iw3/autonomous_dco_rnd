@@ -2,7 +2,32 @@
 
 *Implementation: `services/worker_rlhf/src/main.rs`*
 
-Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the RLHF corpus.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — Operator feedback is ingested batch-by-batch by the RLHF worker.
+
+`services/worker_rlhf/src/main.rs:L90-L91`
+
+```rust
+    async fn transmit_batch(
+        &self,
+```
+
+**2. Logic** — Coordinated override velocity past the global threshold trips an atomic circuit breaker that halts RLHF intake.
+
+`services/worker_rlhf/src/main.rs:L135-L141`
+
+```rust
+                let global_count = GLOBAL_OVERRIDE_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+                if global_count > self.global_circuit_breaker_threshold {
+                    error!(
+                        count = global_count,
+                        threshold = self.global_circuit_breaker_threshold,
+                        "GLOBAL CIRCUIT BREAKER: override threshold exceeded. Halting RLHF."
+                    );
+```
+
+**3. Execution** — Operators exhibiting Sybil/poisoning feedback patterns are quarantined so their preference signal cannot corrupt the reward corpus.
 
 `services/worker_rlhf/src/main.rs:L132-L158`
 

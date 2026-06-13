@@ -2,7 +2,19 @@
 
 *Implementation: `services/core_ingress/src/integrity.rs`*
 
-Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage.
+**Execution chain:** Invocation → Logic → Logic → Execution
+
+**1. Invocation** — The ingestion gateway's batch-verification entry point — every inbound batch passes through here before it is accepted.
+
+`services/core_ingress/src/integrity.rs:L211-L213`
+
+```rust
+    pub fn verify_batch(
+        &self,
+        parquet_bytes: &[u8],
+```
+
+**2. Logic** — Each batch is authenticated with HMAC-SHA256 over a canonical (parquet ‖ sequence ‖ sensor ‖ timestamp) preimage.
 
 `services/core_ingress/src/integrity.rs:L29-L41`
 
@@ -22,7 +34,7 @@ fn compute_hmac(
     mac.update(&timestamp.to_be_bytes());
 ```
 
-HMAC comparison is constant-time, closing the timing-oracle side channel.
+**3. Logic** — HMAC comparison is constant-time, closing the timing-oracle side channel.
 
 `services/core_ingress/src/integrity.rs:L46-L56`
 
@@ -40,7 +52,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 ```
 
-A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense.
+**4. Execution** — A bounded replay window + monotonic sequence rejects replayed/out-of-order batches — the third tier of replay defense.
 
 `services/core_ingress/src/integrity.rs:L127-L145`
 

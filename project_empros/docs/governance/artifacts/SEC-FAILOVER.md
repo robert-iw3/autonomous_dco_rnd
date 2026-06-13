@@ -2,7 +2,17 @@
 
 *Implementation: `analytics/llm_hunter/agents/llm_providers.py`*
 
-Providers are composed into a cascading failover chain that degrades toward the sovereign on-prem model rather than failing open.
+**Execution chain:** Invocation → Logic → Execution
+
+**1. Invocation** — Every expert (and the supervisor / response / board) is constructed over the failover chain, so degradation is uniform across the swarm.
+
+`analytics/llm_hunter/agents/expert_base.py:L25-L25`
+
+```python
+    return [(name, create_react_agent(llm, tools)) for name, llm in build_failover_chain(temperature)]
+```
+
+**2. Logic** — Providers are composed into a cascading chain that degrades toward the sovereign on-prem model rather than failing open.
 
 `analytics/llm_hunter/agents/llm_providers.py:L163-L188`
 
@@ -33,4 +43,13 @@ def build_failover_chain(temperature: float = 0.0):
 
 
 @lru_cache(maxsize=1)
+```
+
+**3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
+
+`analytics/llm_hunter/agents/response.py:L215-L216`
+
+```python
+    for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
+        if not circuit_is_callable(provider_name):
 ```

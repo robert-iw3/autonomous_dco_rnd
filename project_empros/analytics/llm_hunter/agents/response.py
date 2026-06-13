@@ -5,6 +5,7 @@ Response Agent -- final report synthesis, HitL circuit breaker, SOAR payload, RA
 import os
 import time
 import uuid
+import hashlib
 import logging
 import asyncio
 from typing import List, Dict
@@ -18,9 +19,16 @@ from state import InvestigativeState, build_memory_signature, FP_CONFIDENCE_GATE
 from agents.llm_providers import (build_failover_chain, get_embedder,
                                    circuit_is_callable, record_call_success, record_call_failure)
 from agents.controls import stamp_ai_provenance
+import agents.verdict_ledger as verdict_ledger
+import agents.energy_accounting as energy_accounting
+import agents.active_learning as active_learning
 from tools.sanitizer import CognitiveSanitizer
 
 logger = logging.getLogger("nexus-response")
+
+# Average node power draw (W) used by the per-run inference energy estimate
+# (NC-11, NIST MS-2.12-003); overridable per deployment via the env var.
+NEXUS_AVG_POWER_W = float(os.getenv("NEXUS_AVG_POWER_W", "700.0"))
 
 async_qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_HTTP_URL", "http://qdrant:6333"))
 redis_client = Redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"), decode_responses=True)
@@ -140,6 +148,58 @@ async def _persist_memory(alert: dict, verdict: dict, action_type: str, incident
         logger.error(f"Failed to encode memory to Qdrant: {e}")
 
 
+def _record_run_controls(alert: dict, verdict: dict, incident_report: str,
+                         inference_s: float, grounding_violations) -> None:
+    """Per-run NIST AI 600-1 ledgers, wired into every investigation's terminal
+    node. All writes are best-effort: a ledger I/O error must never block or alter
+    a containment decision, so each is isolated in its own try/except.
+
+      NC-10  Tamper-evident verdict lineage (Risk 2.8 Information Integrity)
+      NC-11  Per-run inference energy/carbon accounting (NIST MS-2.12-003)
+      NC-9   Active-learning capture of a grounding-violation failure (MG-4.1-004)
+
+    Ledger paths resolve from env at call time (falling back to each module's
+    default) so deployments and tests can redirect them without import-order games.
+    """
+    event_id = str(alert.get("event_id", ""))
+
+    # NC-10 -- append the final verdict to the tamper-evident hash chain.
+    try:
+        verdict_ledger.append_verdict(
+            {
+                "event_id": event_id,
+                "is_true_positive": bool(verdict.get("is_true_positive")),
+                "confidence": float(verdict.get("confidence", 0.0) or 0.0),
+                "recommended_action": verdict.get("recommended_action", "monitor"),
+                "report_sha256": hashlib.sha256((incident_report or "").encode("utf-8")).hexdigest(),
+            },
+            ledger_path=os.getenv("NEXUS_VERDICT_LEDGER", verdict_ledger.DEFAULT_LEDGER),
+        )
+    except Exception as e:
+        logger.warning(f"NC-10 verdict-lineage append failed (non-fatal): {e}")
+
+    # NC-11 -- per-run inference energy/carbon estimate.
+    try:
+        energy_accounting.record_run(
+            inference_s, NEXUS_AVG_POWER_W, event_id=event_id,
+            ledger_path=os.getenv("NEXUS_ENERGY_LEDGER", energy_accounting.DEFAULT_LEDGER),
+        )
+    except Exception as e:
+        logger.warning(f"NC-11 energy accounting failed (non-fatal): {e}")
+
+    # NC-9 -- a confabulated (ungrounded) citation is a runtime model failure;
+    # capture it as a hard example for the MLOps continuous-improvement corpus.
+    try:
+        if grounding_violations:
+            active_learning.capture(
+                verdict, grounding_violation=True, event_id=event_id,
+                artifacts=list(grounding_violations),
+                corpus_path=os.getenv("NEXUS_FAILURE_CORPUS", active_learning.DEFAULT_CORPUS),
+            )
+    except Exception as e:
+        logger.warning(f"NC-9 active-learning capture failed (non-fatal): {e}")
+
+
 async def response_agent(state: InvestigativeState):
     verdict = state.get("verdict") or {}
     alert = state["alert"]
@@ -151,6 +211,7 @@ async def response_agent(state: InvestigativeState):
         ("system", report_prompt),
         MessagesPlaceholder(variable_name="messages"),
     ])
+    _inference_t0 = time.monotonic()
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
         if not circuit_is_callable(provider_name):
             logger.info(f"Response Agent skipping {provider_name}: circuit OPEN")
@@ -166,6 +227,7 @@ async def response_agent(state: InvestigativeState):
             record_call_failure(provider_name)
             logger.warning(f"Response Provider '{provider_name}' failed: {e}. Cascading to next.")
             continue
+    _inference_s = time.monotonic() - _inference_t0
     if incident_report is None:
         logger.error(f"Failed to generate report on all providers: {last_error}")
         incident_report = "Report generation failed due to Swarm timeout or error."
@@ -173,6 +235,12 @@ async def response_agent(state: InvestigativeState):
     # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
     # AI-generated so a human consumer is never misled about its source.
     incident_report = stamp_ai_provenance(incident_report)
+
+    # Per-run NIST ledgers (NC-9/10/11). Placed before the verdict branches so the
+    # verdict lineage + energy accounting are recorded for every investigation
+    # (TP, FP, or incomplete), and a confabulation failure is captured if present.
+    _record_run_controls(alert, verdict, incident_report, _inference_s,
+                         state.get("grounding_violations"))
 
     target = alert.get("sensor_id", "")
     recommended_action = verdict.get("recommended_action", "monitor")

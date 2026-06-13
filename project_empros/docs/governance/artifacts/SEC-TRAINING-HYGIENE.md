@@ -2,7 +2,9 @@
 
 *Implementation: `mlops/scripts/01_spool_datasets.py`*
 
-Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code.
+**Execution chain:** Logic
+
+**1. Logic** — Training-pipeline credentials are resolved from Vault (env fallback only for offline test) — no secrets are baked into the corpus or the code.
 
 `mlops/scripts/01_spool_datasets.py:L47-L58`
 
