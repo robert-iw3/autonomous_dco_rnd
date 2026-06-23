@@ -18,7 +18,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "operations" / "agent"))
 import response_executor as rx   # noqa: E402
 
-PLAYBOOKS = ROOT / "operations" / "playbooks"
+# Bundled playbooks live under operations/playbooks/playbooks/<os>/ (the inner
+# `playbooks/` is the script tree; the outer dir is the toolkit root with the
+# builder, docker, tests, planning). This is what gets staged to the air-gapped host.
+PLAYBOOKS = ROOT / "operations" / "playbooks" / "playbooks"
 SECRET = b"nexus-soar-task-secret"
 
 
@@ -37,6 +40,11 @@ def _task(action="isolate_host", os_family="linux", **over):
     ("block_ip", "linux", "linux", "04_block_c2.sh"),
     ("restore", "windows", "windows", "06_Restore-Host.ps1"),
     ("acquire_artifact", "linux", "linux", "05_acquire_artifact.sh"),
+    ("collect_forensics", "linux", "linux", "00_collect_forensics.sh"),
+    ("collect_forensics", "windows", "windows", "00_Collect-Forensics.ps1"),
+    ("eradicate_persistence", "linux", "linux", "03_eradicate_persistence.sh"),
+    ("eradicate_persistence", "windows", "windows", "03_Eradicate-Persistence.ps1"),
+    ("eradicate_process", "linux", "linux", "02_eradicate_process.sh"),
 ])
 def test_action_maps_to_real_playbook(action, os_family, subdir, fname):
     pb = rx.select_playbook(action, os_family)
@@ -53,14 +61,25 @@ def test_unknown_action_or_os_refused():
 
 
 # ── env construction per action ──────────────────────────────────────────────
-def test_build_env_per_action():
-    assert rx.build_env(_task("block_ip"))["NEXUS_C2_IPS"] == "10.0.0.9"
+# The playbooks read IR_* (same names playbooks/run_containment.sh exports); the
+# agent must set those, NOT a divergent NEXUS_* set, or playbooks run param-less.
+def test_build_env_uses_the_ir_contract_the_playbooks_read():
+    assert rx.build_env(_task("block_ip"))["IR_C2_IPS"] == "10.0.0.9"
     erad = rx.build_env(_task("eradicate_process", pids=[1337], processes=["evil.exe"], hashes=["ab"]))
-    assert erad["NEXUS_MALICIOUS_PIDS"] == "1337" and erad["NEXUS_MALICIOUS_PROCESSES"] == "evil.exe"
+    assert erad["IR_MALICIOUS_PIDS"] == "1337" and erad["IR_MALICIOUS_PROCESSES"] == "evil.exe"
     acq = rx.build_env(_task("acquire_artifact", file_path="/tmp/x", host="EP-1"))
-    assert acq["NEXUS_TARGET_PATH"] == "/tmp/x"
-    assert all(e["NEXUS_INCIDENT_ID"] == "INC-R" for e in
+    assert acq["IR_TARGET_PATH"] == "/tmp/x"
+    assert all(e["IR_INCIDENT_ID"] == "INC-R" for e in
                (rx.build_env(_task()), erad, acq))
+    # no stray NEXUS_* keys leak (would be silently ignored by the playbooks)
+    assert not any(k.startswith("NEXUS_") for k in erad)
+
+def test_build_env_eradicate_persistence_and_collect():
+    persist = rx.build_env(_task("eradicate_persistence", file_paths=["/tmp/.x/p.bin"], hashes=["abc"]))
+    assert persist["IR_MALICIOUS_PATHS"] == "/tmp/.x/p.bin"
+    assert persist["IR_MALICIOUS_HASHES"] == "abc"
+    collect = rx.build_env(_task("collect_forensics", host="EP-7"))
+    assert collect["IR_HOST"] == "EP-7" and collect["IR_INCIDENT_ID"] == "INC-R"
 
 
 # ── SAFETY: only signed tasks run; the task can't choose the command ─────────
@@ -76,7 +95,7 @@ def test_unsigned_or_forged_task_refused():
 
 def test_prepare_execution_happy_path():
     pb, env = rx.prepare_execution(_task("isolate_host", "linux", mgmt_ips=["10.0.0.0/24"]), secret=SECRET)
-    assert pb == "01_contain_host.sh" and env["NEXUS_MGMT_IPS"] == "10.0.0.0/24"
+    assert pb == "01_contain_host.sh" and env["IR_MGMT_IPS"] == "10.0.0.0/24"
 
 
 def test_task_cannot_inject_an_arbitrary_path():

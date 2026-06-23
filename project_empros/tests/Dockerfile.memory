@@ -1,0 +1,16 @@
+# SECTION: memory — worker_memory (memory-forensics bridge to the agentic stack)
+#   docker build -f project_empros/tests/Dockerfile.memory -t nexus-test-memory .
+FROM docker.io/alpine:3.24
+
+RUN apk add --no-cache python3 py3-pip
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+RUN pip3 install --no-cache-dir "pytest>=7.4.0"
+
+COPY project_empros/services/worker_memory/        /repo/project_empros/services/worker_memory/
+COPY project_empros/tests/lab_memory_forensics/    /repo/project_empros/tests/lab_memory_forensics/
+COPY project_empros/tests/pytest.ini               /repo/project_empros/tests/
+COPY project_empros/tests/conftest.py              /repo/project_empros/tests/
+
+WORKDIR /repo/project_empros
+CMD ["python3", "-m", "pytest", "tests/lab_memory_forensics/", \
+     "-v", "--tb=short", "--junit-xml=/reports/memory.xml"]

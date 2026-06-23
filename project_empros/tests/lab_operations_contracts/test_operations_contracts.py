@@ -209,6 +209,12 @@ class TestStreamsInitScript:
         for stream in self.REQUIRED_STREAMS:
             assert stream in sh, f"Stream '{stream}' must be created in streams_init.sh"
 
+    def test_memory_evidence_streams_defined(self):
+        sh = _sh()
+        # verified intake handle (gateway → worker_memory) + analysis enrichment (→ swarm)
+        assert "Nexus_Memory_Intake" in sh and "nexus.memory.intake" in sh
+        assert "Nexus_Memory_Enrichment" in sh and "nexus.memory.enrichment" in sh
+
     def test_tier5_telemetry_wildcard_subject(self):
         assert "nexus.*.telemetry" in _sh(), \
             "Tier5_Telemetry must subscribe to nexus.*.telemetry (wildcard for all sensor types)"

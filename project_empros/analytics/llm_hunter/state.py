@@ -4,7 +4,7 @@ from typing import TypedDict, Annotated, List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field, field_validator, constr
 from langchain_core.messages import BaseMessage, RemoveMessage
 
-# ─── Global "Do Not Pivot" set (Blast-Radius defense, Enhancement 2) ──
+# --- Global "Do Not Pivot" set (Blast-Radius defense, Enhancement 2) --
 # Public resolvers, broadcast/loopback, link-local metadata. Defined here so the
 # entity reducer can drop them at MERGE time -- meaning they can never enter the
 # blast radius in the first place, rather than relying on a router mutation that
@@ -15,7 +15,7 @@ GLOBAL_DO_NOT_PIVOT = {
 }
 MAX_ENTITIES = 10  # hard cap on simultaneously tracked entities per investigation
 
-# ─── Deep-Analysis Loop Gates ──────────────────────────────────────
+# --- Deep-Analysis Loop Gates --------------------------------------
 # FP_CONFIDENCE_GATE is the single confidence threshold for the False Positive
 # review/memory contract: an FP verdict BELOW the gate is routed through the
 # adversarial review board before the response agent (it cannot be dismissed unreviewed),
@@ -46,7 +46,7 @@ def route_for_source_type(source_type: str) -> str:
     # macos_sensor, trellix_ens → host_expert
     return "host_expert"
 
-# ─── Alert Schema (Strictly Typed) ─────────────────────────────────
+# --- Alert Schema (Strictly Typed) ---------------------------------
 class UnifiedAlertSchema(BaseModel):
     event_id: str = Field(description="The unique UUID of the triggering event.")
     timestamp: float = Field(description="Epoch timestamp of the anomaly.")
@@ -83,14 +83,23 @@ class UnifiedAlertSchema(BaseModel):
     anomaly_score: float = Field(ge=0.0, le=1.0, description="The mathematical deviation score (0.0 to 1.0).")
     raw_event: Dict[str, Any] = Field(default_factory=dict, description="The fat payload of narrative context.")
 
-# ─── Final Verdict Schema (Strictly Typed) ─────────────────────────
+# --- Final Verdict Schema (Strictly Typed) -------------------------
 class VerdictSchema(BaseModel):
     is_true_positive: bool = Field(description="True if this is a genuine threat, False if benign/administrative.")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0.")
     justification: str = Field(description="A concise, technical explanation of why this verdict was reached.")
     recommended_action: Literal['contain', 'monitor', 'dismiss'] = Field(description="The final action to take.")
 
-# ─── SOAR Execution Schema (Strictly Typed) ────────────────────────
+# --- SOAR Execution Schema (Strictly Typed) ------------------------
+# Only these host playbooks may be initiated (mirror of
+# operations/agent/response_executor RESPONSE_ACTIONS); response_actions entries
+# outside this set are dropped by the schema validator before they can be signed.
+ALLOWED_RESPONSE_ACTIONS = frozenset({
+    "isolate_host", "block_ip", "eradicate_process", "eradicate_persistence",
+    "collect_forensics", "restore",
+})
+
+
 class SoarExecutionSchema(BaseModel):
     """
     OWASP LLM07 & LLM08: Restricts the LLM's agency to a mathematically verifiable
@@ -110,6 +119,11 @@ class SoarExecutionSchema(BaseModel):
     incident_id: str
     action_type: Literal[
         "isolate_host", "block_ip", "monitor_subnet", "manual_review_required",
+        # On-host eradication / evidence playbooks (operations/agent/response_executor.py).
+        # The swarm emits these in `response_actions` (below); each maps to a fixed
+        # bundled playbook the on-host agent runs. They are valid as a primary
+        # action_type too, but the canonical incident primary stays isolate_host.
+        "eradicate_process", "eradicate_persistence", "collect_forensics",
         # "restore" reverses containment/eradication when a detonation flips the
         # verdict to benign (false positive) -- routes to the ssh_playbook_v1
         # `restore` action (06_restore.{sh,ps1}).
@@ -126,12 +140,34 @@ class SoarExecutionSchema(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     reason: constr(max_length=200) = Field(description="Brief justification for the audit log.")
 
+    # --- On-host playbook initiation (DC-N11) ----------------------------------
+    # The ordered host IR playbooks to initiate for this verdict (each → a fixed
+    # bundled playbook the on-host agent runs). Empty for cloud/network targets and
+    # non-contain verdicts. os_family selects .sh vs .ps1; the typed IOC lists are
+    # the NEXUS_* params the playbooks consume (response_executor.build_env).
+    os_family: Optional[Literal["windows", "linux"]] = None
+    response_actions: List[str] = Field(default_factory=list, max_length=8)
+    c2_ips: List[str] = Field(default_factory=list, max_length=64)
+    c2_domains: List[str] = Field(default_factory=list, max_length=64)
+    pids: List[str] = Field(default_factory=list, max_length=64)
+    processes: List[str] = Field(default_factory=list, max_length=64)
+    hashes: List[str] = Field(default_factory=list, max_length=64)
+    file_paths: List[str] = Field(default_factory=list, max_length=64)
+    users: List[str] = Field(default_factory=list, max_length=64)
+    mgmt_ips: List[str] = Field(default_factory=list, max_length=32)
+
     @field_validator("targets")
     @classmethod
     def _strip_blanks(cls, v: List[str]) -> List[str]:
         return [t for t in v if t and str(t).strip()]
 
-# ─── Live Acquisition Request (host_expert → Det Chamber) ──────────
+    @field_validator("response_actions")
+    @classmethod
+    def _known_actions_only(cls, v: List[str]) -> List[str]:
+        # defense in depth: a poisoned/unknown action can never reach the agent.
+        return [a for a in v if a in ALLOWED_RESPONSE_ACTIONS]
+
+# --- Live Acquisition Request (host_expert → Det Chamber) ----------
 class AcquisitionRequestSchema(BaseModel):
     """The validated request the host_expert's acquire_and_detonate tool emits on
     nexus.acquire.request. First-line path safety lives here (the deterministic
@@ -154,7 +190,7 @@ class AcquisitionRequestSchema(BaseModel):
             raise ValueError("file_path contains path traversal")
         return v
 
-# ─── RAG Immunity Signature ────────────────────────────────────────
+# --- RAG Immunity Signature ----------------------------------------
 def build_memory_signature(sensor_id: str, source_type: str, vector_name: str) -> str:
     """
     Canonical text embedded for RAG-driven immunity.
@@ -170,7 +206,7 @@ def build_memory_signature(sensor_id: str, source_type: str, vector_name: str) -
     """
     return f"sensor:{sensor_id}|source_type:{source_type}|vector:{vector_name}"
 
-# ─── Entity State Machine ──────────────────────────────────────────
+# --- Entity State Machine ------------------------------------------
 class EntityTracking(BaseModel):
     # "file" tracks a confirmed-TP artifact (path in notes) the host_expert can
     # hand to the Det Chamber for live acquisition + detonation.
@@ -208,7 +244,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
     return merged
 
-# ─── Context Window Manager ────────────────────────────────────────
+# --- Context Window Manager ----------------------------------------
 def manage_messages(left: list[BaseMessage], right: list[BaseMessage]):
     """
     Appends new messages, honouring RemoveMessage tombstones so callers can
@@ -238,7 +274,7 @@ class InvestigativeState(TypedDict):
     # (NC-9) for the confabulation. Empty/absent when the verdict was grounded.
     grounding_violations: Optional[List[str]]
     canary: Optional[str]  # OWASP LLM01 prompt-leak tripwire (injected into agent system prompts)
-    # ── Deep-analysis loop bookkeeping ──
+    # -- Deep-analysis loop bookkeeping --
     # Number of times the supervisor's deterministic thoroughness gate rejected a
     # FINISH that left unresolved entities (bounded by MAX_GATE_OVERRIDES).
     gate_overrides: int

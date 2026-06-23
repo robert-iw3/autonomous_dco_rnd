@@ -30,7 +30,7 @@ WIN_DOTNET_TEST = ROOT / "windows" / "windows_xdr_dev" / "tests" / "dotnet" / "R
 WIN_PROGRAM = ROOT / "windows" / "windows_xdr_dev" / "agent" / "Program.cs"
 SYSMON_RESPONSE = ROOT / "windows" / "sysmon_sensor" / "response_channel.py"
 LINUX_TX = ROOT / "linux" / "sentinel" / "src" / "siem" / "parquet_transmitter.rs"
-PLAYBOOKS = REPO / "operations" / "playbooks"
+PLAYBOOKS = REPO / "operations" / "playbooks" / "playbooks"  # inner dir holds the <os>/0X_* scripts
 
 
 # -- Windows XDR: local response executor present (SOAR-mappable primitives) ---

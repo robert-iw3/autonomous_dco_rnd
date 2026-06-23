@@ -331,8 +331,45 @@ class TestSoarExecutionSchema:
             pass
 
     def test_all_action_types_accepted(self):
-        for at in ("isolate_host", "block_ip", "monitor_subnet", "manual_review_required"):
+        for at in ("isolate_host", "block_ip", "monitor_subnet", "manual_review_required",
+                   "eradicate_process", "eradicate_persistence", "collect_forensics", "restore"):
             assert _soar(action_type=at).action_type == at
+
+    # ── on-host playbook initiation fields (DC-N11) ──
+    def test_playbook_fields_default_empty(self):
+        s = _soar()
+        assert s.os_family is None
+        assert s.response_actions == []
+        for f in ("c2_ips", "c2_domains", "pids", "processes", "hashes",
+                  "file_paths", "users", "mgmt_ips"):
+            assert getattr(s, f) == []
+
+    def test_playbook_fields_roundtrip(self):
+        s = _soar(os_family="linux", response_actions=["isolate_host", "eradicate_process"],
+                  c2_ips=["10.0.0.9"], pids=["4242"], hashes=["a" * 64],
+                  file_paths=["/tmp/x"], c2_domains=["evil.test"], users=["bob"])
+        assert s.os_family == "linux"
+        assert s.response_actions == ["isolate_host", "eradicate_process"]
+        assert s.c2_ips == ["10.0.0.9"] and s.pids == ["4242"]
+
+    def test_response_actions_validator_drops_unknown(self):
+        # a poisoned/unknown action can never survive into a signed task
+        s = _soar(response_actions=["isolate_host", "rm_rf_slash", "collect_forensics"])
+        assert s.response_actions == ["isolate_host", "collect_forensics"]
+
+    def test_os_family_must_be_windows_or_linux(self):
+        try:
+            _soar(os_family="solaris")
+            assert False, "expected ValidationError for unknown os_family"
+        except ValidationError:
+            pass
+
+    def test_ioc_list_caps_enforced(self):
+        try:
+            _soar(c2_ips=[f"10.0.0.{i}" for i in range(65)])  # > 64 cap
+            assert False, "expected ValidationError for oversized IOC list"
+        except ValidationError:
+            pass
 
     def test_targets_max_five(self):
         try:

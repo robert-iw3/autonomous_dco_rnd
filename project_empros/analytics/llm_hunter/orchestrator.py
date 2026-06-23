@@ -328,6 +328,18 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
+            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
+            # which builds a signed agent task per response_action with these IOCs.
+            os_family=action.get("os_family"),
+            response_actions=action.get("response_actions", []),
+            c2_ips=action.get("c2_ips", []),
+            c2_domains=action.get("c2_domains", []),
+            pids=action.get("pids", []),
+            processes=action.get("processes", []),
+            hashes=action.get("hashes", []),
+            file_paths=action.get("file_paths", []),
+            users=action.get("users", []),
+            mgmt_ips=action.get("mgmt_ips", []),
         )
     except ValidationError as e:
         logger.error(f"SOAR payload failed schema validation; dropping to prevent "

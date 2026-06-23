@@ -44,6 +44,7 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | `mlops` | `Dockerfile.mlops` | Data flow, Track 6 dry-run, TI ingest, eval minilab, s3 parquet worker | Debian slim |
 | `analytics` | `Dockerfile.analytics` | LLM hunter (review board, SIEM tools/contracts), agentic swarm, redteam bypass | Alpine 3.23 |
 | `governance` | `Dockerfile.governance` | NIST AI 600-1 control suite + GRC manifest/evidence-chain/wiring (`lab_governance/`) | Debian slim |
+| `memory` | `Dockerfile.memory` | `worker_memory` — memory-forensics bridge to the agentic stack (`lab_memory_forensics/`) | Debian slim |
 | `services` | `Dockerfile.services` | Worker/infra/orchestration source contracts (255 tests) | Alpine 3.23 |
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
 | `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
@@ -69,6 +70,7 @@ The script maps changed file paths to sections automatically:
 | `tests/test_phase*` | pipeline |
 | `tests/lab_analytics_*`, `tests/lab_redteam/` | analytics |
 | `tests/lab_governance/` | governance |
+| `services/worker_memory/`, `tests/lab_memory_forensics/` | memory |
 
 ### Reports
 
@@ -91,6 +93,7 @@ tests/reports/
 ├── mlops.xml        │  canonical per-section reports (committed)
 ├── analytics.xml    │
 ├── governance.xml   │
+├── memory.xml       │
 ├── services.xml     │
 ├── pipeline.xml     │
 ├── detchamber.xml   │

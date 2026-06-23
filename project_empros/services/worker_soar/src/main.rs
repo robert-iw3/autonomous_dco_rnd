@@ -129,6 +129,19 @@ struct ContainmentPayload {
     /// platform's playbook). Empty when unknown.
     #[serde(default)]
     os_family: String,
+    /// Ordered on-host playbooks the swarm wants initiated (DC-N11). worker_soar
+    /// signs one agent task per action with that action's IOC params (below).
+    /// Empty → fall back to the single primary `action_type`.
+    #[serde(default)]
+    response_actions: Vec<String>,
+    /// Typed IOC params the bundled playbooks consume (see response_executor.build_env).
+    #[serde(default)] c2_ips: Vec<String>,
+    #[serde(default)] c2_domains: Vec<String>,
+    #[serde(default)] pids: Vec<String>,
+    #[serde(default)] processes: Vec<String>,
+    #[serde(default)] hashes: Vec<String>,
+    #[serde(default)] file_paths: Vec<String>,
+    #[serde(default)] mgmt_ips: Vec<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -368,21 +381,46 @@ impl SiemAdapter for SoarAdapter {
                         // host == the agent's JWT subject (sensor_id); the orchestrator
                         // sets targets to the on-host agent identity. core_ingress keys
                         // its task store by this `host` and drains it on the agent's poll.
+                        //
+                        // One signed task PER (host × response_action): the swarm's
+                        // ordered playbook plan (isolate → collect → block → eradicate)
+                        // each carries that action's typed IOC params so the on-host
+                        // playbook reads the right IR_* values. Empty response_actions
+                        // falls back to the single primary action_type (legacy shape).
+                        let empty: Vec<String> = Vec::new();
+                        let actions: Vec<String> = if payload.response_actions.is_empty() {
+                            vec![payload.action_type.clone()]
+                        } else {
+                            payload.response_actions.clone()
+                        };
                         for host in &payload.targets {
-                            let task = agent_task::build_signed_task(
-                                &payload.incident_id, host, &payload.os_family,
-                                &payload.action_type, &payload.targets, created, secret.as_bytes(),
-                            );
-                            let body = serde_json::to_vec(&task).unwrap_or_default();
-                            match nats.publish("nexus.agent.tasks".to_string(), Bytes::from(body)).await {
-                                Ok(_) => {
-                                    counter!("nexus_soar_agent_tasks_enqueued_total").increment(1);
-                                    info!(incident = %payload.incident_id, host = %host,
-                                          executor = %agent_exec, "agent task signed + published");
+                            for action in &actions {
+                                if !agent_task::is_response_action(action) {
+                                    continue;   // only allowlisted host playbooks are signed
                                 }
-                                Err(e) => {
-                                    error!(error = %e, host = %host, "failed to publish agent task");
-                                    n8n_failures += 1;   // → batch retained for retry
+                                let (targets, params) = agent_task::action_targets_and_params(
+                                    action, host, &empty,
+                                    &payload.c2_ips, &payload.c2_domains, &payload.pids,
+                                    &payload.processes, &payload.hashes, &payload.file_paths,
+                                    &payload.mgmt_ips,
+                                );
+                                let task = agent_task::build_signed_task(
+                                    &payload.incident_id, host, &payload.os_family,
+                                    action, targets, &params, created, secret.as_bytes(),
+                                );
+                                let body = serde_json::to_vec(&task).unwrap_or_default();
+                                match nats.publish("nexus.agent.tasks".to_string(), Bytes::from(body)).await {
+                                    Ok(_) => {
+                                        counter!("nexus_soar_agent_tasks_enqueued_total").increment(1);
+                                        info!(incident = %payload.incident_id, host = %host,
+                                              action = %action, executor = %agent_exec,
+                                              "agent task signed + published");
+                                    }
+                                    Err(e) => {
+                                        error!(error = %e, host = %host, action = %action,
+                                               "failed to publish agent task");
+                                        n8n_failures += 1;   // → batch retained for retry
+                                    }
                                 }
                             }
                         }

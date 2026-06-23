@@ -6,7 +6,9 @@ Same pattern as det_chamber/agents/acquire_core.py: this is the tested Python
 spec; the on-host agents mirror it (linux/sentinel in Rust, windows/windows_xdr_dev
 in C#). worker_soar emits a signed RESPONSE TASK; the agent polls it (GET
 /api/v1/tasks), verifies it, runs the matching playbook from a FIXED allowlist with
-NEXUS_* env, and reports the outcome outbound (→ nexus.soar.callback).
+`IR_*` env (the same parameter contract playbooks/run_containment.sh exports), and
+reports the outcome outbound (→ nexus.soar.callback). The bundled playbooks + tools
+must be staged on the host in advance (offline toolkit) -- the stack is air-gapped.
 
 SECURITY: the agent NEVER runs a path supplied by the task. The action_type selects
 one of the fixed `operations/playbooks/{os}/0X_*` scripts; the task only carries
@@ -54,23 +56,32 @@ def select_playbook(action_type: str, os_family: str) -> str:
 
 
 def build_env(task: dict) -> Dict[str, str]:
-    """Map a response task to the NEXUS_* env the playbooks read. Targets/params
-    only -- never a command or path the playbook would execute."""
+    """Map a response task to the `IR_*` env the bundled playbooks actually read
+    (the same contract `playbooks/run_containment.sh` exports, so the agent and the
+    SSH fallback drive the playbooks identically). Targets/params only -- never a
+    command or path the playbook would execute."""
     targets = task.get("targets", []) or []
-    env = {"NEXUS_INCIDENT_ID": str(task["incident_id"])}
+    env = {"IR_INCIDENT_ID": str(task["incident_id"]),
+           "IR_HOST": str(task.get("host", ""))}
     action = task["action_type"]
     if action == "isolate_host":
-        env["NEXUS_MGMT_IPS"] = ",".join(task.get("mgmt_ips", []))
+        env["IR_MGMT_IPS"] = ",".join(task.get("mgmt_ips", []))
     elif action == "block_ip":
-        env["NEXUS_C2_IPS"] = ",".join(targets)
-        env["NEXUS_C2_DOMAINS"] = ",".join(task.get("c2_domains", []))
+        # for a block_ip task `targets` carries the C2 IPs (per-action target set)
+        env["IR_C2_IPS"] = ",".join(targets)
+        env["IR_C2_DOMAINS"] = ",".join(task.get("c2_domains", []))
     elif action == "eradicate_process":
-        env["NEXUS_MALICIOUS_PIDS"] = ",".join(str(p) for p in task.get("pids", []))
-        env["NEXUS_MALICIOUS_PROCESSES"] = ",".join(task.get("processes", []))
-        env["NEXUS_MALICIOUS_HASHES"] = ",".join(task.get("hashes", []))
+        env["IR_MALICIOUS_PIDS"] = ",".join(str(p) for p in task.get("pids", []))
+        env["IR_MALICIOUS_PROCESSES"] = ",".join(task.get("processes", []))
+        env["IR_MALICIOUS_HASHES"] = ",".join(task.get("hashes", []))
+    elif action == "eradicate_persistence":
+        env["IR_MALICIOUS_PATHS"] = ",".join(task.get("file_paths", []) or task.get("paths", []))
+        env["IR_MALICIOUS_HASHES"] = ",".join(task.get("hashes", []))
+        env["IR_MALICIOUS_PROCESSES"] = ",".join(task.get("processes", []))
     elif action == "acquire_artifact":
-        env["NEXUS_TARGET_PATH"] = str(task.get("file_path", ""))
-        env["NEXUS_HOST"] = str(task.get("host", ""))
+        env["IR_TARGET_PATH"] = str(task.get("file_path", ""))
+    # collect_forensics / restore take no IOC params -- they snapshot / reverse the
+    # whole host from IR_INCIDENT_ID + IR_HOST (the rollback journal keyed by incident).
     return env
 
 

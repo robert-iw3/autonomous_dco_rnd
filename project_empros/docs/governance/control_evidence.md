@@ -162,7 +162,7 @@ AI_PROVENANCE_BANNER = (
 
 **3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
 
-`analytics/llm_hunter/agents/response.py:L139-L141`
+`analytics/llm_hunter/agents/response.py:L140-L142`
 
 ```python
                     # NIST GV-1.3-005: timestamp so the supervisor's recall can
@@ -202,7 +202,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **2. Execution** — Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted.
 
-`analytics/llm_hunter/agents/response.py:L235-L237`
+`analytics/llm_hunter/agents/response.py:L236-L238`
 
 ```python
     # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
@@ -545,7 +545,7 @@ def run_bias_audit(records: List[Dict[str, Any]], dimension: str = "source_type"
 
 **1. Invocation** — Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L167-L177`
+`analytics/llm_hunter/agents/response.py:L168-L178`
 
 ```python
     try:
@@ -617,7 +617,7 @@ def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
 
 **1. Invocation** — Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L182-L186`
+`analytics/llm_hunter/agents/response.py:L183-L187`
 
 ```python
     try:
@@ -865,7 +865,7 @@ def record_reliance(verdict: dict, operator_action: str,
 
 **1. Invocation** — Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L193-L198`
+`analytics/llm_hunter/agents/response.py:L194-L199`
 
 ```python
         if grounding_violations:
@@ -945,7 +945,7 @@ def capture(verdict: dict, operator_disposition: Optional[str] = None,
 
 **1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
-`analytics/llm_hunter/state.py:L181-L211`
+`analytics/llm_hunter/state.py:L217-L247`
 
 ```python
 def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
@@ -978,7 +978,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
     return merged
 
-# ─── Context Window Manager ────────────────────────────────────────
+# --- Context Window Manager ----------------------------------------
 ```
 
 **2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
@@ -994,7 +994,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L76-L78`
+`analytics/llm_hunter/agents/response.py:L77-L79`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
@@ -1078,7 +1078,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
 
-`analytics/llm_hunter/agents/response.py:L312-L312`
+`analytics/llm_hunter/agents/response.py:L337-L337`
 
 ```python
     reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
@@ -1210,7 +1210,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
 
-`analytics/llm_hunter/agents/response.py:L215-L216`
+`analytics/llm_hunter/agents/response.py:L216-L217`
 
 ```python
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
@@ -1227,10 +1227,10 @@ def build_failover_chain(temperature: float = 0.0):
 
 **1. Logic** — Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute.
 
-`analytics/llm_hunter/agents/response.py:L320-L323`
+`analytics/llm_hunter/agents/response.py:L354-L357`
 
 ```python
-        "reason": reason,
+        "users": iocs["users"],
         # Audit / idempotency extras (ignored by the schema, kept for the SOAR log):
         "idempotency_key": f"iso-{target}-{int(float(alert.get('timestamp', 0) or 0) // 900)}",
         "source_type": alert.get("source_type", ""),
@@ -1238,7 +1238,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **2. Execution** — The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor.
 
-`services/worker_soar/src/main.rs:L270-L273`
+`services/worker_soar/src/main.rs:L283-L286`
 
 ```rust
                 let mut dedup = self.dedup.write().await;
@@ -1308,7 +1308,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
-`analytics/llm_hunter/state.py:L94-L129`
+`analytics/llm_hunter/state.py:L103-L138`
 
 ```python
 class SoarExecutionSchema(BaseModel):
@@ -1330,6 +1330,11 @@ class SoarExecutionSchema(BaseModel):
     incident_id: str
     action_type: Literal[
         "isolate_host", "block_ip", "monitor_subnet", "manual_review_required",
+        # On-host eradication / evidence playbooks (operations/agent/response_executor.py).
+        # The swarm emits these in `response_actions` (below); each maps to a fixed
+        # bundled playbook the on-host agent runs. They are valid as a primary
+        # action_type too, but the canonical incident primary stays isolate_host.
+        "eradicate_process", "eradicate_persistence", "collect_forensics",
         # "restore" reverses containment/eradication when a detonation flips the
         # verdict to benign (false positive) -- routes to the ssh_playbook_v1
         # `restore` action (06_restore.{sh,ps1}).
@@ -1342,11 +1347,6 @@ class SoarExecutionSchema(BaseModel):
         default_factory=list,
         description="List of target identifiers (IPs or hostnames).",
         max_length=5,  # ATLAS AML.T0016: prevent resource exhaustion / mass shutdown
-    )
-    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    reason: constr(max_length=200) = Field(description="Brief justification for the audit log.")
-
-    @field_validator("targets")
 ```
 
 **2. Invocation** — The dispatch path is the single egress for any containment action.
@@ -1370,7 +1370,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
-        )
+            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
 ```
 
 \newpage

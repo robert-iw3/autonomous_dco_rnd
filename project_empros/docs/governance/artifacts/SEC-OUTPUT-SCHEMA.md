@@ -6,7 +6,7 @@
 
 **1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
-`analytics/llm_hunter/state.py:L94-L129`
+`analytics/llm_hunter/state.py:L103-L138`
 
 ```python
 class SoarExecutionSchema(BaseModel):
@@ -28,6 +28,11 @@ class SoarExecutionSchema(BaseModel):
     incident_id: str
     action_type: Literal[
         "isolate_host", "block_ip", "monitor_subnet", "manual_review_required",
+        # On-host eradication / evidence playbooks (operations/agent/response_executor.py).
+        # The swarm emits these in `response_actions` (below); each maps to a fixed
+        # bundled playbook the on-host agent runs. They are valid as a primary
+        # action_type too, but the canonical incident primary stays isolate_host.
+        "eradicate_process", "eradicate_persistence", "collect_forensics",
         # "restore" reverses containment/eradication when a detonation flips the
         # verdict to benign (false positive) -- routes to the ssh_playbook_v1
         # `restore` action (06_restore.{sh,ps1}).
@@ -40,11 +45,6 @@ class SoarExecutionSchema(BaseModel):
         default_factory=list,
         description="List of target identifiers (IPs or hostnames).",
         max_length=5,  # ATLAS AML.T0016: prevent resource exhaustion / mass shutdown
-    )
-    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
-    reason: constr(max_length=200) = Field(description="Brief justification for the audit log.")
-
-    @field_validator("targets")
 ```
 
 **2. Invocation** — The dispatch path is the single egress for any containment action.
@@ -68,5 +68,5 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
-        )
+            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
 ```

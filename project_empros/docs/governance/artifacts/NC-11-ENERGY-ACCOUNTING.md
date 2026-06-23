@@ -6,7 +6,7 @@
 
 **1. Invocation** — Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L182-L186`
+`analytics/llm_hunter/agents/response.py:L183-L187`
 
 ```python
     try:

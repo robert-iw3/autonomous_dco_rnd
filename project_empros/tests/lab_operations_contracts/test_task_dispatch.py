@@ -3,7 +3,7 @@ Lab operations -- Phase A: Nexus-side task dispatch (shared), end to end.
 
 Proves the shared path that tasks an outbound-only endpoint: a SOAR action (or an
 acquisition) becomes a SIGNED task in a per-host store; the agent polls it and the
-canonical response_executor turns it into a fixed playbook + NEXUS_* env. Includes
+canonical response_executor turns it into a fixed playbook + IR_* env. Includes
 the E2E seam (dispatch → store → poll → prepare_execution) and the safety property
 (a forged/unsigned polled task is refused).
 """
@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "operations" / "agent"))
 import task_dispatch as td       # noqa: E402
 import response_executor as rx   # noqa: E402
 
-PLAYBOOKS = ROOT / "operations" / "playbooks"
+PLAYBOOKS = ROOT / "operations" / "playbooks" / "playbooks"
 SECRET = b"nexus-task-dispatch-secret"
 
 
@@ -72,13 +72,13 @@ def _dispatch_and_execute(action, os_family, **params):
 def test_e2e_isolate_host_linux():
     pb, env = _dispatch_and_execute("isolate_host", "linux", mgmt_ips=["10.0.0.0/24"])
     assert pb == "01_contain_host.sh" and (PLAYBOOKS / "linux" / pb).exists()
-    assert env["NEXUS_MGMT_IPS"] == "10.0.0.0/24" and env["NEXUS_INCIDENT_ID"] == "INC-E2E"
+    assert env["IR_MGMT_IPS"] == "10.0.0.0/24" and env["IR_INCIDENT_ID"] == "INC-E2E"
 
 
 def test_e2e_block_ip_windows():
     pb, env = _dispatch_and_execute("block_ip", "windows", targets=["8.8.8.8"])
     assert pb == "04_Block-C2.ps1" and (PLAYBOOKS / "windows" / pb).exists()
-    assert env["NEXUS_C2_IPS"] == "8.8.8.8"
+    assert env["IR_C2_IPS"] == "8.8.8.8"
 
 
 def test_e2e_acquisition_task():
@@ -86,7 +86,7 @@ def test_e2e_acquisition_task():
     store.enqueue("EP-9", td.build_acquisition_task(
         incident_id="INC", host="EP-9", os_family="linux", file_path="/tmp/evil", secret=SECRET))
     pb, env = rx.prepare_execution(store.poll("EP-9")[0], secret=SECRET)
-    assert pb == "05_acquire_artifact.sh" and env["NEXUS_TARGET_PATH"] == "/tmp/evil"
+    assert pb == "05_acquire_artifact.sh" and env["IR_TARGET_PATH"] == "/tmp/evil"
 
 
 # -- containment.toml wires the outbound agent-task executor ------------------
@@ -131,7 +131,7 @@ def test_transport_routes_to_correct_host_and_isolates_others():
 
     # the delivered task still verifies and resolves to the right local action
     pb, env = rx.prepare_execution(delivered[0], secret=SECRET)
-    assert pb == "01_contain_host.sh" and env["NEXUS_MGMT_IPS"] == "10.0.0.0/24"
+    assert pb == "01_contain_host.sh" and env["IR_MGMT_IPS"] == "10.0.0.0/24"
 
 
 def test_transport_rejects_task_corrupted_in_transit():

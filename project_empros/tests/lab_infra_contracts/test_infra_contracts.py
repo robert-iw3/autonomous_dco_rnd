@@ -179,3 +179,53 @@ class TestProductionYAML:
 
     def test_ansible_ssh_key_file_defined(self):
         assert "ansible_ssh_key_file" in _prod()
+
+
+# ── Memory / IR evidence WORM archive + worker_memory automation ────────────
+TF_MEM_BUCKET = PROJECT_ROOT / "infrastructure/terraform/aws/memory_evidence_bucket.tf"
+SITE_YML = ANSIBLE_BASE / "site.yml"
+
+
+class TestMemoryEvidenceAutomation:
+    """The memory-forensics bridge is automated into the stack build: a WORM
+    evidence bucket (Terraform), worker_memory in the Ansible fleet, and the
+    config keys core_ingress + worker_memory consume."""
+
+    def test_worm_bucket_terraform_exists(self):
+        assert TF_MEM_BUCKET.exists(), "memory_evidence_bucket.tf must provision the WORM archive"
+
+    def test_bucket_is_object_locked_governance_kms(self):
+        tf = TF_MEM_BUCKET.read_text()
+        assert "object_lock_enabled = true" in tf, "WORM object-lock must be enabled at creation"
+        assert "GOVERNANCE" in tf, "image default retention is GOVERNANCE (operator-purgeable)"
+        assert "aws_kms_key" in tf and "aws:kms" in tf, "KMS server-side encryption required"
+        assert "aws_s3_bucket_public_access_block" in tf, "bucket must block all public access"
+        assert "aws:SecureTransport" in tf, "TLS-only bucket policy required"
+
+    def test_worker_memory_deploys_as_python_service_not_cargo(self):
+        site = SITE_YML.read_text()
+        # worker_memory is Python — it must NOT ride the cargo-only rust_podman_worker
+        # fleet (that build is `cargo build -p <name>` and would fail), but its own role.
+        assert 'worker_name: "worker_memory"' not in site, \
+            "worker_memory is Python; it cannot build via the rust_podman_worker (cargo) fleet"
+        assert "memory_worker" in site, "worker_memory must deploy via the memory_worker role"
+        role = PROJECT_ROOT / "infrastructure/ansible/roles/memory_worker/tasks/main.yml"
+        assert role.exists(), "memory_worker role must exist"
+        rt = role.read_text()
+        assert "services/worker_memory/" in rt, "role builds from the service's own dir (context)"
+        assert "podman.sock" in rt, "worker needs the host runtime to spawn the analyzer container"
+        assert "NEXUS_MEMORY_ARCHIVE_BUCKET" in rt, "evidence bucket env must be passed"
+
+    def test_worker_memory_dockerfile_is_service_local(self):
+        df = (PROJECT_ROOT / "services/worker_memory/Dockerfile").read_text()
+        # built with context = the service dir (like worker_ti_ingest): COPY *.py, no
+        # outer project_empros/ prefix, and not a cargo build.
+        assert "COPY *.py" in df and "project_empros/" not in df
+        assert "cargo" not in df and "alpine:3.24" in df
+
+    def test_production_config_keys(self):
+        p = _prod()
+        assert p.get("worker_memory_instances", 0) >= 1
+        assert p.get("memory_archive_bucket"), "memory_archive_bucket must be set"
+        assert int(p.get("max_evidence_bytes", 0)) > p.get("nats_max_payload_mb", 10) * 1024 * 1024, \
+            "evidence cap must exceed the telemetry NATS payload cap (RAM images are large)"

@@ -2,7 +2,7 @@
 # Tests:   tests/sensors/* (all sensor pipeline schema + vector validation)
 # Deps:    pytest, numpy, pyarrow, pandas, pydantic
 #   docker build -f project_empros/tests/Dockerfile.sensors -t nexus-test-sensors .
-FROM docker.io/alpine:3.23
+FROM docker.io/alpine:3.24
 
 RUN apk add --no-cache \
     python3 python3-dev py3-pip \

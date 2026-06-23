@@ -6,7 +6,7 @@
 
 **1. Invocation** — Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L167-L177`
+`analytics/llm_hunter/agents/response.py:L168-L178`
 
 ```python
     try:

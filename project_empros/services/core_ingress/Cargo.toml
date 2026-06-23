@@ -19,6 +19,9 @@ jsonwebtoken  = { workspace = true }
 async-nats = { workspace = true }
 futures    = { workspace = true }   # Stream for the agent-task subscriber
 
+# WORM evidence archive (memory/IR evidence streamed to S3 on verified upload)
+object_store = { workspace = true }
+
 # Serialization
 serde      = { workspace = true }
 serde_json = { workspace = true }

@@ -2,7 +2,7 @@ use async_nats::HeaderMap;
 use axum::{
     body::Bytes,
     error_handling::HandleErrorLayer,
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::{header, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -12,6 +12,7 @@ use dashmap::DashMap;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use metrics::counter;
 use metrics_exporter_prometheus::PrometheusBuilder;
+use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore};
 use opentelemetry::propagation::Injector;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -54,6 +55,11 @@ struct AppState {
     /// schema, so parsing once eliminates ~2ms of Parquet footer decode per request.
     schema_cache: DashMap<String, Vec<String>>,
     max_payload_bytes: usize,
+    /// Larger cap for memory/IR evidence uploads (RAM images ≫ telemetry batches).
+    max_evidence_bytes: usize,
+    /// WORM image archive (GOVERNANCE-default bucket); the gateway streams verified
+    /// memory images here, then publishes a handle on `nexus.memory.intake`.
+    evidence_store: Option<Arc<dyn ObjectStore>>,
     /// Pending SOAR response tasks (DC-N11), keyed by host == the agent's JWT
     /// subject. worker_soar publishes signed tasks to `nexus.agent.tasks`; the
     /// subscriber files them here; GET /api/v1/tasks drains them on the agent poll.
@@ -79,6 +85,7 @@ struct StartupConfig {
     max_concurrent_requests: usize,
     request_timeout_secs: u64,
     max_payload_bytes: usize,
+    max_evidence_bytes: usize,
     metrics_port: u16,
 }
 
@@ -105,6 +112,9 @@ impl StartupConfig {
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
             max_payload_bytes: std::env::var("MAX_PAYLOAD_BYTES")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(10_485_760),
+            // RAM images are far larger than telemetry batches (default 8 GiB cap).
+            max_evidence_bytes: std::env::var("MAX_EVIDENCE_BYTES")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(8_589_934_592),
             metrics_port: std::env::var("METRICS_PORT")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(9000),
         }
@@ -187,6 +197,17 @@ async fn main() {
 
     let js = async_nats::jetstream::new(client);
 
+    // WORM image archive — built only when a bucket is configured (S3/MinIO from env).
+    let evidence_store: Option<Arc<dyn ObjectStore>> =
+        match std::env::var("NEXUS_MEMORY_ARCHIVE_BUCKET") {
+            Ok(bucket) if !bucket.is_empty() => match AmazonS3Builder::from_env()
+                .with_bucket_name(&bucket).build() {
+                Ok(s) => { info!(bucket, "WORM evidence archive enabled"); Some(Arc::new(s)) }
+                Err(e) => { error!(error = %e, "evidence archive init failed; /api/v1/evidence disabled"); None }
+            },
+            _ => None,
+        };
+
     let state = Arc::new(AppState {
         js,
         jwt_secret: cfg.jwt_secret,
@@ -194,6 +215,8 @@ async fn main() {
         verifier,
         schema_cache: DashMap::new(),
         max_payload_bytes: cfg.max_payload_bytes,
+        max_evidence_bytes: cfg.max_evidence_bytes,
+        evidence_store,
         task_store,
     });
 
@@ -203,8 +226,17 @@ async fn main() {
         // on-host agent polls /api/v1/tasks and transmits the acquired file to
         // /api/v1/artifact over HTTPS with JWT + HMAC.
         .route("/api/v1/artifact", post(handle_artifact_upload))
+        // Memory/IR evidence (its own data class): JWT + HMAC + SHA-256 custody,
+        // streamed to the WORM archive, then a verified handle → nexus.memory.intake.
+        // Large body limit applies to THIS route only (RAM images); every other
+        // route keeps the small default below.
+        .route("/api/v1/evidence", post(handle_evidence_upload)
+            .layer(DefaultBodyLimit::max(cfg.max_evidence_bytes)))
         .route("/api/v1/tasks", get(handle_task_poll))
         .route("/healthz", get(|| async { StatusCode::OK }))
+        // Global small body cap — telemetry/artifact/task routes only; the evidence
+        // route overrides it above so oversized uploads can't hit any other path.
+        .layer(DefaultBodyLimit::max(cfg.max_payload_bytes))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
@@ -473,7 +505,7 @@ async fn handle_artifact_upload(
     }
     match state
         .js
-        .publish_with_headers("nexus.detonation.intake".into(), nats_headers, body.into())
+        .publish_with_headers("nexus.detonation.intake", nats_headers, body.into())
         .await
     {
         Ok(_) => {
@@ -485,6 +517,81 @@ async fn handle_artifact_upload(
             error!(error = %e, "Artifact intake publish rejected");
             StatusCode::SERVICE_UNAVAILABLE
         }
+    }
+}
+
+// -- Memory / IR evidence ingress (its own verified data class) ---------------
+
+const HDR_EVIDENCE_KIND: &str = "X-Evidence-Kind";
+const HDR_OS_FAMILY: &str = "X-Os-Family";
+
+/// SHA-256 chain-of-custody: the body must hash to the sealed manifest value.
+fn verify_sha256(body: &[u8], expected_hex: &str) -> bool {
+    use sha2::{Digest, Sha256};
+    let got = hex::encode(Sha256::digest(body));
+    !expected_hex.is_empty() && got.eq_ignore_ascii_case(expected_hex)
+}
+
+/// POST /api/v1/evidence -- the on-host agent streams a captured RAM image (or IR
+/// evidence) OUTBOUND over HTTPS. JWT-gated, HMAC-verified, SHA-256 custody-checked,
+/// then streamed into the WORM archive; a small verified handle is published to
+/// `nexus.memory.intake` so worker_memory pulls + re-checks before analysis.
+async fn handle_evidence_upload(
+    State(state): State<Arc<AppState>>,
+    headers: header::HeaderMap,
+    body: Bytes,
+) -> impl IntoResponse {
+    if validate_token(&headers, &state.jwt_secret).is_err() {
+        counter!("nexus_ingress_auth_failures_total").increment(1);
+        return StatusCode::UNAUTHORIZED;
+    }
+    let store = match &state.evidence_store {
+        Some(s) => s,
+        None => return StatusCode::SERVICE_UNAVAILABLE,   // WORM archive not configured
+    };
+    if body.len() > state.max_evidence_bytes {
+        return StatusCode::PAYLOAD_TOO_LARGE;
+    }
+    let incident_id = hdr_str(&headers, "X-Incident-Id").unwrap_or("");
+    let host = hdr_str(&headers, HDR_SENSOR_ID).unwrap_or("");
+    let os_family = hdr_str(&headers, HDR_OS_FAMILY).unwrap_or("");
+    let kind = hdr_str(&headers, HDR_EVIDENCE_KIND).unwrap_or("memory_image");
+    let sha256 = hdr_str(&headers, HDR_ARTIFACT_SHA256).unwrap_or("");
+    let provided_hmac = match hdr_str(&headers, HDR_ARTIFACT_HMAC) {
+        Some(h) => h,
+        None => return StatusCode::BAD_REQUEST,
+    };
+    if incident_id.is_empty() || host.is_empty() || sha256.is_empty() {
+        return StatusCode::BAD_REQUEST;
+    }
+    // Verify BEFORE the bytes touch the archive: HMAC (authenticity) + SHA-256 (custody).
+    if !verify_artifact_hmac(&state.integrity_secret, &body, provided_hmac) {
+        counter!("nexus_ingress_hmac_failures_total").increment(1);
+        return StatusCode::FORBIDDEN;
+    }
+    if !verify_sha256(&body, sha256) {
+        counter!("nexus_ingress_custody_failures_total").increment(1);
+        error!(incident_id, "evidence SHA-256 custody mismatch -- rejecting");
+        return StatusCode::FORBIDDEN;
+    }
+
+    // Stream into the WORM archive (GOVERNANCE-default bucket) under a stable key.
+    let key = format!("memory/{incident_id}/{host}/image");
+    if let Err(e) = store.put(&ObjPath::from(key.clone()), body.clone().into()).await {
+        error!(error = %e, incident_id, "WORM evidence write failed");
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+    counter!("nexus_ingress_evidence_verified_total").increment(1);
+
+    // Publish the small verified handle; worker_memory pulls + re-verifies custody.
+    let handle = serde_json::json!({
+        "incident_id": incident_id, "host": host, "os_family": os_family,
+        "kind": kind, "sha256": sha256, "s3_key": key, "size": body.len(),
+    });
+    match state.js.publish("nexus.memory.intake".to_string(),
+                           serde_json::to_vec(&handle).unwrap_or_default().into()).await {
+        Ok(_) => { info!(incident_id, "evidence verified → WORM + nexus.memory.intake"); StatusCode::ACCEPTED }
+        Err(e) => { error!(error = %e, "memory.intake publish rejected"); StatusCode::SERVICE_UNAVAILABLE }
     }
 }
 

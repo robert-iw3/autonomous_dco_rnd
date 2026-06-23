@@ -44,12 +44,16 @@ pub fn sign(task: &Map<String, Value>, secret: &[u8]) -> String {
 }
 
 /// Build a signed response task the on-host agent will verify and execute.
+/// `params` carries this action's typed IOCs (pids/hashes/c2_domains/...); only
+/// non-empty lists are inserted, mirroring the Python signer's
+/// `task.update({k: v for k, v in params.items() if v})` so signatures match.
 pub fn build_signed_task(
     incident_id: &str,
     host: &str,
     os_family: &str,
     action_type: &str,
     targets: &[String],
+    params: &[(&str, &[String])],
     created_at: i64,
     secret: &[u8],
 ) -> Value {
@@ -60,10 +64,42 @@ pub fn build_signed_task(
     t.insert("os_family".into(), json!(os_family));
     t.insert("action_type".into(), json!(action_type));
     t.insert("targets".into(), json!(targets));
+    for (key, vals) in params {
+        if !vals.is_empty() {
+            t.insert((*key).into(), json!(vals));
+        }
+    }
     t.insert("created_at".into(), json!(created_at));
     let sig = sign(&t, secret);
     t.insert("signature".into(), json!(sig));
     Value::Object(t)
+}
+
+/// The per-action `targets` + IOC `params` an action's task carries, drawn from
+/// the SOAR payload. Mirrors operations/agent/response_executor.build_env so the
+/// playbook reads the right `IR_*` values; `empty` is a reusable empty slice.
+#[allow(clippy::too_many_arguments)]
+pub fn action_targets_and_params<'a>(
+    action: &str,
+    host: &'a String,
+    empty: &'a [String],
+    c2_ips: &'a [String],
+    c2_domains: &'a [String],
+    pids: &'a [String],
+    processes: &'a [String],
+    hashes: &'a [String],
+    file_paths: &'a [String],
+    mgmt_ips: &'a [String],
+) -> (&'a [String], Vec<(&'static str, &'a [String])>) {
+    match action {
+        "isolate_host" => (std::slice::from_ref(host), vec![("mgmt_ips", mgmt_ips)]),
+        "block_ip" => (c2_ips, vec![("c2_domains", c2_domains)]),
+        "eradicate_process" => (empty, vec![("pids", pids), ("processes", processes), ("hashes", hashes)]),
+        "eradicate_persistence" => (empty, vec![("file_paths", file_paths), ("hashes", hashes), ("processes", processes)]),
+        "restore" => (std::slice::from_ref(host), vec![]),
+        // collect_forensics (and anything else): host + incident id only
+        _ => (empty, vec![]),
+    }
 }
 
 #[cfg(test)]
@@ -91,12 +127,26 @@ mod tests {
 
     #[test]
     fn built_task_is_signed_and_verifiable() {
+        let mgmt: Vec<String> = vec!["10.0.0.0/24".into()];
         let task = build_signed_task(
-            "INC-1", "ep-1", "linux", "isolate_host", &["10.0.0.5".into()], 1_700_000_000, GOLD_SECRET,
+            "INC-1", "ep-1", "linux", "isolate_host", &["10.0.0.5".into()],
+            &[("mgmt_ips", &mgmt)], 1_700_000_000, GOLD_SECRET,
         );
         let obj = task.as_object().unwrap();
         let provided = obj.get("signature").unwrap().as_str().unwrap();
         assert_eq!(provided, sign(obj, GOLD_SECRET)); // signature covers the task
+        // non-empty IOC params are carried; empty ones are omitted
+        assert!(obj.contains_key("mgmt_ips"));
+    }
+
+    #[test]
+    fn empty_params_are_omitted() {
+        let empty: Vec<String> = vec![];
+        let task = build_signed_task(
+            "INC-2", "ep-2", "linux", "collect_forensics", &[],
+            &[("pids", &empty)], 1_700_000_000, GOLD_SECRET,
+        );
+        assert!(!task.as_object().unwrap().contains_key("pids"));
     }
 
     #[test]

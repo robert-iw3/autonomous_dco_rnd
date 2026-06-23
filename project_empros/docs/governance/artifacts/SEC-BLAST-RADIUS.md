@@ -6,7 +6,7 @@
 
 **1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
-`analytics/llm_hunter/state.py:L181-L211`
+`analytics/llm_hunter/state.py:L217-L247`
 
 ```python
 def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
@@ -39,7 +39,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
     return merged
 
-# ─── Context Window Manager ────────────────────────────────────────
+# --- Context Window Manager ----------------------------------------
 ```
 
 **2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
@@ -55,7 +55,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L76-L78`
+`analytics/llm_hunter/agents/response.py:L77-L79`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)

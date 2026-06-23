@@ -27,6 +27,8 @@ TESTS    = Path(__file__).parent.parent / "tests"
 ORCH     = Path(__file__).parent.parent / "orchestration"
 
 SOAR_MAIN       = SERVICES / "worker_soar/src/main.rs"
+SOAR_AGENT_TASK = SERVICES / "worker_soar/src/agent_task.rs"
+INGRESS_MAIN    = SERVICES / "core_ingress/src/main.rs"
 S3_MAIN         = SERVICES / "worker_s3_archive/src/main.rs"
 QDRANT_INIT     = INFRA    / "qdrant/qdrant_init.sh"
 QDRANT_INIT_T   = TESTS    / "deploy/config/qdrant_init.sh"
@@ -88,6 +90,106 @@ class TestWorkerSoarAckOrdering:
             "worker_soar: TimedDedup cache required for safe retry idempotency"
         assert "is_duplicate" in src, \
             "worker_soar: dedup.is_duplicate() check required"
+
+
+# ── DC-N11: worker_soar on-host playbook initiation (response_actions + IOCs) ─
+
+class TestWorkerSoarPlaybookInitiation:
+    """The signed agent task must carry the swarm's ordered playbook plan and the
+    per-action IOC params, so the on-host playbooks receive their parameters.
+    (Source-contract: Rust is compiled/golden-tested in CI; here we pin behavior.)"""
+
+    def _main(self) -> str:
+        return SOAR_MAIN.read_text()
+
+    def _task(self) -> str:
+        return SOAR_AGENT_TASK.read_text()
+
+    def test_payload_carries_response_actions_and_iocs(self):
+        src = self._main()
+        assert "response_actions: Vec<String>" in src, \
+            "SoarPayload must deserialize response_actions"
+        for f in ("c2_ips", "c2_domains", "pids", "processes", "hashes",
+                  "file_paths", "mgmt_ips"):
+            assert f"{f}: Vec<String>" in src, f"SoarPayload missing IOC field {f}"
+
+    def test_emits_one_task_per_response_action(self):
+        src = self._main()
+        # iterate the ordered actions, fall back to the primary action_type
+        assert "if payload.response_actions.is_empty()" in src
+        assert "for action in &actions" in src
+        assert "action_targets_and_params(" in src
+        # only allowlisted host playbooks are signed
+        assert "is_response_action(action)" in src
+
+    def test_build_signed_task_takes_per_action_params(self):
+        src = self._task()
+        assert "params: &[(&str, &[String])]" in src, \
+            "build_signed_task must accept per-action IOC params"
+        # only non-empty IOC lists are signed into the task (parity with Python)
+        assert "if !vals.is_empty()" in src
+
+    def test_action_param_mapping_matches_executor_contract(self):
+        src = self._task()
+        assert "fn action_targets_and_params" in src
+        # the per-action target/param routing the on-host build_env expects
+        for action in ("isolate_host", "block_ip", "eradicate_process",
+                       "eradicate_persistence", "restore"):
+            assert f'"{action}"' in src, f"action_targets_and_params missing {action}"
+        assert '"mgmt_ips"' in src and '"c2_domains"' in src and '"pids"' in src
+
+    def test_response_actions_allowlist_has_eradicate_and_collect(self):
+        src = self._task()
+        for a in ("eradicate_process", "eradicate_persistence", "collect_forensics"):
+            assert f'"{a}"' in src, f"RESPONSE_ACTIONS must include {a}"
+
+
+# ── Memory/IR evidence ingress — verified gateway path to WORM ──────────────
+
+class TestEvidenceIngress:
+    """Memory/IR evidence is its own data class: it must enter through the same
+    verified gateway (JWT + HMAC + SHA-256 custody) and stream to the WORM archive
+    — never a side channel. (Rust compiled/tested in CI; pinned here.)"""
+
+    def _src(self) -> str:
+        return INGRESS_MAIN.read_text()
+
+    def test_evidence_route_and_handler_exist(self):
+        src = self._src()
+        assert '"/api/v1/evidence"' in src and "handle_evidence_upload" in src
+
+    def test_verified_before_archive(self):
+        src = self._src()
+        h = src[src.find("async fn handle_evidence_upload"):]
+        h = h[:h.find("\n}\n")] if "\n}\n" in h else h
+        assert "validate_token(" in h, "evidence upload must be JWT-gated"
+        assert "verify_artifact_hmac(" in h, "evidence upload must HMAC-verify the body"
+        assert "verify_sha256(" in h, "evidence upload must check the SHA-256 custody hash"
+        # the WORM write happens only after the checks
+        assert h.find("verify_sha256(") < h.find(".put("), "custody check must precede the WORM write"
+
+    def test_streams_to_worm_and_publishes_handle(self):
+        h = self._src()
+        assert "store.put(" in h, "verified evidence must stream into the WORM archive"
+        assert "nexus.memory.intake" in h, "a verified handle must be published for worker_memory"
+
+    def test_custody_failure_is_forbidden(self):
+        src = self._src()
+        h = src[src.find("async fn handle_evidence_upload"):]
+        h = h[:h.find("\n}\n")] if "\n}\n" in h else h
+        assert "StatusCode::FORBIDDEN" in h
+
+    def test_large_body_limit_only_on_evidence_route(self):
+        src = self._src()
+        # the evidence route carries its own large DefaultBodyLimit; every other
+        # route keeps the small global cap (large uploads can't hit telemetry/artifact).
+        ev = src[src.find('"/api/v1/evidence"'):src.find('"/api/v1/tasks"')]
+        assert "DefaultBodyLimit::max(cfg.max_evidence_bytes)" in ev, \
+            "evidence route must raise the body limit for large RAM images"
+        assert "DefaultBodyLimit::max(cfg.max_payload_bytes)" in src, \
+            "a small global body cap must apply to the non-evidence routes"
+        # the small cap must NOT be applied to telemetry/artifact per-route as large
+        assert "max_evidence_bytes" not in src[src.find('"/api/v1/telemetry"'):src.find('"/api/v1/evidence"')]
 
 
 # ── H-P3: worker_s3_archive partial failure DLQ routing ─────────────────────

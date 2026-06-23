@@ -19,6 +19,7 @@ from state import InvestigativeState, build_memory_signature, FP_CONFIDENCE_GATE
 from agents.llm_providers import (build_failover_chain, get_embedder,
                                    circuit_is_callable, record_call_success, record_call_failure)
 from agents.controls import stamp_ai_provenance
+from agents.playbook_planner import build_playbook_plan
 import agents.verdict_ledger as verdict_ledger
 import agents.energy_accounting as energy_accounting
 import agents.active_learning as active_learning
@@ -36,7 +37,7 @@ MEMORY_COLLECTION = "nexus_swarm_memory"
 
 LLM_FAILOVER_CHAIN = build_failover_chain(temperature=0.0)
 
-# ── Asset Criticality Registry ─────────────────────────────────────
+# -- Asset Criticality Registry -------------------------------------
 ASSET_REGISTRY: Dict[str, float] = {
     "dc-prod-01": 1.0, "dc-prod-02": 1.0, "10.0.0.10": 1.0,
     "nexus-core": 0.95, "db-prod-01": 0.9, "ca-root-01": 0.95,
@@ -204,7 +205,7 @@ async def response_agent(state: InvestigativeState):
     verdict = state.get("verdict") or {}
     alert = state["alert"]
 
-    # ── 1. Generate the Incident Report ──
+    # -- 1. Generate the Incident Report --
     incident_report = None
     last_error = None
     prompt = ChatPromptTemplate.from_messages([
@@ -250,7 +251,7 @@ async def response_agent(state: InvestigativeState):
         "dismiss": "manual_review_required",
     }
 
-    # ── 2. Non-true-positive: persist memory (enables immunity) and exit ──
+    # -- 2. Non-true-positive: persist memory (enables immunity) and exit --
     if not verdict or not verdict.get("is_true_positive"):
         analysis_complete = state.get("analysis_complete", True) is not False
         confidence = float(verdict.get("confidence", 0.0) or 0.0)
@@ -289,25 +290,49 @@ async def response_agent(state: InvestigativeState):
                     f"(immunity_eligible={immunity_eligible})")
         return {"action_payload": {}, "incident_report": incident_report}
 
-    # ── 3. True positive: assemble target set ──
+    # -- 3. True positive: assemble target set --
     action_type = action_type_map.get(recommended_action, "isolate_host")
+    # Isolation targets are HOSTS only: the alerting sensor plus any malicious IP
+    # entities (a malicious IP may be a second compromised internal host). PIDs,
+    # hashes, domains, files and users are NOT isolation targets -- they are carried
+    # as typed IOCs (below) into the eradicate/block playbooks. Keeping non-host
+    # IOCs out of `targets` both matches the schema ("IPs or hostnames") and stops
+    # them from inflating the blast-radius / disruption index.
     all_targets = [target] if target else []
     for entity_id, entity_data in (state.get("entities_of_interest", {}) or {}).items():
-        if entity_data.get("status") == "malicious" and entity_id not in all_targets:
+        if (entity_data.get("status") == "malicious"
+                and entity_data.get("type") == "ip"
+                and entity_id not in all_targets):
             all_targets.append(entity_id)
     all_targets = all_targets[:MAX_SOAR_TARGETS]  # honour ATLAS AML.T0016 cap
 
-    # ── 4. HitL circuit breaker ──
+    # -- 4. Plan the on-host IR playbooks to initiate (DC-N11), evidence-first --
+    # The swarm's typed entities → os_family + IOC params + the wave to run now.
+    # First pass: wave 1 (isolate + collect_forensics) — contain spread and capture
+    # the RAM image, which worker_memory analyses and returns as enrichment. The
+    # memory-enriched re-entry runs wave 2 (block_ip + eradicate_*) only once the
+    # memory ground truth confirms the threat. Cloud/network targets initiate none.
+    mem = state.get("memory_enrichment") or {}
+    plan = build_playbook_plan(
+        alert, verdict, state.get("entities_of_interest", {}) or {},
+        memory_enriched=bool(mem), memory_threat=bool(mem.get("memory_threat")),
+    )
+    iocs = plan["iocs"]
+
+    # -- 5. HitL circuit breaker --
     demote, demote_reason = await should_demote_to_manual(all_targets, action_type)
     if demote:
         logger.warning(f"[CIRCUIT BREAKER] Demoting '{action_type}' → 'manual_review_required' "
                        f"for {target}. Reason: {demote_reason}")
         action_type = "manual_review_required"
+        # A demoted incident initiates NO autonomous host playbook -- it goes to
+        # the manual-review queue for an operator, never to the on-host agent.
+        plan["response_actions"] = []
     else:
         logger.info(f"[GOVERNANCE] Action '{action_type}' for {target} passed circuit breaker. "
                     f"Reason: {demote_reason}")
 
-    # ── 5. Build SOAR payload field-aligned to SoarExecutionSchema ──
+    # -- 6. Build SOAR payload field-aligned to SoarExecutionSchema --
     reason_raw = verdict.get("justification", "Swarm consensus")
     reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
     payload = {
@@ -318,6 +343,15 @@ async def response_agent(state: InvestigativeState):
         "targets": all_targets,
         "confidence": float(verdict.get("confidence", 0.0)),
         "reason": reason,
+        # On-host playbook initiation (consumed by worker_soar → signed agent task):
+        "os_family": plan["os_family"],
+        "response_actions": plan["response_actions"],
+        "c2_ips": iocs["c2_ips"],
+        "c2_domains": iocs["c2_domains"],
+        "pids": iocs["pids"],
+        "hashes": iocs["hashes"],
+        "file_paths": iocs["file_paths"],
+        "users": iocs["users"],
         # Audit / idempotency extras (ignored by the schema, kept for the SOAR log):
         "idempotency_key": f"iso-{target}-{int(float(alert.get('timestamp', 0) or 0) // 900)}",
         "source_type": alert.get("source_type", ""),
@@ -328,7 +362,7 @@ async def response_agent(state: InvestigativeState):
         "incident_report": incident_report,
     }
 
-    # ── 6. Persist memory (true positive) ──
+    # -- 6. Persist memory (true positive) --
     await _persist_memory(alert, verdict, action_type, incident_report)
 
     logger.info(f"Response payload generated for {target}: {action_type}")
