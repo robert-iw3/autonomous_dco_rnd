@@ -44,7 +44,8 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | `mlops` | `Dockerfile.mlops` | Data flow, Track 6 dry-run, TI ingest, eval minilab, s3 parquet worker | Debian slim |
 | `analytics` | `Dockerfile.analytics` | LLM hunter (review board, SIEM tools/contracts), agentic swarm, redteam bypass | Alpine 3.23 |
 | `governance` | `Dockerfile.governance` | NIST AI 600-1 control suite + GRC manifest/evidence-chain/wiring (`lab_governance/`) | Debian slim |
-| `memory` | `Dockerfile.memory` | `worker_memory` — memory-forensics bridge to the agentic stack (`lab_memory_forensics/`) | Debian slim |
+| `memory` | `Dockerfile.memory` | `worker_memory` — memory-forensics bridge to the agentic stack (`lab_memory_forensics/`) | Alpine 3.24 |
+| `bench` | `Dockerfile.bench` | WS-A benchmark harness — registry + runner + RSI score-file contract (`lab_benchmarks/`) | Alpine 3.24 |
 | `services` | `Dockerfile.services` | Worker/infra/orchestration source contracts (255 tests) | Alpine 3.23 |
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
 | `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
@@ -94,6 +95,7 @@ tests/reports/
 ├── analytics.xml    │
 ├── governance.xml   │
 ├── memory.xml       │
+├── bench.xml        │
 ├── services.xml     │
 ├── pipeline.xml     │
 ├── detchamber.xml   │

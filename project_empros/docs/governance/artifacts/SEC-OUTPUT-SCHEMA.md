@@ -49,7 +49,7 @@ class SoarExecutionSchema(BaseModel):
 
 **2. Invocation** — The dispatch path is the single egress for any containment action.
 
-`analytics/llm_hunter/orchestrator.py:L294-L295`
+`analytics/llm_hunter/orchestrator.py:L311-L312`
 
 ```python
 async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
@@ -58,7 +58,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
 
 **3. Execution** — Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed.
 
-`analytics/llm_hunter/orchestrator.py:L324-L331`
+`analytics/llm_hunter/orchestrator.py:L341-L348`
 
 ```python
         validated = SoarExecutionSchema(

@@ -326,7 +326,7 @@ regenerated, so the SSP can never cite code that no longer exists. The multiple
 - **AI-GROUNDING** — Confabulated-evidence grounding. *Evidence:* artifacts/AI-GROUNDING.md — controls.py L58-L74,L84-L114; review_board.py L279-L289
 - **AI-MEMORY-TTL** — Immunity-memory TTL / expiry. *Evidence:* artifacts/AI-MEMORY-TTL.md — controls.py L147-L175; supervisor.py L235-L239; response.py L140-L142
 - **AI-PROVENANCE** — AI-origin provenance disclosure. *Evidence:* artifacts/AI-PROVENANCE.md — controls.py L178-L192; response.py L236-L238
-- **AI-REVIEW-BOARD** — Adversarial review board (per-expert counterparts). *Evidence:* artifacts/AI-REVIEW-BOARD.md — orchestrator.py L136-L136; review_board.py L266-L275,L189-L217
+- **AI-REVIEW-BOARD** — Adversarial review board (per-expert counterparts). *Evidence:* artifacts/AI-REVIEW-BOARD.md — orchestrator.py L137-L137; review_board.py L266-L275,L189-L217
 - **IAC-HARDENING** — OS / kernel / network hardening baseline. *Evidence:* artifacts/IAC-HARDENING.md — main.yml L20-L22,L30-L32,L34-L35
 - **ING-DLQ-BREAKER** — Durable worker circuit breaker + dead-letter routing. *Evidence:* artifacts/ING-DLQ-BREAKER.md — lib.rs L44-L60,L104-L110,L262-L269
 - **ING-ZERO-TRUST** — Zero-Trust ingestion gateway (HMAC + 3-tier replay defense). *Evidence:* artifacts/ING-ZERO-TRUST.md — integrity.rs L211-L213,L29-L41,L46-L56,L127-L145
@@ -338,14 +338,14 @@ regenerated, so the SSP can never cite code that no longer exists. The multiple
 - **NC-8-OVER-RELIANCE** — Automation-bias / over-reliance measurement. *Evidence:* artifacts/NC-8-OVER-RELIANCE.md — controls.py L351-L365,L370-L392; calibration_ledger.py L46-L56
 - **NC-9-ACTIVE-LEARNING** — Active-learning failure capture. *Evidence:* artifacts/NC-9-ACTIVE-LEARNING.md — response.py L194-L199; controls.py L429-L438,L441-L455; active_learning.py L23-L35
 - **SEC-BLAST-RADIUS** — Blast-radius cap & entity state machine. *Evidence:* artifacts/SEC-BLAST-RADIUS.md — state.py L217-L247; supervisor.py L196-L199; response.py L77-L79
-- **SEC-CANARY** — Canary token prompt-leak tripwire. *Evidence:* artifacts/SEC-CANARY.md — orchestrator.py L197-L197,L258-L261; sanitizer.py L49-L58
+- **SEC-CANARY** — Canary token prompt-leak tripwire. *Evidence:* artifacts/SEC-CANARY.md — orchestrator.py L199-L199,L260-L263; sanitizer.py L49-L58
 - **SEC-DLP-EGRESS** — Outbound DLP / sovereign data isolation. *Evidence:* artifacts/SEC-DLP-EGRESS.md — sanitizer.py L59-L73; response.py L337-L337
 - **SEC-DUCKDB-SANDBOX** — Read-only data-lake query sandbox. *Evidence:* artifacts/SEC-DUCKDB-SANDBOX.md — duckdb_query.py L27-L30,L78-L104
 - **SEC-ENDPOINT-ID** — Endpoint identity injection defense. *Evidence:* artifacts/SEC-ENDPOINT-ID.md — models.rs L14-L20
 - **SEC-FAILOVER** — Cascading LLM failover & sovereign degradation. *Evidence:* artifacts/SEC-FAILOVER.md — expert_base.py L25-L25; llm_providers.py L163-L188; response.py L216-L217
 - **SEC-IDEMPOTENT-SOAR** — Idempotent SOAR execution & deduplication. *Evidence:* artifacts/SEC-IDEMPOTENT-SOAR.md — response.py L354-L357; main.rs L283-L286
-- **SEC-MODEL-DOS** — Model denial-of-service bounding. *Evidence:* artifacts/SEC-MODEL-DOS.md — orchestrator.py L55-L55,L66-L66,L186-L187,L213-L213,L217-L219
-- **SEC-OUTPUT-SCHEMA** — Strict SOAR output-contract enforcement. *Evidence:* artifacts/SEC-OUTPUT-SCHEMA.md — state.py L103-L138; orchestrator.py L294-L295,L324-L331
+- **SEC-MODEL-DOS** — Model denial-of-service bounding. *Evidence:* artifacts/SEC-MODEL-DOS.md — orchestrator.py L56-L56,L67-L67,L187-L188,L215-L215,L219-L221
+- **SEC-OUTPUT-SCHEMA** — Strict SOAR output-contract enforcement. *Evidence:* artifacts/SEC-OUTPUT-SCHEMA.md — state.py L103-L138; orchestrator.py L311-L312,L341-L348
 - **SEC-REGRESSION-GATE** — Deterministic regression / deploy gate. *Evidence:* artifacts/SEC-REGRESSION-GATE.md — 03_eval_model.py L312-L338,L198-L200
 - **SEC-RLHF-QUARANTINE** — Sybil RLHF poisoning quarantine. *Evidence:* artifacts/SEC-RLHF-QUARANTINE.md — main.rs L90-L91,L135-L141,L132-L158
 - **SEC-SANITIZER** — Cognitive boundary isolation & untrusted-payload wrapping. *Evidence:* artifacts/SEC-SANITIZER.md — sanitizer.py L24-L48,L88-L96; expert_base.py L83-L84

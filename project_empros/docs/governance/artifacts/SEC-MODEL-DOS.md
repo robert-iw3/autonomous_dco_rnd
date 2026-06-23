@@ -6,7 +6,7 @@
 
 **1. Invocation** — A hard ceiling on simultaneous investigations…
 
-`analytics/llm_hunter/orchestrator.py:L55-L55`
+`analytics/llm_hunter/orchestrator.py:L56-L56`
 
 ```python
 MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
@@ -14,7 +14,7 @@ MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
 
 **2. Effect** — …realised as a semaphore…
 
-`analytics/llm_hunter/orchestrator.py:L66-L66`
+`analytics/llm_hunter/orchestrator.py:L67-L67`
 
 ```python
 _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
@@ -22,7 +22,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **3. Effect** — …acquired before any LLM work, bounding model-DoS blast at the investigation entry point.
 
-`analytics/llm_hunter/orchestrator.py:L186-L187`
+`analytics/llm_hunter/orchestrator.py:L187-L188`
 
 ```python
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
@@ -31,7 +31,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **4. Execution** — Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…
 
-`analytics/llm_hunter/orchestrator.py:L213-L213`
+`analytics/llm_hunter/orchestrator.py:L215-L215`
 
 ```python
             config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
@@ -39,7 +39,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **5. Execution** — …and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm.
 
-`analytics/llm_hunter/orchestrator.py:L217-L219`
+`analytics/llm_hunter/orchestrator.py:L219-L221`
 
 ```python
                 final_state = await asyncio.wait_for(

@@ -1,6 +1,13 @@
 # MLOps Maturation Plan: Embedded Benchmarking, Evaluation QA, Fail-Fast Learning, and Training/Serving Plane Separation
 
-**Status:** PLAN (current beta testing gap analysis @RW)
+**Status:** IN PROGRESS — **B0 landed** (M-26 runner+registry, M-27 investigation metrics +
+outcome join, `bench` CI section). Per-section status legend below.
+
+**Status legend** (per section / phase):
+- 🧪 **Unit testing completed** — logic implemented + proven offline in `tests/` (test-first).
+- ⏳ **Validating production implementation** — unit-tested; live/production wiring (real NATS
+  stream, parquet ledger, GPU endpoints) still to validate on the stack.
+- 📋 **Planned** — designed here, not yet implemented.
 
 **Date:** 2026-06-09
 
@@ -76,6 +83,8 @@ the same ledgers.
 
 ### 3.1 Benchmark runner and registry
 
+*Status: 🧪 unit testing completed (M-26, `tests/lab_benchmarks/test_benchmark_runner.py` — incl. RSI gate-activation) · ⏳ validating production implementation (live-endpoint scoring; the runner currently aggregates precomputed per-case results).*
+
 New: `mlops/scripts/09_benchmark_runner.py` + `mlops/benchmarks/registry.toml`.
 
 * **Registry** declares each benchmark: id, version, capability axis, dataset path
@@ -108,6 +117,8 @@ Mapped to existing assets so v1 is mostly *formalization*, not new data:
 
 ### 3.3 Investigation Replay Bench (the biggest lever)
 
+*Status: 📋 planned (B1 / M-28 — `10_freeze_replay_case.py`).*
+
 Every closed investigation already contains everything a benchmark case needs: the
 `UnifiedAlertSchema` trigger, the Parquet slice the experts queried, the entity board with
 terminal statuses, the verdict, and — within days — the operator adjudication and SOAR
@@ -126,6 +137,8 @@ outcome. Freeze it:
   and rotates quarterly with dedup (§4.1).
 
 ### 3.4 Per-investigation metrics (the embedded part)
+
+*Status: 🧪 unit testing completed (M-27, `tests/lab_analytics_hunter/test_investigation_metrics.py` + `tests/lab_mlops_train/test_join_outcomes.py`; emit wired into `trigger_swarm`) · ⏳ validating production implementation (parquet-ledger writer + live NATS join).*
 
 New record emitted at the end of `trigger_swarm` (fire-and-forget, never blocks SOAR):
 
@@ -174,6 +187,8 @@ as an external reference point. (a) and (c) run quarterly, not per-cycle — the
 
 ## 4. Pillar 2 — QA Harness for the Evaluations Themselves
 
+*Status: 📋 planned (B2 / Q-20 — leakage scan, dataset SHA-384 manifests, judge-κ gate).*
+
 Evaluations are code + data; they get the same QA discipline as the pipeline.
 
 ### 4.1 Dataset QA (per benchmark version, blocking its registration)
@@ -216,6 +231,8 @@ judge-weighted promotion until recalibrated.
 ---
 
 ## 5. Pillar 3 — Fail Fast, Learn Fast
+
+*Status: 📋 planned (B1/B3 — M-29 tier-0 canary, M-31 micro-batch, M-32 live rollback).*
 
 Current loop latency: miss → operator dismissal → Track 5 spool → ≥50-verdict batch →
 full train → full gates → deploy. Weeks, and the full gate cost is paid even for doomed
@@ -264,6 +281,8 @@ the backstop when shadow traffic missed a regime.
 ---
 
 ## 6. Pillar 4 — Training/Serving Plane Separation & Model Registry
+
+*Status: 📋 planned (B2.5 / M-33 registry, M-34 model_steward, Q-21 contract tests).*
 
 ### 6.1 The coupling problem
 
@@ -416,25 +435,25 @@ mode. The registry seam ships with its contract suite or not at all:
 
 ## 7. Phased Roadmap
 
-**Phase B0 — Contracts & plumbing (1 sprint)**
+**Phase B0 — Contracts & plumbing (1 sprint)** — 🧪 unit testing completed · ⏳ validating production implementation
 `InvestigationMetrics` schema + NATS subject + parquet ledger writer in the orchestrator;
 `11_join_outcomes.py` (RLHF + SOAR join); M-25 closed via `09_benchmark_runner.py` skeleton
 emitting the score file from the *existing* eval scripts; registry.toml + 2 registered
 benches (hard-negative held-out, governance). `bench` CI section. *Acceptance: RSI
 regression gate runs non-vacuously; Grafana shows live agreement/FP-burden panels.*
 
-**Phase B1 — Replay Bench + tier-0 (1–2 sprints)**
+**Phase B1 — Replay Bench + tier-0 (1–2 sprints)** — 📋 planned
 `10_freeze_replay_case.py` + selection policy; 100-case tier-0 canary assembled; tier-0
 wired into `08_rsi_loop.py` before alignment gates; leakage gate operational.
 *Acceptance: a deliberately overfit adapter is caught by tier-0 in <5 min; replay cases
 reproduce frozen verdicts bit-stable on the champion.*
 
-**Phase B2 — Eval QA (1 sprint, parallel with B1)**
+**Phase B2 — Eval QA (1 sprint, parallel with B1)** — 📋 planned
 Dataset manifests + SHA-384, balance audits, consistency-sweep integration, judge
 calibration sampling + κ gate, `validate_pipeline.py` checks. *Acceptance: registering a
 bench with training-set leakage fails CI.*
 
-**Phase B2.5 — Plane split & model registry (1–2 sprints, prerequisite for B3/B4)**
+**Phase B2.5 — Plane split & model registry (1–2 sprints, prerequisite for B3/B4)** — 📋 planned
 Registry bucket + manifest schema (§6.3); `model_steward` on the serving plane (deploy/
 rollback mechanics moved out of the Makefile training context); `08_rsi_loop.py` ends at
 publish; `nexus.models.promote/promoted/rejected` subjects + NATS per-plane authorization;
@@ -443,13 +462,13 @@ deployment_prep ships baseline weights as registry v0; contract suite (§6.8).
 serving boots from local cache with the registry down; promotion and re-pin rollback both
 recorded in the RSI ledger.*
 
-**Phase B3 — Fail-fast learning (2 sprints, needs B2.5 + production traffic)**
+**Phase B3 — Fail-fast learning (2 sprints, needs B2.5 + production traffic)** — 📋 planned
 Shadow champion/challenger (challenger = second registry version in a second adapter slot);
 miss-driven micro-batch path with full gate reuse; failure-clustering gap reports;
 time-to-learn KPI on the ledger. *Acceptance: a seeded synthetic miss travels
 adjudication → replay case → micro-batch → gated promotion in <72h in the lab.*
 
-**Phase B4 — Live rollback + config matrix (1 sprint, needs B2.5)**
+**Phase B4 — Live rollback + config matrix (1 sprint, needs B2.5)** — 📋 planned
 24h post-deploy control bands + auto re-pin rollback via the steward; quantization ×
 fine-tune matrix for Model A ONNX and any quantized variant; baseline-ladder quarterly
 run. *Acceptance: injected metric degradation in the lab triggers re-pin without human

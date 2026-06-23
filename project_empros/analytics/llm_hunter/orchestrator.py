@@ -40,6 +40,7 @@ from agents.nettap_expert import nettap_expert_node
 from agents.review_board import review_board_node
 from agents.response import response_agent
 from detonation_enrichment import enrichment_decision
+from investigation_metrics import build_record as build_investigation_metrics
 from tools.sanitizer import CognitiveSanitizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -185,6 +186,7 @@ async def trigger_swarm(alert: UnifiedAlertSchema, js_client, nc_client, graph):
     """Execute the LangGraph DAG for one alert, then dispatch governed action."""
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
         await _broadcast_hud(alert, nc_client)
+        _t0 = time.monotonic()
         with METRIC_LLM_LATENCY.time():
             initial_entities = (
                 {alert.sensor_id: {"type": "ip", "status": "pending", "notes": "Initial alert target"}}
@@ -271,6 +273,21 @@ async def trigger_swarm(alert: UnifiedAlertSchema, js_client, nc_client, graph):
                 await manage_ephemeral_interface("trigger", alert.event_id)
 
             await _dispatch_soar(alert, action, js_client)
+
+            # Measurement plane (M-27): emit the per-investigation metrics record,
+            # fire-and-forget — never blocks or fails the SOAR path.
+            await _emit_investigation_metrics(
+                alert, final_state, js_client, int((time.monotonic() - _t0) * 1000))
+
+
+async def _emit_investigation_metrics(alert, final_state, js_client, wall_ms):
+    """Publish one InvestigationMetrics record to nexus.metrics.investigation."""
+    try:
+        record = build_investigation_metrics(
+            alert.model_dump(), final_state, efficiency={"wall_ms": wall_ms})
+        await js_client.publish("nexus.metrics.investigation", json.dumps(record).encode())
+    except Exception as exc:  # never let measurement disturb the hot path
+        logger.warning(f"investigation-metrics emit failed (non-fatal): {exc}")
 
 
 async def _publish_cognitive_dlq(alert: UnifiedAlertSchema, reason: str, js_client):

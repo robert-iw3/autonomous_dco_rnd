@@ -215,6 +215,11 @@ class TestStreamsInitScript:
         assert "Nexus_Memory_Intake" in sh and "nexus.memory.intake" in sh
         assert "Nexus_Memory_Enrichment" in sh and "nexus.memory.enrichment" in sh
 
+    def test_measurement_plane_stream_defined(self):
+        sh = _sh()
+        # WS-A M-27: per-investigation metrics emitted by the orchestrator
+        assert "Nexus_Metrics_Investigation" in sh and "nexus.metrics.investigation" in sh
+
     def test_tier5_telemetry_wildcard_subject(self):
         assert "nexus.*.telemetry" in _sh(), \
             "Tier5_Telemetry must subscribe to nexus.*.telemetry (wildcard for all sensor types)"

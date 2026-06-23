@@ -6,7 +6,7 @@
 
 **1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
 
-`analytics/llm_hunter/orchestrator.py:L197-L197`
+`analytics/llm_hunter/orchestrator.py:L199-L199`
 
 ```python
             canary = CognitiveSanitizer.generate_canary()
@@ -31,7 +31,7 @@
 
 **3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
-`analytics/llm_hunter/orchestrator.py:L258-L261`
+`analytics/llm_hunter/orchestrator.py:L260-L263`
 
 ```python
             # OWASP LLM01: verify the canary did not leak into any outbound surface.

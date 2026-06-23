@@ -51,7 +51,7 @@ STANDARD OPERATING PROCEDURE (SOP):
    - Events 3/22 (NetworkConnect/DNSQuery) → pivot on DestinationIp/QueryName for C2 correlation.
    - Events 6/7 (DriverLoad/ImageLoad) → check Signed + SignatureStatus for unsigned kernel drivers.
    - Events 12/13/14 (RegistryEvent) → check TargetObject for Run keys and scheduled task paths.
-   - Events 17/18 (PipeEvent) → check PipeName for known lateral movement pipe names (e.g., \msagent_*, \lsarpc).
+   - Events 17/18 (PipeEvent) → check PipeName for known lateral movement pipe names (e.g., \\msagent_*, \\lsarpc).
    - Use `parent_child_score` (pre-computed): values above 0.7 indicate a flagged suspicious parent-child pair.
 7. WINDOWS LOTL DETECTION: Pay special attention to native Windows binaries (e.g., powershell.exe, cmd.exe, wmiprvse.exe, rundll32.exe) executing with high `avg_entropy` (DeepSensor) or high `command_entropy` (Sysmon) or obfuscated `CommandLine` / `command_line` arguments.
 8. LINUX LOTL DETECTION: Monitor native binaries (e.g., bash, python, cron) executing with high `shannon_entropy` or targeting sensitive paths.

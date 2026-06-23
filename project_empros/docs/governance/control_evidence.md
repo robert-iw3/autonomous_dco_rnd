@@ -220,7 +220,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **1. Invocation** — The board is wired into the graph as a mandatory node on the path to any response.
 
-`analytics/llm_hunter/orchestrator.py:L136-L136`
+`analytics/llm_hunter/orchestrator.py:L137-L137`
 
 ```python
     builder.add_node("review_board", review_board_node)
@@ -1012,7 +1012,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
 
-`analytics/llm_hunter/orchestrator.py:L197-L197`
+`analytics/llm_hunter/orchestrator.py:L199-L199`
 
 ```python
             canary = CognitiveSanitizer.generate_canary()
@@ -1037,7 +1037,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
-`analytics/llm_hunter/orchestrator.py:L258-L261`
+`analytics/llm_hunter/orchestrator.py:L260-L263`
 
 ```python
             # OWASP LLM01: verify the canary did not leak into any outbound surface.
@@ -1257,7 +1257,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **1. Invocation** — A hard ceiling on simultaneous investigations…
 
-`analytics/llm_hunter/orchestrator.py:L55-L55`
+`analytics/llm_hunter/orchestrator.py:L56-L56`
 
 ```python
 MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
@@ -1265,7 +1265,7 @@ MAX_CONCURRENT_INVESTIGATIONS = int(os.getenv("NEXUS_MAX_CONCURRENT", "8"))
 
 **2. Effect** — …realised as a semaphore…
 
-`analytics/llm_hunter/orchestrator.py:L66-L66`
+`analytics/llm_hunter/orchestrator.py:L67-L67`
 
 ```python
 _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
@@ -1273,7 +1273,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **3. Effect** — …acquired before any LLM work, bounding model-DoS blast at the investigation entry point.
 
-`analytics/llm_hunter/orchestrator.py:L186-L187`
+`analytics/llm_hunter/orchestrator.py:L187-L188`
 
 ```python
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
@@ -1282,7 +1282,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **4. Execution** — Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…
 
-`analytics/llm_hunter/orchestrator.py:L213-L213`
+`analytics/llm_hunter/orchestrator.py:L215-L215`
 
 ```python
             config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
@@ -1290,7 +1290,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **5. Execution** — …and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm.
 
-`analytics/llm_hunter/orchestrator.py:L217-L219`
+`analytics/llm_hunter/orchestrator.py:L219-L221`
 
 ```python
                 final_state = await asyncio.wait_for(
@@ -1351,7 +1351,7 @@ class SoarExecutionSchema(BaseModel):
 
 **2. Invocation** — The dispatch path is the single egress for any containment action.
 
-`analytics/llm_hunter/orchestrator.py:L294-L295`
+`analytics/llm_hunter/orchestrator.py:L311-L312`
 
 ```python
 async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
@@ -1360,7 +1360,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
 
 **3. Execution** — Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed.
 
-`analytics/llm_hunter/orchestrator.py:L324-L331`
+`analytics/llm_hunter/orchestrator.py:L341-L348`
 
 ```python
         validated = SoarExecutionSchema(

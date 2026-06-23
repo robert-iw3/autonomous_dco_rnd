@@ -1,0 +1,1424 @@
+{
+  "components": {
+    "core_ingress": {
+      "calls": [
+        "/api/v1/artifact",
+        "/api/v1/evidence",
+        "/api/v1/tasks",
+        "/api/v1/telemetry"
+      ],
+      "deploy": {
+        "host": "ingress",
+        "role": "rust_ingress"
+      },
+      "dockerfile": "services/core_ingress/Dockerfile",
+      "language": "rust",
+      "mentions": [
+        "nexus.agent.tasks",
+        "nexus.detonation.intake",
+        "nexus.memory.intake"
+      ],
+      "paths": [
+        "services/core_ingress/src/integrity.rs",
+        "services/core_ingress/src/main.rs"
+      ],
+      "publishes": [
+        "nexus.detonation.intake",
+        "nexus.memory.intake"
+      ],
+      "serves": [
+        "/api/v1/artifact",
+        "/api/v1/evidence",
+        "/api/v1/tasks",
+        "/api/v1/telemetry"
+      ],
+      "subscribes": [
+        "nexus.agent.tasks"
+      ],
+      "test_section": "services"
+    },
+    "det_chamber": {
+      "calls": [
+        "/api/v1/artifact",
+        "/api/v1/tasks"
+      ],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "python",
+      "mentions": [
+        "nexus.acquire.request",
+        "nexus.alerts.detonation",
+        "nexus.detonation.intake"
+      ],
+      "paths": [
+        "det_chamber/agents/__init__.py",
+        "det_chamber/agents/acquire_core.py",
+        "det_chamber/agents/acquire_worker.py",
+        "det_chamber/agents/acquisition_agent.py",
+        "det_chamber/engine/compile_yara_rules.py",
+        "det_chamber/engine/engine_runner.py",
+        "det_chamber/engine/linux_analyzer.py",
+        "det_chamber/engine/malware_sandbox.py",
+        "det_chamber/engine/sandbox_config.py",
+        "det_chamber/engine/summary_schema.py",
+        "det_chamber/engine/targets.py",
+        "det_chamber/intake/__init__.py",
+        "det_chamber/intake/intake_service.py",
+        "det_chamber/intake/manifest.py"
+      ],
+      "publishes": [
+        "nexus.alerts.detonation",
+        "nexus.detonation.intake"
+      ],
+      "serves": [],
+      "subscribes": [
+        "nexus.acquire.request",
+        "nexus.detonation.intake"
+      ],
+      "test_section": "detchamber"
+    },
+    "ir_playbooks": {
+      "calls": [],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "mixed",
+      "mentions": [],
+      "paths": [
+        "operations/playbooks/Build-OfflineToolkit-Linux.sh",
+        "operations/playbooks/Invoke-Eradication-Cloud.sh",
+        "operations/playbooks/Invoke-Eradication-Linux.sh",
+        "operations/playbooks/Invoke-IRCollection-Cloud.sh",
+        "operations/playbooks/Invoke-IRCollection-Linux.sh",
+        "operations/playbooks/docker/entrypoint.sh",
+        "operations/playbooks/playbooks/cloud/00_collect_forensics.sh",
+        "operations/playbooks/playbooks/cloud/01_contain_host.sh",
+        "operations/playbooks/playbooks/cloud/02_eradicate_process.sh",
+        "operations/playbooks/playbooks/cloud/03_eradicate_persistence.sh",
+        "operations/playbooks/playbooks/cloud/04_block_c2.sh",
+        "operations/playbooks/playbooks/cloud/05_restore_host.sh",
+        "operations/playbooks/playbooks/cloud/adjudicate_cloud.py",
+        "operations/playbooks/playbooks/lib/fw_baseline.sh",
+        "operations/playbooks/playbooks/lib/status.sh",
+        "operations/playbooks/playbooks/linux/00_collect_forensics.sh",
+        "operations/playbooks/playbooks/linux/01_contain_host.sh",
+        "operations/playbooks/playbooks/linux/02_eradicate_process.sh",
+        "operations/playbooks/playbooks/linux/03_eradicate_persistence.sh",
+        "operations/playbooks/playbooks/linux/04_block_c2.sh",
+        "operations/playbooks/playbooks/linux/05_acquire_artifact.sh",
+        "operations/playbooks/playbooks/linux/06_restore.sh",
+        "operations/playbooks/playbooks/linux/07_revoke_credentials.sh",
+        "operations/playbooks/playbooks/linux/threat_hunting/Analyze-Memory-Linux.sh",
+        "operations/playbooks/playbooks/linux/threat_hunting/Build-LinuxSymbols.sh",
+        "operations/playbooks/playbooks/linux/threat_hunting/adjudicate.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/analyze_memory_linux.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/container_hunt.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/edr_hunt.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/journal_analysis.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/linux_yara.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/linux_yara_worker.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/remote_access_triage.py",
+        "operations/playbooks/playbooks/reporting/build_iocs.py",
+        "operations/playbooks/playbooks/reporting/clock_context.py",
+        "operations/playbooks/playbooks/reporting/correlate_campaign.py",
+        "operations/playbooks/playbooks/reporting/evidence_custody.py",
+        "operations/playbooks/playbooks/reporting/extract_principals.py",
+        "operations/playbooks/playbooks/reporting/finding_schema.py",
+        "operations/playbooks/playbooks/reporting/generate_reports.py",
+        "operations/playbooks/playbooks/reporting/llm_incident_review.py",
+        "operations/playbooks/playbooks/reporting/merge_findings.py",
+        "operations/playbooks/playbooks/run_containment.sh",
+        "operations/playbooks/playbooks/windows/threat_hunting/memory_forensic.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/memory_yara.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/memory_yara_worker.py",
+        "operations/playbooks/test/conftest.py",
+        "operations/playbooks/test/fixtures.py",
+        "operations/playbooks/test/run_tests.sh",
+        "operations/playbooks/test/test_01_collection.py",
+        "operations/playbooks/test/test_02_analysis.py",
+        "operations/playbooks/test/test_03_reporting.py",
+        "operations/playbooks/test/test_04_eradication.py",
+        "operations/playbooks/test/test_05_restoration.py",
+        "operations/playbooks/test/test_06_cloud.py",
+        "operations/playbooks/test/test_07_e2e.py",
+        "operations/playbooks/test/test_08_ioc_decoupling.py",
+        "operations/playbooks/test/test_09_cloud_analysis.py",
+        "operations/playbooks/test/test_10_schema.py",
+        "operations/playbooks/test/test_11_status_contract.py",
+        "operations/playbooks/test/test_12_fw_baseline.py",
+        "operations/playbooks/test/test_13_mock_and_idempotency.py",
+        "operations/playbooks/test/test_14_timeline.py",
+        "operations/playbooks/test/test_15_attack_graph.py",
+        "operations/playbooks/test/test_16_campaign.py",
+        "operations/playbooks/test/test_17_offline_toolkit.py",
+        "operations/playbooks/test/test_18_credential_revocation.py",
+        "operations/playbooks/test/test_19_journal_analysis.py",
+        "operations/playbooks/test/test_20_disk_snapshot.py",
+        "operations/playbooks/test/test_21_flow_logs.py",
+        "operations/playbooks/test/test_22_llm_review.py",
+        "operations/playbooks/test/test_23_terraform_storage.py",
+        "operations/playbooks/test/test_24_docker_entrypoint.py",
+        "operations/playbooks/test/test_25_container_hunt.py",
+        "operations/playbooks/test/test_26_evidence_custody.py",
+        "operations/playbooks/test/test_27_clock_context.py",
+        "operations/playbooks/test/test_28_memory_linux.py",
+        "operations/playbooks/test/test_29_memory_orchestrator.py",
+        "operations/playbooks/test/test_30_symbols_distro.py",
+        "operations/playbooks/test/test_31_linux_eradication.py",
+        "operations/playbooks/test/test_32_memory_yara.py",
+        "operations/playbooks/test/test_33_linux_yara.py",
+        "operations/playbooks/test/test_34_linux_yara_worker.py",
+        "operations/playbooks/test/workflow_sim.py",
+        "operations/playbooks/tools/memprocfs/memprocfs.py",
+        "operations/playbooks/tools/memprocfs/memprocfs_example.py",
+        "operations/playbooks/tools/memprocfs/memprocfs_pythonexec_example.py",
+        "operations/playbooks/tools/memprocfs/vmmpyplugin.py"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "lib_siem_core": {
+      "calls": [],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "rust",
+      "mentions": [
+        "nexus.dlq",
+        "nexus.telemetry"
+      ],
+      "paths": [
+        "libs/lib_siem_core/src/lib.rs",
+        "libs/lib_siem_core/src/models.rs"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "llm_hunter_swarm": {
+      "calls": [
+        "/api/v1/indicators/",
+        "/api/v2/check"
+      ],
+      "deploy": {
+        "host": "analytics",
+        "role": "nexus_hunter"
+      },
+      "dockerfile": "analytics/llm_hunter/Dockerfile",
+      "language": "python",
+      "mentions": [
+        "nexus.acquire.request",
+        "nexus.alerts.>",
+        "nexus.alerts.detonation",
+        "nexus.dlq.cognitive",
+        "nexus.hud.telemetry",
+        "nexus.metrics.investigation",
+        "nexus.soar.callback",
+        "nexus.soar.execute"
+      ],
+      "paths": [
+        "analytics/llm_hunter/agents/__init__.py",
+        "analytics/llm_hunter/agents/active_learning.py",
+        "analytics/llm_hunter/agents/bias_audit.py",
+        "analytics/llm_hunter/agents/calibration_ledger.py",
+        "analytics/llm_hunter/agents/cloud_expert.py",
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/energy_accounting.py",
+        "analytics/llm_hunter/agents/expert_base.py",
+        "analytics/llm_hunter/agents/host_expert.py",
+        "analytics/llm_hunter/agents/lateral_movement.py",
+        "analytics/llm_hunter/agents/llm_providers.py",
+        "analytics/llm_hunter/agents/net_expert.py",
+        "analytics/llm_hunter/agents/nettap_expert.py",
+        "analytics/llm_hunter/agents/playbook_planner.py",
+        "analytics/llm_hunter/agents/response.py",
+        "analytics/llm_hunter/agents/review_board.py",
+        "analytics/llm_hunter/agents/supervisor.py",
+        "analytics/llm_hunter/agents/verdict_ledger.py",
+        "analytics/llm_hunter/compile-requirements.sh",
+        "analytics/llm_hunter/detonation_enrichment.py",
+        "analytics/llm_hunter/investigation_metrics.py",
+        "analytics/llm_hunter/orchestrator.py",
+        "analytics/llm_hunter/state.py",
+        "analytics/llm_hunter/tools/__init__.py",
+        "analytics/llm_hunter/tools/acquire_detonate.py",
+        "analytics/llm_hunter/tools/duckdb_query.py",
+        "analytics/llm_hunter/tools/entity_manager.py",
+        "analytics/llm_hunter/tools/nexus_config.py",
+        "analytics/llm_hunter/tools/qdrant_search.py",
+        "analytics/llm_hunter/tools/query_cookbook.py",
+        "analytics/llm_hunter/tools/sanitizer.py",
+        "analytics/llm_hunter/tools/siem_cookbook.py",
+        "analytics/llm_hunter/tools/siem_query.py",
+        "analytics/llm_hunter/tools/ti_lookup.py"
+      ],
+      "publishes": [
+        "nexus.dlq.cognitive",
+        "nexus.hud.telemetry",
+        "nexus.metrics.investigation",
+        "nexus.soar.execute"
+      ],
+      "serves": [],
+      "subscribes": [
+        "nexus.alerts.>",
+        "nexus.alerts.detonation",
+        "nexus.soar.callback"
+      ],
+      "test_section": "analytics"
+    },
+    "middleware": {
+      "calls": [
+        "/api/v1/telemetry"
+      ],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "middleware/src/core_ingress/src/config.rs",
+        "middleware/src/core_ingress/src/integrity.rs",
+        "middleware/src/core_ingress/src/main.rs",
+        "middleware/src/lib_etl/src/lib.rs",
+        "middleware/src/lib_etl/src/schema.rs",
+        "middleware/src/lib_middleware/src/lib.rs",
+        "middleware/src/worker_elastic/src/main.rs",
+        "middleware/src/worker_nexus/src/main.rs",
+        "middleware/src/worker_splunk/src/main.rs",
+        "middleware/src/worker_sql/src/main.rs"
+      ],
+      "publishes": [],
+      "serves": [
+        "/api/v1/telemetry"
+      ],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "mlops_pipeline": {
+      "calls": [
+        "/api/v2/check"
+      ],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "python",
+      "mentions": [
+        "nexus.alerts.baseline",
+        "nexus.c2.telemetry",
+        "nexus.deepsensor.telemetry",
+        "nexus.macos.telemetry",
+        "nexus.network_tap.telemetry",
+        "nexus.pyrit",
+        "nexus.rsi",
+        "nexus.sensor.telemetry",
+        "nexus.sentinel.telemetry",
+        "nexus.training.rlhf.judge_scores",
+        "nexus.trellix.telemetry"
+      ],
+      "paths": [
+        "mlops/scripts/01_spool_datasets.py",
+        "mlops/scripts/02_train_dpo_critic.py",
+        "mlops/scripts/02_train_network.py",
+        "mlops/scripts/02_train_qlora.py",
+        "mlops/scripts/02_train_sft_cot.py",
+        "mlops/scripts/03_eval_critic.py",
+        "mlops/scripts/03_eval_model.py",
+        "mlops/scripts/03_eval_network.py",
+        "mlops/scripts/03_eval_pyrit.py",
+        "mlops/scripts/04_merge_weights.py",
+        "mlops/scripts/04_reward_model.py",
+        "mlops/scripts/05_critic_loop.py",
+        "mlops/scripts/05_mine_cloud_fps.py",
+        "mlops/scripts/05_serve_critic.py",
+        "mlops/scripts/05_serve_network.py",
+        "mlops/scripts/05_serve_sovereign.py",
+        "mlops/scripts/05_synthetic_data_gen.py",
+        "mlops/scripts/06_sandbox_runner.py",
+        "mlops/scripts/07_feed_ingest.py",
+        "mlops/scripts/08_rsi_loop.py",
+        "mlops/scripts/09_benchmark_runner.py",
+        "mlops/scripts/11_join_outcomes.py",
+        "mlops/scripts/build_baseline_windows.py",
+        "mlops/scripts/build_model_b_corpus.py",
+        "mlops/scripts/corpus_utils.py",
+        "mlops/scripts/export_model_a_onnx.py",
+        "mlops/scripts/generate_golden_datasets.py",
+        "mlops/scripts/model_config.py",
+        "mlops/scripts/projector.py",
+        "mlops/scripts/serve_baseline.py",
+        "mlops/scripts/stage_active_directory_behavioral.py",
+        "mlops/scripts/stage_bypass_behavioral.py",
+        "mlops/scripts/stage_c2_behavioral.py",
+        "mlops/scripts/stage_cross_source_temporal.py",
+        "mlops/scripts/stage_exfiltration_behavioral.py",
+        "mlops/scripts/stage_lateral_movement_behavioral.py",
+        "mlops/scripts/stage_linux_exploitation_behavioral.py",
+        "mlops/scripts/stage_lotl_behavioral.py",
+        "mlops/scripts/stage_malware_behavioral.py",
+        "mlops/scripts/stage_mitre_attack.py",
+        "mlops/scripts/stage_pcap_corpus.py",
+        "mlops/scripts/stage_persistence_behavioral.py",
+        "mlops/scripts/stage_recon_behavioral.py",
+        "mlops/scripts/stage_siem_pivot.py",
+        "mlops/scripts/stage_suricata_rules.py",
+        "mlops/scripts/stage_tools_supplemental.py",
+        "mlops/scripts/stage_windows_exploitation_behavioral.py",
+        "mlops/scripts/train_lstm_ae.py",
+        "mlops/scripts/validate_pipeline.py",
+        "mlops/scripts/validate_sensor_pipeline.py",
+        "mlops/scripts/vault_client.py"
+      ],
+      "publishes": [
+        "nexus.alerts.baseline"
+      ],
+      "serves": [],
+      "subscribes": [
+        "nexus.network_tap.telemetry"
+      ],
+      "test_section": "offline"
+    },
+    "nats_streams": {
+      "calls": [
+        "/api/v1/evidence"
+      ],
+      "deploy": {},
+      "dockerfile": "infrastructure/nats/Dockerfile",
+      "language": "shell",
+      "mentions": [
+        "middleware.dlq.>",
+        "middleware.telemetry.*",
+        "nexus.*.telemetry",
+        "nexus.acquire.request",
+        "nexus.alerts.baseline",
+        "nexus.alerts.detonation",
+        "nexus.alerts.math",
+        "nexus.detonation.intake",
+        "nexus.dlq.>",
+        "nexus.memory.enrichment",
+        "nexus.memory.intake",
+        "nexus.metrics.investigation",
+        "nexus.soar.callback",
+        "nexus.soar.execute",
+        "nexus.training.rlhf.records"
+      ],
+      "paths": [
+        "infrastructure/nats/streams_init.sh"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "on_host_agent": {
+      "calls": [
+        "/api/v1/tasks"
+      ],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "python",
+      "mentions": [],
+      "paths": [
+        "operations/agent/response_executor.py",
+        "operations/agent/task_dispatch.py"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_memory": {
+      "calls": [
+        "/api/v1/evidence"
+      ],
+      "deploy": {
+        "host": "analytics",
+        "role": "memory_worker"
+      },
+      "dockerfile": "services/worker_memory/Dockerfile",
+      "language": "python",
+      "mentions": [
+        "nexus.memory.cleanup",
+        "nexus.memory.cleanup.audit",
+        "nexus.memory.enrichment",
+        "nexus.memory.intake"
+      ],
+      "paths": [
+        "services/worker_memory/evidence_intake.py",
+        "services/worker_memory/main.py",
+        "services/worker_memory/memory_analysis.py"
+      ],
+      "publishes": [
+        "nexus.memory.cleanup.audit",
+        "nexus.memory.enrichment"
+      ],
+      "serves": [],
+      "subscribes": [
+        "nexus.memory.cleanup",
+        "nexus.memory.intake"
+      ],
+      "test_section": "memory"
+    },
+    "worker_qdrant": {
+      "calls": [],
+      "deploy": {
+        "host": "workers",
+        "role": "rust_podman_worker"
+      },
+      "dockerfile": "services/worker_qdrant/Dockerfile",
+      "language": "rust",
+      "mentions": [
+        "nexus.alerts.math"
+      ],
+      "paths": [
+        "services/worker_qdrant/src/main.rs"
+      ],
+      "publishes": [
+        "nexus.alerts.math"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_rlhf": {
+      "calls": [],
+      "deploy": {
+        "host": "workers",
+        "role": "rust_podman_worker"
+      },
+      "dockerfile": "services/worker_rlhf/Dockerfile",
+      "language": "rust",
+      "mentions": [
+        "nexus.dlq",
+        "nexus.training.rlhf",
+        "nexus.training.rlhf.records"
+      ],
+      "paths": [
+        "services/worker_rlhf/src/main.rs"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_rules": {
+      "calls": [],
+      "deploy": {
+        "host": "workers",
+        "role": "rust_podman_worker"
+      },
+      "dockerfile": "services/worker_rules/Dockerfile",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "services/worker_rules/src/main.rs"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_s3_archive": {
+      "calls": [],
+      "deploy": {
+        "host": "workers",
+        "role": "rust_podman_worker"
+      },
+      "dockerfile": "services/worker_s3_archive/Dockerfile",
+      "language": "rust",
+      "mentions": [
+        "nexus.*.telemetry",
+        "nexus.dlq"
+      ],
+      "paths": [
+        "services/worker_s3_archive/src/main.rs"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_soar": {
+      "calls": [
+        "/api/v1/isolate",
+        "/api/v1/tasks"
+      ],
+      "deploy": {
+        "host": "workers",
+        "role": "rust_podman_worker"
+      },
+      "dockerfile": "services/worker_soar/Dockerfile",
+      "language": "rust",
+      "mentions": [
+        "nexus.agent.tasks",
+        "nexus.soar.execute"
+      ],
+      "paths": [
+        "services/worker_soar/src/agent_task.rs",
+        "services/worker_soar/src/main.rs"
+      ],
+      "publishes": [
+        "nexus.agent.tasks"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_ti_ingest": {
+      "calls": [],
+      "deploy": {
+        "host": "ti",
+        "role": "ti_ingest_worker"
+      },
+      "dockerfile": "services/worker_ti_ingest/Dockerfile",
+      "language": "python",
+      "mentions": [
+        "nexus.ti.status"
+      ],
+      "paths": [
+        "services/worker_ti_ingest/ingest.py",
+        "services/worker_ti_ingest/main.py",
+        "services/worker_ti_ingest/reranker.py",
+        "services/worker_ti_ingest/retrieval.py"
+      ],
+      "publishes": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "mlops"
+    }
+  },
+  "http_endpoints": {
+    "/api/v1/artifact": {
+      "callers": [
+        "det_chamber"
+      ],
+      "methods": [
+        "post"
+      ],
+      "service": "core_ingress"
+    },
+    "/api/v1/evidence": {
+      "callers": [
+        "nats_streams",
+        "worker_memory"
+      ],
+      "methods": [
+        "post"
+      ],
+      "service": "core_ingress"
+    },
+    "/api/v1/tasks": {
+      "callers": [
+        "det_chamber",
+        "on_host_agent",
+        "worker_soar"
+      ],
+      "methods": [
+        "get"
+      ],
+      "service": "core_ingress"
+    },
+    "/api/v1/telemetry": {
+      "callers": [
+        "middleware"
+      ],
+      "methods": [
+        "post"
+      ],
+      "service": "core_ingress"
+    }
+  },
+  "pipelines": {
+    "deploy": [
+      [
+        "01",
+        "render-templates",
+        "Stage 1: Render Jinja2 templates using the environment YAML."
+      ],
+      [
+        "02",
+        "provision-infra",
+        "Stage 2: Provision infrastructure via Terraform, then build the Ansible inventory"
+      ],
+      [
+        "02b",
+        "build-inventory",
+        "Bridge: Terraform outputs + environment YAML \u2192 Ansible inventory.yml"
+      ],
+      [
+        "03",
+        "harden-os",
+        "Stage 3: OS hardening across all provisioned hosts (Layer 0)."
+      ],
+      [
+        "04",
+        "deploy-core",
+        "Stage 4: Deploy core infrastructure \u2014 NATS, Redis, Qdrant, MinIO, Rust workers,"
+      ],
+      [
+        "05",
+        "deploy-middleware",
+        "Stage 5: Deploy the Zero-Trust Middleware layer (Layer 1.5)."
+      ],
+      [
+        "06",
+        "trigger-mlops",
+        "Stage 6: Sovereign MLOps Training Pipeline"
+      ],
+      [
+        "07",
+        "deploy-inference",
+        "Stage 7: Deploy Trained Models to Inference Nodes"
+      ],
+      [
+        "07b",
+        "deploy-detchamber",
+        "Stage 7b: Deploy the Det Chamber (live acquisition & detonation)"
+      ]
+    ],
+    "mlops": [
+      [
+        "01",
+        "spool_datasets",
+        "01_spool_datasets.py \u2014 Multi-Track Dataset Spooler for Sovereign MLOps"
+      ],
+      [
+        "02",
+        "train_dpo_critic",
+        "02_train_dpo_critic.py \u2014 Model D: SOAR Critic (DPO/IPO Alignment)"
+      ],
+      [
+        "02",
+        "train_network",
+        "02_train_network.py \u2014 Model B: Network Adversarial (QLoRA + Dual-Track Curriculum)"
+      ],
+      [
+        "02",
+        "train_qlora",
+        "02_train_qlora.py \u2014 Model C: Spatial Endpoint (QLoRA + Multi-Head Projector)"
+      ],
+      [
+        "02",
+        "train_sft_cot",
+        "02_train_sft_cot.py -- Chain-of-Thought SFT with Response Masking"
+      ],
+      [
+        "03",
+        "eval_critic",
+        "03_eval_critic.py \u2014 Model D: SOAR Critic Evaluation Suite"
+      ],
+      [
+        "03",
+        "eval_model",
+        "03_eval_model.py \u2014 Model C: Spatial Endpoint Evaluation Suite"
+      ],
+      [
+        "03",
+        "eval_network",
+        "03_eval_network.py \u2014 Model B: Network Adversarial Evaluation Suite"
+      ],
+      [
+        "03",
+        "eval_pyrit",
+        "03_eval_pyrit.py \u2014 ADDON Phase 2: PyRIT Multi-Turn Attack Orchestrator"
+      ],
+      [
+        "04",
+        "merge_weights",
+        ""
+      ],
+      [
+        "04",
+        "reward_model",
+        "04_reward_model.py \u2014 Reward Model Training + LLM-as-Judge Evaluation"
+      ],
+      [
+        "05",
+        "critic_loop",
+        "05_critic_loop.py -- Generator\u2192NeMo schema check\u2192Critic\u2192Regenerate cycle (Phase 2.3)"
+      ],
+      [
+        "05",
+        "mine_cloud_fps",
+        "05_mine_cloud_fps.py \u2014 Cloud False-Positive Mining Pipeline (M-17 SKELETON)"
+      ],
+      [
+        "05",
+        "serve_critic",
+        "05_serve_critic.py \u2014 Model D: SOAR Critic (Blast Radius Evaluator)"
+      ],
+      [
+        "05",
+        "serve_network",
+        "05_serve_network.py \u2014 Model B: Network Adversarial Pattern Classifier"
+      ],
+      [
+        "05",
+        "serve_sovereign",
+        "05_serve_sovereign.py \u2014 Model C: Spatial Endpoint Expert Inference Server"
+      ],
+      [
+        "05",
+        "synthetic_data_gen",
+        "05_synthetic_data_gen.py \u2014 Synthetic Hard Negative Generation + Validation"
+      ],
+      [
+        "06",
+        "sandbox_runner",
+        "06_sandbox_runner.py \u2014 Firecracker micro-VM atomic execution runner (PIPELINE Phase 1)"
+      ],
+      [
+        "07",
+        "feed_ingest",
+        "07_feed_ingest.py \u2014 Continuous threat feed pipeline (PIPELINE Phase 1)"
+      ],
+      [
+        "08",
+        "rsi_loop",
+        "08_rsi_loop.py -- ADDON Phase 4: Closed-Loop Recursive Self-Improvement"
+      ],
+      [
+        "09",
+        "benchmark_runner",
+        "09_benchmark_runner.py \u2014 WS-A M-26 benchmark runner + registry."
+      ],
+      [
+        "11",
+        "join_outcomes",
+        "11_join_outcomes.py \u2014 WS-A M-27 delayed-ground-truth join."
+      ]
+    ]
+  },
+  "python_imports": {
+    "analytics/llm_hunter/agents/__init__.py": [
+      "agents.cloud_expert",
+      "agents.host_expert",
+      "agents.net_expert",
+      "agents.nettap_expert",
+      "agents.response",
+      "agents.review_board",
+      "agents.supervisor"
+    ],
+    "analytics/llm_hunter/agents/active_learning.py": [
+      "agents.controls"
+    ],
+    "analytics/llm_hunter/agents/bias_audit.py": [
+      "agents.controls"
+    ],
+    "analytics/llm_hunter/agents/calibration_ledger.py": [
+      "agents.controls"
+    ],
+    "analytics/llm_hunter/agents/cloud_expert.py": [
+      "agents.expert_base",
+      "state",
+      "tools",
+      "tools.query_cookbook",
+      "tools.siem_cookbook"
+    ],
+    "analytics/llm_hunter/agents/energy_accounting.py": [
+      "agents.controls"
+    ],
+    "analytics/llm_hunter/agents/expert_base.py": [
+      "agents.llm_providers",
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/agents/host_expert.py": [
+      "agents.expert_base",
+      "state",
+      "tools",
+      "tools.query_cookbook",
+      "tools.siem_cookbook"
+    ],
+    "analytics/llm_hunter/agents/llm_providers.py": [
+      "agents.controls",
+      "tools.nexus_config"
+    ],
+    "analytics/llm_hunter/agents/net_expert.py": [
+      "agents.expert_base",
+      "state",
+      "tools",
+      "tools.query_cookbook",
+      "tools.siem_cookbook"
+    ],
+    "analytics/llm_hunter/agents/nettap_expert.py": [
+      "agents.expert_base",
+      "state",
+      "tools",
+      "tools.query_cookbook",
+      "tools.siem_cookbook"
+    ],
+    "analytics/llm_hunter/agents/response.py": [
+      "agents.active_learning",
+      "agents.controls",
+      "agents.energy_accounting",
+      "agents.llm_providers",
+      "agents.playbook_planner",
+      "agents.verdict_ledger",
+      "state",
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/agents/review_board.py": [
+      "agents.controls",
+      "agents.llm_providers",
+      "state",
+      "tools.nexus_config",
+      "tools.siem_query"
+    ],
+    "analytics/llm_hunter/agents/supervisor.py": [
+      "agents.controls",
+      "agents.llm_providers",
+      "state",
+      "tools.nexus_config"
+    ],
+    "analytics/llm_hunter/agents/verdict_ledger.py": [
+      "agents.controls"
+    ],
+    "analytics/llm_hunter/orchestrator.py": [
+      "agents.cloud_expert",
+      "agents.host_expert",
+      "agents.net_expert",
+      "agents.nettap_expert",
+      "agents.response",
+      "agents.review_board",
+      "agents.supervisor",
+      "detonation_enrichment",
+      "investigation_metrics",
+      "state",
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/tools/__init__.py": [
+      "tools.acquire_detonate",
+      "tools.duckdb_query",
+      "tools.entity_manager",
+      "tools.nexus_config",
+      "tools.qdrant_search",
+      "tools.sanitizer",
+      "tools.siem_query",
+      "tools.ti_lookup"
+    ],
+    "analytics/llm_hunter/tools/acquire_detonate.py": [
+      "state"
+    ],
+    "analytics/llm_hunter/tools/duckdb_query.py": [
+      "tools.nexus_config",
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/tools/qdrant_search.py": [
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/tools/siem_cookbook.py": [
+      "tools.nexus_config",
+      "tools.siem_query"
+    ],
+    "analytics/llm_hunter/tools/siem_query.py": [
+      "tools.nexus_config",
+      "tools.sanitizer"
+    ],
+    "analytics/llm_hunter/tools/ti_lookup.py": [
+      "tools.nexus_config",
+      "tools.sanitizer"
+    ],
+    "mlops/scripts/01_spool_datasets.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/02_train_dpo_critic.py": [
+      "model_config"
+    ],
+    "mlops/scripts/02_train_network.py": [
+      "model_config"
+    ],
+    "mlops/scripts/02_train_qlora.py": [
+      "model_config"
+    ],
+    "mlops/scripts/02_train_sft_cot.py": [
+      "model_config"
+    ],
+    "mlops/scripts/03_eval_critic.py": [
+      "model_config"
+    ],
+    "mlops/scripts/03_eval_model.py": [
+      "model_config"
+    ],
+    "mlops/scripts/03_eval_network.py": [
+      "model_config"
+    ],
+    "mlops/scripts/04_merge_weights.py": [
+      "model_config"
+    ],
+    "mlops/scripts/04_reward_model.py": [
+      "agents.llm_providers",
+      "model_config"
+    ],
+    "mlops/scripts/05_critic_loop.py": [
+      "corpus_utils",
+      "model_config"
+    ],
+    "mlops/scripts/05_serve_critic.py": [
+      "model_config"
+    ],
+    "mlops/scripts/05_serve_network.py": [
+      "model_config"
+    ],
+    "mlops/scripts/05_serve_sovereign.py": [
+      "model_config"
+    ],
+    "mlops/scripts/08_rsi_loop.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/projector.py": [
+      "model_config"
+    ],
+    "mlops/scripts/stage_active_directory_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_bypass_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_c2_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_exfiltration_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_lateral_movement_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_linux_exploitation_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_lotl_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_malware_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_persistence_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_recon_behavioral.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/stage_windows_exploitation_behavioral.py": [
+      "corpus_utils"
+    ],
+    "services/worker_memory/main.py": [
+      "evidence_intake",
+      "memory_analysis"
+    ]
+  },
+  "stores": {
+    "qdrant_swarm_memory": {
+      "kind": "qdrant",
+      "touched_by": [
+        "llm_hunter_swarm"
+      ]
+    },
+    "qdrant_ti_corpus": {
+      "kind": "qdrant",
+      "touched_by": [
+        "worker_ti_ingest"
+      ]
+    },
+    "s3_cold_archive": {
+      "kind": "s3",
+      "touched_by": [
+        "llm_hunter_swarm",
+        "worker_s3_archive"
+      ]
+    },
+    "s3_memory_evidence": {
+      "kind": "s3",
+      "touched_by": [
+        "core_ingress",
+        "worker_memory"
+      ]
+    },
+    "s3_quarantine": {
+      "kind": "s3",
+      "touched_by": [
+        "det_chamber"
+      ]
+    }
+  },
+  "subjects": {
+    "$2": {
+      "consumers": [],
+      "mentioned_by": [],
+      "producers": [],
+      "streams": [
+        "$1"
+      ]
+    },
+    "middleware.dlq.>": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams"
+      ],
+      "producers": [],
+      "streams": [
+        "MiddlewareStream_DLQ"
+      ]
+    },
+    "middleware.telemetry.*": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams"
+      ],
+      "producers": [],
+      "streams": [
+        "MiddlewareStream"
+      ]
+    },
+    "nexus.*.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams",
+        "worker_s3_archive"
+      ],
+      "producers": [],
+      "streams": [
+        "Tier5_Telemetry"
+      ]
+    },
+    "nexus.acquire.request": {
+      "consumers": [
+        "det_chamber"
+      ],
+      "mentioned_by": [
+        "det_chamber",
+        "llm_hunter_swarm",
+        "nats_streams"
+      ],
+      "producers": [],
+      "streams": [
+        "Nexus_Acquire_Request"
+      ]
+    },
+    "nexus.agent.tasks": {
+      "consumers": [
+        "core_ingress"
+      ],
+      "mentioned_by": [
+        "core_ingress",
+        "worker_soar"
+      ],
+      "producers": [
+        "worker_soar"
+      ],
+      "streams": []
+    },
+    "nexus.alerts.>": {
+      "consumers": [
+        "llm_hunter_swarm"
+      ],
+      "mentioned_by": [
+        "llm_hunter_swarm"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.alerts.baseline": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline",
+        "nats_streams"
+      ],
+      "producers": [
+        "mlops_pipeline"
+      ],
+      "streams": [
+        "Nexus_Baseline_Alerts"
+      ]
+    },
+    "nexus.alerts.detonation": {
+      "consumers": [
+        "llm_hunter_swarm"
+      ],
+      "mentioned_by": [
+        "det_chamber",
+        "llm_hunter_swarm",
+        "nats_streams"
+      ],
+      "producers": [
+        "det_chamber"
+      ],
+      "streams": [
+        "Nexus_Alerts_Detonation"
+      ]
+    },
+    "nexus.alerts.math": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams",
+        "worker_qdrant"
+      ],
+      "producers": [
+        "worker_qdrant"
+      ],
+      "streams": [
+        "Nexus_Math_Alerts"
+      ]
+    },
+    "nexus.c2.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.deepsensor.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.detonation.intake": {
+      "consumers": [
+        "det_chamber"
+      ],
+      "mentioned_by": [
+        "core_ingress",
+        "det_chamber",
+        "nats_streams"
+      ],
+      "producers": [
+        "core_ingress",
+        "det_chamber"
+      ],
+      "streams": [
+        "Nexus_Detonation_Intake"
+      ]
+    },
+    "nexus.dlq": {
+      "consumers": [],
+      "mentioned_by": [
+        "lib_siem_core",
+        "worker_rlhf",
+        "worker_s3_archive"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.dlq.>": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams"
+      ],
+      "producers": [],
+      "streams": [
+        "Nexus_DLQ"
+      ]
+    },
+    "nexus.dlq.cognitive": {
+      "consumers": [],
+      "mentioned_by": [
+        "llm_hunter_swarm"
+      ],
+      "producers": [
+        "llm_hunter_swarm"
+      ],
+      "streams": []
+    },
+    "nexus.hud.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "llm_hunter_swarm"
+      ],
+      "producers": [
+        "llm_hunter_swarm"
+      ],
+      "streams": []
+    },
+    "nexus.macos.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.memory.cleanup": {
+      "consumers": [
+        "worker_memory"
+      ],
+      "mentioned_by": [
+        "worker_memory"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.memory.cleanup.audit": {
+      "consumers": [],
+      "mentioned_by": [
+        "worker_memory"
+      ],
+      "producers": [
+        "worker_memory"
+      ],
+      "streams": []
+    },
+    "nexus.memory.enrichment": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams",
+        "worker_memory"
+      ],
+      "producers": [
+        "worker_memory"
+      ],
+      "streams": [
+        "Nexus_Memory_Enrichment"
+      ]
+    },
+    "nexus.memory.intake": {
+      "consumers": [
+        "worker_memory"
+      ],
+      "mentioned_by": [
+        "core_ingress",
+        "nats_streams",
+        "worker_memory"
+      ],
+      "producers": [
+        "core_ingress"
+      ],
+      "streams": [
+        "Nexus_Memory_Intake"
+      ]
+    },
+    "nexus.metrics.investigation": {
+      "consumers": [],
+      "mentioned_by": [
+        "llm_hunter_swarm",
+        "nats_streams"
+      ],
+      "producers": [
+        "llm_hunter_swarm"
+      ],
+      "streams": [
+        "Nexus_Metrics_Investigation"
+      ]
+    },
+    "nexus.network_tap.telemetry": {
+      "consumers": [
+        "mlops_pipeline"
+      ],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.pyrit": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.rsi": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.sensor.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.sentinel.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.soar.callback": {
+      "consumers": [
+        "llm_hunter_swarm"
+      ],
+      "mentioned_by": [
+        "llm_hunter_swarm",
+        "nats_streams"
+      ],
+      "producers": [],
+      "streams": [
+        "Nexus_SOAR_Callback"
+      ]
+    },
+    "nexus.soar.execute": {
+      "consumers": [],
+      "mentioned_by": [
+        "llm_hunter_swarm",
+        "nats_streams",
+        "worker_soar"
+      ],
+      "producers": [
+        "llm_hunter_swarm"
+      ],
+      "streams": [
+        "Nexus_SOAR_Execute"
+      ]
+    },
+    "nexus.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "lib_siem_core"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.ti.status": {
+      "consumers": [],
+      "mentioned_by": [
+        "worker_ti_ingest"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.training.rlhf": {
+      "consumers": [],
+      "mentioned_by": [
+        "worker_rlhf"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.training.rlhf.judge_scores": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.training.rlhf.records": {
+      "consumers": [],
+      "mentioned_by": [
+        "nats_streams",
+        "worker_rlhf"
+      ],
+      "producers": [],
+      "streams": [
+        "Nexus_RLHF_Training"
+      ]
+    },
+    "nexus.trellix.telemetry": {
+      "consumers": [],
+      "mentioned_by": [
+        "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    }
+  }
+}
