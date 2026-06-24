@@ -1,0 +1,94 @@
+{
+  "name": "K8s_Containment",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "k8s-containment",
+        "responseMode": "lastNode",
+        "options": { "rawBody": true }
+      },
+      "id": "k8s-webhook",
+      "name": "K8s Containment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the worker_soar container step into a Kubernetes API request.\n// cordon_node / quarantine_container (deny-all NetworkPolicy) / kill_pod / uncordon_node.\nconst body = $input.first().json.body || $input.first().json;\nconst action = body.action || 'quarantine_container';\nreturn [{ json: {\n  incident_id: body.incident_id || 'UNKNOWN',\n  target: body.target || '',\n  action: action,\n  api_url: $env.K8S_CONTAINMENT_GATEWAY_URL,\n  api_body: JSON.stringify({ incident_id: body.incident_id, target: body.target, action, namespace: body.namespace || 'default' }),\n} }];"
+      },
+      "id": "build-request",
+      "name": "Build K8s Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Nexus-Signature", "value": "={{ $env.NEXUS_HMAC_SECRET }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.api_body }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "call-k8s",
+      "name": "Call K8s API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [440, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build K8s Request').first().json;\nreturn [{ json: { incident_id: ctx.incident_id, target: ctx.target, action: ctx.action, status: 'CONTAINED', detail: JSON.stringify($input.first().json), timestamp: new Date().toISOString() } }];"
+      },
+      "id": "normalize-result",
+      "name": "Normalize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build K8s Request').first().json;\nreturn [{ json: { incident_id: ctx.incident_id, target: ctx.target, action: ctx.action, status: 'FAILED', detail: 'K8s API call failed: ' + JSON.stringify($input.first().json), timestamp: new Date().toISOString() } }];"
+      },
+      "id": "handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NATS_HTTP_URL }}/publish/nexus.soar.callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "signal-soar",
+      "name": "Signal SOAR via NATS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [880, 0],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "K8s Containment Webhook": { "main": [[{ "node": "Build K8s Request", "type": "main", "index": 0 }]] },
+    "Build K8s Request": { "main": [[{ "node": "Call K8s API", "type": "main", "index": 0 }]] },
+    "Call K8s API": {
+      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
+      "error": [[{ "node": "Handle Error", "type": "main", "index": 0 }]]
+    },
+    "Normalize Result": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] },
+    "Handle Error": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

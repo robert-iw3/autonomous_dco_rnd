@@ -67,6 +67,27 @@ class TestExtractors:
         assert ("post", "/api/v1/evidence") in cg.http_routes('.route("/api/v1/evidence", post(h))')
         assert "/api/v1/tasks" in cg.http_calls('client.get("/api/v1/tasks")')
 
+    def test_workspace_members_and_cargo_deps(self):
+        assert "libs/lib_siem_core" in cg.workspace_members('members = [\n  "libs/lib_siem_core",\n  "services/worker_soar",\n]')
+        deps = cg.cargo_deps("[package]\nname = \"x\"\n[dependencies]\ntokio = { workspace = true }\n"
+                             "lib_siem_core = { path = \"../../libs/lib_siem_core\" }\n[dev-dependencies]\nmockall = \"*\"\n")
+        assert "tokio" in deps and "lib_siem_core" in deps and "mockall" not in deps
+
+    def test_config_subjects_and_tf_resources(self):
+        assert "nexus.soar.execute" in cg.config_subjects('subject: "nexus.soar.execute".into(),')
+        assert ("aws_lambda_function", "aws_isolate") in cg.tf_resources('resource "aws_lambda_function" "aws_isolate" {')
+
+    def test_load_controls_joins_impl_evidence_tests(self):
+        man = ('controls:\n  - id: X-1\n    status: implemented\n'
+               '    implementation: analytics/llm_hunter/agents/response.py\n'
+               '    tests: ["tests/lab_governance/test_x.py"]\n')
+        evm = ('evidence:\n  X-1:\n    - file: services/core_ingress/src/main.rs\n      anchor: foo\n')
+        ctl = cg.load_controls(man, evm)["X-1"]
+        assert ctl["status"] == "implemented"
+        assert {"llm_hunter_swarm", "core_ingress"} <= set(ctl["components"])
+        assert ctl["tests"] == ["tests/lab_governance/test_x.py"]
+        assert "services/core_ingress/src/main.rs" in ctl["evidence_files"]
+
     def test_pipeline_stages_order_and_purpose(self):
         entries = [("d/03-harden.sh", "#!/bin/bash\n# Stage 3: harden\nset -e\n"),
                    ("d/01-render.sh", "#!/bin/bash\n# Stage 1: render\n"),
@@ -141,6 +162,32 @@ class TestExpandedGraph:
         mlops = {s[1] for s in self.G["pipelines"]["mlops"]}
         assert "render-templates" in deploy and "deploy-core" in deploy
         assert "benchmark_runner" in mlops and "rsi_loop" in mlops
+
+    def test_config_driven_subject_consumers(self):     # CG-2d
+        assert "worker_soar" in self.G["subjects"]["nexus.soar.execute"]["consumers"]
+        assert "worker_rlhf" in self.G["subjects"]["nexus.training.rlhf"]["consumers"]
+
+    def test_rust_internal_crate_deps(self):            # CG-2a
+        assert "lib_siem_core" in self.G["components"]["worker_soar"]["rust_deps"]
+
+    def test_controls_joined_with_components_and_tests(self):   # CG-2b
+        ctl = self.G["controls"]
+        assert len(ctl) >= 20
+        ai = ctl["AI-GROUNDING"]
+        assert "llm_hunter_swarm" in ai["components"] and ai["tests"]
+        # reverse index lands on the component
+        assert "AI-GROUNDING" in self.G["components"]["llm_hunter_swarm"]["controls"]
+
+    def test_infrastructure_inventory(self):            # CG-2c
+        inf = self.G["infrastructure"]
+        assert {"rust_ingress", "nexus_hunter", "qdrant_node"} <= set(inf["ansible_roles"])
+        assert inf["terraform_resources"] and any(t == "aws_lambda_function" for t, _ in inf["terraform_resources"])
+        assert any("haproxy" in c for c in inf["config_files"])
+
+    def test_containment_capability_matrix(self):       # WS-I / TC-4
+        rows = self.G["containment"]
+        assert ["endpoint", "windows", "isolate_host", "agent_task_v1"] in rows
+        assert any(r[0] == "cloud_instance" and r[1] == "aws" for r in rows)
 
 
 # ── drift guard ──────────────────────────────────────────────────────────────

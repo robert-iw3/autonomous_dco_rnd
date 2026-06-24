@@ -1038,3 +1038,37 @@ class TestLLMCircuitBreaker:
         finally:
             os.environ.pop("NEXUS_CB_FAILURE_THRESHOLD", None)
             os.environ.pop("NEXUS_CB_RECOVERY_TIMEOUT_SECS", None)
+
+
+class TestWorkerSoarProtocolDispatch:
+    """worker_soar dispatches the tailored containment protocol: each auto step to
+    its executor (agent task or provider), operator-gated steps never auto-run, and
+    the blunt legacy per-target fallback is suppressed in protocol mode."""
+
+    def _src(self) -> str:
+        return SOAR_MAIN.read_text()
+
+    def test_containment_step_struct_and_field(self):
+        src = self._src()
+        assert "struct ContainmentStep" in src
+        assert "containment_steps: Vec<ContainmentStep>" in src
+        # the step gate + IOC accessor the dispatch relies on
+        assert "fn is_auto(&self)" in src and 'self.gate == "auto"' in src
+        assert 'fn ioc(&self, key: &str)' in src
+
+    def test_protocol_mode_guards_legacy_and_native(self):
+        src = self._src()
+        assert "let protocol_mode = !payload.containment_steps.is_empty();" in src
+        # legacy single-action provider disabled in protocol mode
+        assert "if protocol_mode {\n                \"\"" in src or 'if protocol_mode {' in src
+        # native per-target fallback skipped in protocol mode
+        assert "if protocol_mode { Vec::new() } else { payload.targets }" in src
+        # legacy agent emission also guarded
+        assert "if !protocol_mode && !is_cloud" in src
+
+    def test_protocol_steps_dispatched_by_executor(self):
+        src = self._src()
+        # provider steps render the provider action; agent steps are signed
+        assert "if !st.is_auto() || &st.executor == agent_exec" in src
+        assert "if protocol_mode && !agent_exec.is_empty()" in src
+        assert "build_signed_task(" in src

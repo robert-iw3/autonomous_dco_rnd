@@ -75,7 +75,7 @@ METRIC_STACK_TEARDOWNS = Counter('nexus_stack_teardowns_total', 'Stack teardowns
 async def bootstrap_swarm_memory():
     """Ensure the Swarm's long-term RAG memory collection exists on startup."""
     try:
-        response = await async_qdrant.get_collections()
+        response = await async_qdrant.get_collections
         existing = [c.name for c in response.collections]
         if MEMORY_COLLECTION not in existing:
             logger.info("First run detected. Bootstrapping Swarm RAG Memory...")
@@ -166,7 +166,7 @@ async def _broadcast_hud(alert: UnifiedAlertSchema, nc_client):
         raw = alert.raw_event or {}
         hud_payload = {
             "type": "telemetry",
-            "timestamp": alert.timestamp,
+            "timestamp": alert.timestamp(),
             "comm": raw.get("process_name", raw.get("process", "unknown")),
             "mitre_tactic": raw.get("mitre_tactic", raw.get("tactic", "Unknown")),
             "mitre_technique": raw.get("mitre_technique", raw.get("technique", "Unknown")),
@@ -275,7 +275,7 @@ async def trigger_swarm(alert: UnifiedAlertSchema, js_client, nc_client, graph):
             await _dispatch_soar(alert, action, js_client)
 
             # Measurement plane (M-27): emit the per-investigation metrics record,
-            # fire-and-forget — never blocks or fails the SOAR path.
+            # fire-and-forget - never blocks or fails the SOAR path.
             await _emit_investigation_metrics(
                 alert, final_state, js_client, int((time.monotonic() - _t0) * 1000))
 
@@ -330,7 +330,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             "nexus.soar.execute",   # H-I2 fix: was "Nexus_System.SOAR.ManualQueue" -- worker_soar subscribes to nexus.soar.execute (lowercase)
             json.dumps(manual_payload).encode(),
         )
-        METRIC_ALERTS.inc()
+        METRIC_ALERTS.inc
         logger.warning(
             f"[!] MANUAL REVIEW QUEUED: {alert.sensor_id} "
             f"reason={manual_payload['reason'][:80]}"
@@ -345,9 +345,14 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
-            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
+            # On-host playbook initiation (DC-N11) - carried through to worker_soar,
             # which builds a signed agent task per response_action with these IOCs.
             os_family=action.get("os_family"),
+            # Tailored cross-class containment protocol; worker_soar
+            # dispatches each step to its executor. Legacy fields stay populated.
+            environment=action.get("environment"),
+            target_class=action.get("target_class"),
+            containment_steps=action.get("containment_steps", []),
             response_actions=action.get("response_actions", []),
             c2_ips=action.get("c2_ips", []),
             c2_domains=action.get("c2_domains", []),
@@ -371,7 +376,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
         json.dumps(dump).encode(),
         headers={"Nats-Msg-Id": msg_id} if msg_id else None,
     )
-    METRIC_ALERTS.inc()
+    METRIC_ALERTS.inc
     logger.warning(f"[+] CONTAINMENT PUBLISHED to JetStream for {validated.target_sensor} "
                    f"({action_type})")
 
@@ -404,7 +409,7 @@ async def redis_polling_loop(js_client, nc_client, graph):
                 continue
             if not await is_new_anomaly(alert.event_id):
                 continue
-            METRIC_ANOMALIES.labels(source="redis").inc()
+            METRIC_ANOMALIES.labels(source="redis").inc
             asyncio.create_task(trigger_swarm(alert, js_client, nc_client, graph))
         except Exception as e:
             logger.error(f"[!] Redis polling exception: {e}")
@@ -439,30 +444,30 @@ async def reactive_alert_consumer(js_client, nc_client, graph):
                 alert = _parse_alert(alert_data)
             except (ValidationError, json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison message TERMinated (will not redeliver): {e}")
-                await msg.term()
+                await msg.term
                 continue
             except Exception as e:
                 logger.error(f"Unexpected parse error; NAK for redelivery: {e}")
-                await msg.nak()
+                await msg.nak
                 continue
 
             try:
                 if not await is_new_anomaly(alert.event_id):
-                    await msg.ack()  # already handled; drop the duplicate
+                    await msg.ack  # already handled; drop the duplicate
                     continue
-                METRIC_ANOMALIES.labels(source="nats").inc()
+                METRIC_ANOMALIES.labels(source="nats").inc
                 asyncio.create_task(trigger_swarm(alert, js_client, nc_client, graph))
                 # At-most-once: ack on successful scheduling. Investigations are
                 # idempotent via thread_id=event_id and the dedup lock above.
-                await msg.ack()
+                await msg.ack
             except Exception as e:
                 logger.error(f"Failed to schedule investigation; NAK: {e}")
-                await msg.nak()
+                await msg.nak
 
 
 async def _teardown_stack(event_id: str, reason: str = "unknown"):
     """Remove a stack from the active set, run teardown, and purge lifecycle state."""
-    METRIC_STACK_TEARDOWNS.labels(reason=reason).inc()
+    METRIC_STACK_TEARDOWNS.labels(reason=reason).inc
     await redis_client.srem("nexus:active_operations_stacks", event_id)
     await manage_ephemeral_interface("teardown", event_id)
     for suffix in ("created_at", "ttl_deadline", "last_alert_at", "status"):
@@ -518,7 +523,7 @@ async def manage_ephemeral_interface(action: str, event_id: str):
             script, event_id,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate()
+        stdout, stderr = await process.communicate
         if process.returncode != 0:
             logger.error(f"Interface {action} script failed: {stderr.decode()}")
             if action == "trigger":
@@ -575,13 +580,13 @@ async def soar_callback_listener(js_client):
                     logger.warning(f"[SOAR] {event_id} reported {soar_status}. TTL extended to "
                                    f"{(new_deadline - now) / 60:.0f}m remaining for operator review.")
 
-                await msg.ack()
+                await msg.ack
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison callback TERMinated: {e}")
-                await msg.term()
+                await msg.term
             except Exception as e:
                 logger.error(f"Callback handling fault; NAK: {e}")
-                await msg.nak()
+                await msg.nak
 
 
 async def detonation_enrichment_listener(js_client):
@@ -617,20 +622,20 @@ async def detonation_enrichment_listener(js_client):
                         validated = SoarExecutionSchema(**action)
                     except ValidationError as e:
                         logger.error(f"Enrichment action failed schema validation; dropping: {e}")
-                        await msg.ack()
+                        await msg.ack
                         continue
                     dump = validated.model_dump()
                     dump["reason"] = CognitiveSanitizer.scrub_outbound_dlp(dump.get("reason", ""))
                     await js_client.publish("nexus.soar.execute", json.dumps(dump).encode())
                     logger.warning(f"[DETONATION] {incident_id}: {validated.action_type} "
                                    f"(verdict-driven follow-up).")
-                await msg.ack()
+                await msg.ack
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison detonation alert TERMinated: {e}")
-                await msg.term()
+                await msg.term
             except Exception as e:
                 logger.error(f"Detonation enrichment fault; NAK: {e}")
-                await msg.nak()
+                await msg.nak
 
 
 async def stack_lifecycle_monitor():
@@ -700,13 +705,13 @@ async def stack_lifecycle_monitor():
 async def _connect_nats_with_retry(url: str, max_attempts: int = 0) -> NATS:
     """
     H-F4 fix: NATS connection with exponential backoff reconnect loop.
-    Previously a connection drop caused orchestrator exit → swarm dark until container restart.
+    Previously a connection drop caused orchestrator exit -> swarm dark until container restart.
     max_attempts=0 means infinite retry (appropriate for a long-running service).
     """
-    nc = NATS()
+    nc = NATS
     attempt = 0
     backoff = 2.0
-    # C2: central NATS runs default-deny authorization — authenticate as the
+    # C2: central NATS runs default-deny authorization - authenticate as the
     # swarm_node user when credentials are provisioned (hunter.env).
     nats_user = os.getenv("NATS_USER", "")
     nats_pass = os.getenv("NATS_PASS", "")
@@ -737,18 +742,18 @@ async def main():
     logger.info("Starting Prometheus Exporter on Port 8000")
     start_http_server(8000)
 
-    await bootstrap_swarm_memory()
+    await bootstrap_swarm_memory
 
     # H-F4 fix: use reconnect-aware connect helper
     nc = await _connect_nats_with_retry(os.getenv("NATS_URL", "nats://nats:4222"))
-    js = nc.jetstream()
+    js = nc.jetstream
 
     # Construct the async checkpointer inside the running loop and set up its
     # Redis indices before compiling the graph (the original passed a raw client
-    # to the constructor and never ran asetup()).
+    # to the constructor and never ran asetup).
     async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
         try:
-            await checkpointer.asetup()
+            await checkpointer.asetup
         except AttributeError:
             pass  # some versions set up lazily
         graph = build_graph(checkpointer)
@@ -759,9 +764,9 @@ async def main():
             reactive_alert_consumer(js, nc, graph),
             soar_callback_listener(js),
             detonation_enrichment_listener(js),
-            stack_lifecycle_monitor(),
+            stack_lifecycle_monitor,
         )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main)

@@ -6,7 +6,7 @@
 
 **1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
-`analytics/llm_hunter/state.py:L103-L138`
+`analytics/llm_hunter/state.py:L139-L174`
 
 ```python
 class SoarExecutionSchema(BaseModel):
@@ -68,5 +68,5 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
-            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
+            # On-host playbook initiation (DC-N11) - carried through to worker_soar,
 ```

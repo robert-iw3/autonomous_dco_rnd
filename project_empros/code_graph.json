@@ -7,6 +7,9 @@
         "/api/v1/tasks",
         "/api/v1/telemetry"
       ],
+      "controls": [
+        "ING-ZERO-TRUST"
+      ],
       "deploy": {
         "host": "ingress",
         "role": "rust_ingress"
@@ -26,6 +29,7 @@
         "nexus.detonation.intake",
         "nexus.memory.intake"
       ],
+      "rust_deps": [],
       "serves": [
         "/api/v1/artifact",
         "/api/v1/evidence",
@@ -42,8 +46,9 @@
         "/api/v1/artifact",
         "/api/v1/tasks"
       ],
+      "controls": [],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "det_chamber/agents/Dockerfile",
       "language": "python",
       "mentions": [
         "nexus.acquire.request",
@@ -70,6 +75,7 @@
         "nexus.alerts.detonation",
         "nexus.detonation.intake"
       ],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [
         "nexus.acquire.request",
@@ -79,8 +85,9 @@
     },
     "ir_playbooks": {
       "calls": [],
+      "controls": [],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "operations/playbooks/Dockerfile",
       "language": "mixed",
       "mentions": [],
       "paths": [
@@ -174,14 +181,19 @@
         "operations/playbooks/tools/memprocfs/vmmpyplugin.py"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
     },
     "lib_siem_core": {
       "calls": [],
+      "controls": [
+        "ING-DLQ-BREAKER",
+        "SEC-ENDPOINT-ID"
+      ],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "libs/lib_siem_core/Dockerfile",
       "language": "rust",
       "mentions": [
         "nexus.dlq",
@@ -192,14 +204,43 @@
         "libs/lib_siem_core/src/models.rs"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
-      "subscribes": [],
+      "subscribes": [
+        "nexus.telemetry"
+      ],
       "test_section": "services"
     },
     "llm_hunter_swarm": {
       "calls": [
         "/api/v1/indicators/",
         "/api/v2/check"
+      ],
+      "controls": [
+        "AI-GROUNDING",
+        "AI-MEMORY-TTL",
+        "AI-PROVENANCE",
+        "AI-REVIEW-BOARD",
+        "NC-1-BIAS-AUDIT",
+        "NC-10-VERDICT-LINEAGE",
+        "NC-11-ENERGY-ACCOUNTING",
+        "NC-2-CALIBRATION",
+        "NC-3-FRONTIER-PIN",
+        "NC-8-OVER-RELIANCE",
+        "NC-9-ACTIVE-LEARNING",
+        "SEC-BLAST-RADIUS",
+        "SEC-CANARY",
+        "SEC-DLP-EGRESS",
+        "SEC-DUCKDB-SANDBOX",
+        "SEC-FAILOVER",
+        "SEC-IDEMPOTENT-SOAR",
+        "SEC-MODEL-DOS",
+        "SEC-OUTPUT-SCHEMA",
+        "SEC-SANITIZER",
+        "SEC-VECTOR-DIM",
+        "SIEM-CONFIG-CONTRACT",
+        "SIEM-COUNTERPART-DISPROOF",
+        "SIEM-TOOL-GUARD"
       ],
       "deploy": {
         "host": "analytics",
@@ -223,6 +264,8 @@
         "analytics/llm_hunter/agents/bias_audit.py",
         "analytics/llm_hunter/agents/calibration_ledger.py",
         "analytics/llm_hunter/agents/cloud_expert.py",
+        "analytics/llm_hunter/agents/containment_capability.py",
+        "analytics/llm_hunter/agents/containment_protocol.py",
         "analytics/llm_hunter/agents/controls.py",
         "analytics/llm_hunter/agents/energy_accounting.py",
         "analytics/llm_hunter/agents/expert_base.py",
@@ -235,6 +278,7 @@
         "analytics/llm_hunter/agents/response.py",
         "analytics/llm_hunter/agents/review_board.py",
         "analytics/llm_hunter/agents/supervisor.py",
+        "analytics/llm_hunter/agents/target_class.py",
         "analytics/llm_hunter/agents/verdict_ledger.py",
         "analytics/llm_hunter/compile-requirements.sh",
         "analytics/llm_hunter/detonation_enrichment.py",
@@ -259,6 +303,7 @@
         "nexus.metrics.investigation",
         "nexus.soar.execute"
       ],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [
         "nexus.alerts.>",
@@ -271,8 +316,9 @@
       "calls": [
         "/api/v1/telemetry"
       ],
+      "controls": [],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "middleware/src/Dockerfile",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -288,6 +334,10 @@
         "middleware/src/worker_sql/src/main.rs"
       ],
       "publishes": [],
+      "rust_deps": [
+        "lib_etl",
+        "lib_middleware"
+      ],
       "serves": [
         "/api/v1/telemetry"
       ],
@@ -298,8 +348,12 @@
       "calls": [
         "/api/v2/check"
       ],
+      "controls": [
+        "SEC-REGRESSION-GATE",
+        "SEC-TRAINING-HYGIENE"
+      ],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "mlops/scripts/Dockerfile",
       "language": "python",
       "mentions": [
         "nexus.alerts.baseline",
@@ -370,6 +424,7 @@
       "publishes": [
         "nexus.alerts.baseline"
       ],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [
         "nexus.network_tap.telemetry"
@@ -380,6 +435,7 @@
       "calls": [
         "/api/v1/evidence"
       ],
+      "controls": [],
       "deploy": {},
       "dockerfile": "infrastructure/nats/Dockerfile",
       "language": "shell",
@@ -404,6 +460,7 @@
         "infrastructure/nats/streams_init.sh"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
@@ -412,8 +469,9 @@
       "calls": [
         "/api/v1/tasks"
       ],
+      "controls": [],
       "deploy": {},
-      "dockerfile": "",
+      "dockerfile": "operations/agent/Dockerfile",
       "language": "python",
       "mentions": [],
       "paths": [
@@ -421,6 +479,7 @@
         "operations/agent/task_dispatch.py"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
@@ -429,6 +488,7 @@
       "calls": [
         "/api/v1/evidence"
       ],
+      "controls": [],
       "deploy": {
         "host": "analytics",
         "role": "memory_worker"
@@ -450,6 +510,7 @@
         "nexus.memory.cleanup.audit",
         "nexus.memory.enrichment"
       ],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [
         "nexus.memory.cleanup",
@@ -459,6 +520,7 @@
     },
     "worker_qdrant": {
       "calls": [],
+      "controls": [],
       "deploy": {
         "host": "workers",
         "role": "rust_podman_worker"
@@ -474,12 +536,18 @@
       "publishes": [
         "nexus.alerts.math"
       ],
+      "rust_deps": [
+        "lib_siem_core"
+      ],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
     },
     "worker_rlhf": {
       "calls": [],
+      "controls": [
+        "SEC-RLHF-QUARANTINE"
+      ],
       "deploy": {
         "host": "workers",
         "role": "rust_podman_worker"
@@ -495,12 +563,18 @@
         "services/worker_rlhf/src/main.rs"
       ],
       "publishes": [],
+      "rust_deps": [
+        "lib_siem_core"
+      ],
       "serves": [],
-      "subscribes": [],
+      "subscribes": [
+        "nexus.training.rlhf"
+      ],
       "test_section": "services"
     },
     "worker_rules": {
       "calls": [],
+      "controls": [],
       "deploy": {
         "host": "workers",
         "role": "rust_podman_worker"
@@ -512,12 +586,16 @@
         "services/worker_rules/src/main.rs"
       ],
       "publishes": [],
+      "rust_deps": [
+        "lib_siem_core"
+      ],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
     },
     "worker_s3_archive": {
       "calls": [],
+      "controls": [],
       "deploy": {
         "host": "workers",
         "role": "rust_podman_worker"
@@ -532,6 +610,7 @@
         "services/worker_s3_archive/src/main.rs"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [],
       "test_section": "services"
@@ -540,6 +619,9 @@
       "calls": [
         "/api/v1/isolate",
         "/api/v1/tasks"
+      ],
+      "controls": [
+        "SEC-IDEMPOTENT-SOAR"
       ],
       "deploy": {
         "host": "workers",
@@ -558,12 +640,18 @@
       "publishes": [
         "nexus.agent.tasks"
       ],
+      "rust_deps": [
+        "lib_siem_core"
+      ],
       "serves": [],
-      "subscribes": [],
+      "subscribes": [
+        "nexus.soar.execute"
+      ],
       "test_section": "services"
     },
     "worker_ti_ingest": {
       "calls": [],
+      "controls": [],
       "deploy": {
         "host": "ti",
         "role": "ti_ingest_worker"
@@ -580,9 +668,818 @@
         "services/worker_ti_ingest/retrieval.py"
       ],
       "publishes": [],
+      "rust_deps": [],
       "serves": [],
       "subscribes": [],
       "test_section": "mlops"
+    }
+  },
+  "containment": [
+    [
+      "cloud_instance",
+      "aws",
+      "isolate_host",
+      "aws_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "aws",
+      "release_host",
+      "aws_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "aws",
+      "revoke_instance_role",
+      "aws_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "aws",
+      "snapshot_volume",
+      "aws_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "azure",
+      "isolate_host",
+      "azure_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "azure",
+      "release_host",
+      "azure_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "azure",
+      "revoke_instance_role",
+      "azure_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "azure",
+      "snapshot_volume",
+      "azure_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "gcp",
+      "isolate_host",
+      "gcp_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "gcp",
+      "release_host",
+      "gcp_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "gcp",
+      "revoke_instance_role",
+      "gcp_containment_v1"
+    ],
+    [
+      "cloud_instance",
+      "gcp",
+      "snapshot_volume",
+      "gcp_containment_v1"
+    ],
+    [
+      "container",
+      "k8s",
+      "cordon_node",
+      "k8s_containment_v1"
+    ],
+    [
+      "container",
+      "k8s",
+      "kill_pod",
+      "k8s_containment_v1"
+    ],
+    [
+      "container",
+      "k8s",
+      "quarantine_container",
+      "k8s_containment_v1"
+    ],
+    [
+      "container",
+      "k8s",
+      "uncordon_node",
+      "k8s_containment_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "block_ip",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "collect_forensics",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "eradicate_persistence",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "eradicate_process",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "isolate_host",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "linux",
+      "restore",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "block_ip",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "collect_forensics",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "eradicate_persistence",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "eradicate_process",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "isolate_host",
+      "agent_task_v1"
+    ],
+    [
+      "endpoint",
+      "windows",
+      "restore",
+      "agent_task_v1"
+    ],
+    [
+      "identity",
+      "entra",
+      "disable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "entra",
+      "enable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "entra",
+      "revoke_sessions",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "gcp",
+      "disable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "gcp",
+      "enable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "gcp",
+      "revoke_sessions",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "iam",
+      "disable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "iam",
+      "enable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "iam",
+      "revoke_sessions",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "local",
+      "disable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "local",
+      "enable_user",
+      "idp_containment_v1"
+    ],
+    [
+      "identity",
+      "local",
+      "revoke_sessions",
+      "idp_containment_v1"
+    ],
+    [
+      "network",
+      "aws",
+      "block_ip",
+      "aws_containment_v1"
+    ],
+    [
+      "network",
+      "aws",
+      "dns_sinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "aws",
+      "unblock_ip",
+      "aws_containment_v1"
+    ],
+    [
+      "network",
+      "aws",
+      "unsinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "azure",
+      "block_ip",
+      "azure_containment_v1"
+    ],
+    [
+      "network",
+      "azure",
+      "dns_sinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "azure",
+      "unblock_ip",
+      "azure_containment_v1"
+    ],
+    [
+      "network",
+      "azure",
+      "unsinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "gcp",
+      "block_ip",
+      "gcp_containment_v1"
+    ],
+    [
+      "network",
+      "gcp",
+      "dns_sinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "gcp",
+      "unblock_ip",
+      "gcp_containment_v1"
+    ],
+    [
+      "network",
+      "gcp",
+      "unsinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "onprem",
+      "block_ip",
+      "custom_fw_v1"
+    ],
+    [
+      "network",
+      "onprem",
+      "dns_sinkhole",
+      "dns_containment_v1"
+    ],
+    [
+      "network",
+      "onprem",
+      "unblock_ip",
+      "custom_fw_v1"
+    ],
+    [
+      "network",
+      "onprem",
+      "unsinkhole",
+      "dns_containment_v1"
+    ]
+  ],
+  "controls": {
+    "AI-GROUNDING": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/review_board.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestGroundingEnforcement"
+      ]
+    },
+    "AI-MEMORY-TTL": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/response.py",
+        "analytics/llm_hunter/agents/supervisor.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestMemoryTTL"
+      ]
+    },
+    "AI-PROVENANCE": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/response.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestProvenanceDisclosure"
+      ]
+    },
+    "AI-REVIEW-BOARD": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/review_board.py",
+        "analytics/llm_hunter/orchestrator.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_review_board.py",
+        "tests/lab_analytics_hunter/test_review_board_simulation.py"
+      ]
+    },
+    "IAC-HARDENING": {
+      "category": "Infrastructure Hardening",
+      "components": [],
+      "evidence_files": [
+        "hardening/tasks/main.yml"
+      ],
+      "status": "implemented",
+      "tests": [
+        "infrastructure/tests/test_infrastructure.py"
+      ]
+    },
+    "ING-DLQ-BREAKER": {
+      "category": "Ingestion Integrity",
+      "components": [
+        "lib_siem_core"
+      ],
+      "evidence_files": [
+        "libs/lib_siem_core/src/lib.rs"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/test_worker_contracts.py"
+      ]
+    },
+    "ING-ZERO-TRUST": {
+      "category": "Ingestion Integrity",
+      "components": [
+        "core_ingress"
+      ],
+      "evidence_files": [
+        "services/core_ingress/src/integrity.rs"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/test_worker_contracts.py"
+      ]
+    },
+    "NC-1-BIAS-AUDIT": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/bias_audit.py",
+        "analytics/llm_hunter/agents/controls.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_nist_controls_wave2.py::TestBiasAudit"
+      ]
+    },
+    "NC-10-VERDICT-LINEAGE": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/response.py",
+        "analytics/llm_hunter/agents/verdict_ledger.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestVerdictLineage",
+        "tests/lab_governance/test_nist_controls_wave4.py::TestVerdictLedger"
+      ]
+    },
+    "NC-11-ENERGY-ACCOUNTING": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/energy_accounting.py",
+        "analytics/llm_hunter/agents/response.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestInferenceEnergy",
+        "tests/lab_governance/test_nist_controls_wave4.py::TestEnergyAccounting"
+      ]
+    },
+    "NC-2-CALIBRATION": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/calibration_ledger.py",
+        "analytics/llm_hunter/agents/controls.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_nist_controls_wave2.py::TestCalibrationLedger"
+      ]
+    },
+    "NC-3-FRONTIER-PIN": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/llm_providers.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_nist_controls_wave2.py::TestFrontierPinEnforcement"
+      ]
+    },
+    "NC-4-RETENTION": {
+      "category": "NIST AI 600-1",
+      "components": [],
+      "evidence_files": [],
+      "status": "documented",
+      "tests": []
+    },
+    "NC-6-ENERGY": {
+      "category": "NIST AI 600-1",
+      "components": [],
+      "evidence_files": [],
+      "status": "documented",
+      "tests": []
+    },
+    "NC-8-OVER-RELIANCE": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/calibration_ledger.py",
+        "analytics/llm_hunter/agents/controls.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestOverReliance",
+        "tests/lab_governance/test_nist_controls_wave4.py::TestRelianceLedger"
+      ]
+    },
+    "NC-9-ACTIVE-LEARNING": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/active_learning.py",
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/response.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestActiveLearningFailure",
+        "tests/lab_governance/test_nist_controls_wave4.py::TestActiveLearning"
+      ]
+    },
+    "SEC-BLAST-RADIUS": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/containment_protocol.py",
+        "analytics/llm_hunter/agents/response.py",
+        "analytics/llm_hunter/agents/supervisor.py",
+        "analytics/llm_hunter/state.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_hunter_contracts.py"
+      ]
+    },
+    "SEC-CANARY": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/orchestrator.py",
+        "analytics/llm_hunter/tools/sanitizer.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"
+      ]
+    },
+    "SEC-DLP-EGRESS": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/response.py",
+        "analytics/llm_hunter/tools/sanitizer.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_redteam/test_cognitive_bypass.py"
+      ]
+    },
+    "SEC-DUCKDB-SANDBOX": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/tools/duckdb_query.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_query_cookbook.py"
+      ]
+    },
+    "SEC-ENDPOINT-ID": {
+      "category": "Ingestion Integrity",
+      "components": [
+        "lib_siem_core"
+      ],
+      "evidence_files": [
+        "libs/lib_siem_core/src/models.rs"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/test_worker_contracts.py"
+      ]
+    },
+    "SEC-FAILOVER": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/expert_base.py",
+        "analytics/llm_hunter/agents/llm_providers.py",
+        "analytics/llm_hunter/agents/response.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/test_worker_contracts.py"
+      ]
+    },
+    "SEC-IDEMPOTENT-SOAR": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm",
+        "worker_soar"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/response.py",
+        "services/worker_soar/src/main.rs"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"
+      ]
+    },
+    "SEC-MODEL-DOS": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/orchestrator.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"
+      ]
+    },
+    "SEC-OUTPUT-SCHEMA": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/orchestrator.py",
+        "analytics/llm_hunter/state.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_agentic_swarm/test_agentic_swarm_contracts.py"
+      ]
+    },
+    "SEC-REGRESSION-GATE": {
+      "category": "AI Security",
+      "components": [
+        "mlops_pipeline"
+      ],
+      "evidence_files": [
+        "mlops/scripts/03_eval_model.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_mlops_serving/test_mlops_serving.py"
+      ]
+    },
+    "SEC-RLHF-QUARANTINE": {
+      "category": "AI Security",
+      "components": [
+        "worker_rlhf"
+      ],
+      "evidence_files": [
+        "services/worker_rlhf/src/main.rs"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/test_worker_contracts.py"
+      ]
+    },
+    "SEC-SANITIZER": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/expert_base.py",
+        "analytics/llm_hunter/tools/sanitizer.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_redteam/test_cognitive_bypass.py"
+      ]
+    },
+    "SEC-SUPPLY-CHAIN": {
+      "category": "AI Security",
+      "components": [],
+      "evidence_files": [
+        "mlops/serve_vllm.sh"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_mlops_serving/test_mlops_serving.py"
+      ]
+    },
+    "SEC-TRAINING-HYGIENE": {
+      "category": "AI Security",
+      "components": [
+        "mlops_pipeline"
+      ],
+      "evidence_files": [
+        "mlops/scripts/01_spool_datasets.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_mlops_serving/test_mlops_serving.py"
+      ]
+    },
+    "SEC-VECTOR-DIM": {
+      "category": "AI Security",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/tools/qdrant_search.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_hunter_contracts.py"
+      ]
+    },
+    "SIEM-CONFIG-CONTRACT": {
+      "category": "SIEM Federation",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/tools/nexus_config.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_siem_config.py"
+      ]
+    },
+    "SIEM-COUNTERPART-DISPROOF": {
+      "category": "SIEM Federation",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/review_board.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_siem_review_board.py"
+      ]
+    },
+    "SIEM-E2E": {
+      "category": "SIEM Federation",
+      "components": [],
+      "evidence_files": [
+        "tests/lab_siem_federation/test_siem_federation_e2e.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_siem_federation/test_siem_federation_e2e.py"
+      ]
+    },
+    "SIEM-TOOL-GUARD": {
+      "category": "SIEM Federation",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/tools/siem_query.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_analytics_hunter/test_siem_query.py"
+      ]
     }
   },
   "http_endpoints": {
@@ -625,6 +1522,307 @@
       ],
       "service": "core_ingress"
     }
+  },
+  "infrastructure": {
+    "ansible_roles": [
+      "bare_metal_base",
+      "common_hardening",
+      "det_chamber_linux",
+      "det_chamber_sandbox",
+      "gpu_inference",
+      "haproxy_node",
+      "internal_networking",
+      "looking_glass",
+      "memory_worker",
+      "minio_node",
+      "nats_node",
+      "nexus_hunter",
+      "observability_node",
+      "opencti_node",
+      "podman_setup",
+      "qdrant_node",
+      "redis_node",
+      "rust_ingress",
+      "rust_podman_worker",
+      "ti_ingest_worker"
+    ],
+    "config_files": [
+      "infrastructure/ansible/ansible.cfg",
+      "infrastructure/ansible/roles/common_hardening/templates/sshd_hardening.conf.j2",
+      "infrastructure/ansible/roles/common_hardening/templates/sysctl_hardening.conf.j2",
+      "infrastructure/ansible/roles/nats_node/templates/nats-server-bare-metal.conf.j2",
+      "infrastructure/ansible/roles/nats_node/templates/nats-server.conf.j2",
+      "infrastructure/ansible/roles/opencti_node/files/rabbitmq.conf",
+      "infrastructure/ansible/roles/redis_node/templates/redis.conf.j2",
+      "infrastructure/ansible/roles/redis_node/templates/sentinel.conf.j2",
+      "infrastructure/haproxy/haproxy.cfg",
+      "infrastructure/haproxy/haproxy.cfg.j2",
+      "infrastructure/nats/nats-server.conf",
+      "infrastructure/redis/redis.conf.j2",
+      "infrastructure/redis/sentinel.conf.j2"
+    ],
+    "terraform_resources": [
+      [
+        "aws_cloudwatch_event_rule",
+        "guardduty_auto_respond"
+      ],
+      [
+        "aws_cloudwatch_event_target",
+        "guardduty_lambda"
+      ],
+      [
+        "aws_cloudwatch_log_group",
+        "block_ip"
+      ],
+      [
+        "aws_cloudwatch_log_group",
+        "isolate"
+      ],
+      [
+        "aws_iam_instance_profile",
+        "worker_profile"
+      ],
+      [
+        "aws_iam_policy",
+        "lambda_containment"
+      ],
+      [
+        "aws_iam_policy",
+        "s3_archive_policy"
+      ],
+      [
+        "aws_iam_role",
+        "lambda_containment"
+      ],
+      [
+        "aws_iam_role",
+        "worker_role"
+      ],
+      [
+        "aws_iam_role_policy_attachment",
+        "lambda_containment"
+      ],
+      [
+        "aws_iam_role_policy_attachment",
+        "worker_s3_attach"
+      ],
+      [
+        "aws_instance",
+        "analytics_nodes"
+      ],
+      [
+        "aws_instance",
+        "ingress_nodes"
+      ],
+      [
+        "aws_instance",
+        "management_node"
+      ],
+      [
+        "aws_instance",
+        "nats_nodes"
+      ],
+      [
+        "aws_instance",
+        "qdrant_nodes"
+      ],
+      [
+        "aws_instance",
+        "redis_nodes"
+      ],
+      [
+        "aws_instance",
+        "worker_nodes"
+      ],
+      [
+        "aws_key_pair",
+        "nexus_admin"
+      ],
+      [
+        "aws_kms_key",
+        "eks_secrets"
+      ],
+      [
+        "aws_kms_key",
+        "memory_evidence"
+      ],
+      [
+        "aws_kms_key",
+        "quarantine"
+      ],
+      [
+        "aws_lambda_function",
+        "aws_block_ip"
+      ],
+      [
+        "aws_lambda_function",
+        "aws_isolate"
+      ],
+      [
+        "aws_lambda_function_url",
+        "aws_block_ip"
+      ],
+      [
+        "aws_lambda_function_url",
+        "aws_isolate"
+      ],
+      [
+        "aws_lambda_permission",
+        "allow_eventbridge_isolate"
+      ],
+      [
+        "aws_security_group",
+        "external_ingress"
+      ],
+      [
+        "aws_security_group",
+        "internal_mesh"
+      ],
+      [
+        "aws_ssm_parameter",
+        "hmac_secret"
+      ],
+      [
+        "aws_ssm_parameter",
+        "n8n_callback_url"
+      ],
+      [
+        "azurerm_automation_account",
+        "nexus"
+      ],
+      [
+        "azurerm_automation_runbook",
+        "nsg_isolation"
+      ],
+      [
+        "azurerm_automation_webhook",
+        "nsg_isolation"
+      ],
+      [
+        "azurerm_resource_group",
+        "containment"
+      ],
+      [
+        "azurerm_resource_group",
+        "evidence"
+      ],
+      [
+        "azurerm_role_assignment",
+        "automation_network_contributor"
+      ],
+      [
+        "azurerm_storage_account",
+        "evidence"
+      ],
+      [
+        "azurerm_storage_container",
+        "evidence"
+      ],
+      [
+        "azurerm_storage_container_immutability_policy",
+        "evidence"
+      ],
+      [
+        "google_cloudfunctions_function",
+        "gcp_isolate"
+      ],
+      [
+        "google_cloudfunctions_function_iam_member",
+        "invoker"
+      ],
+      [
+        "google_project_iam_member",
+        "containment_compute_admin"
+      ],
+      [
+        "google_service_account",
+        "containment"
+      ],
+      [
+        "google_storage_bucket",
+        "evidence"
+      ],
+      [
+        "google_storage_bucket",
+        "function_source"
+      ],
+      [
+        "google_storage_bucket_object",
+        "function_source"
+      ],
+      [
+        "hyperv_vhd",
+        "cuckoo_vhd"
+      ],
+      [
+        "hyperv_vhd",
+        "detchamber_windows_sandbox_vhd"
+      ],
+      [
+        "hyperv_vm_instance",
+        "cuckoo_vm"
+      ],
+      [
+        "hyperv_vm_instance",
+        "detchamber_windows_sandbox_vm"
+      ],
+      [
+        "libvirt_domain",
+        "linux_sandbox"
+      ],
+      [
+        "libvirt_network",
+        "detchamber_isolated"
+      ],
+      [
+        "libvirt_volume",
+        "linux_sandbox"
+      ],
+      [
+        "vsphere_folder",
+        "nexus_folder"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "analytics_node"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "cuckoo_vm"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "detchamber_windows_sandbox_vm"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "ingress_nodes"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "management_node"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "nats_nodes"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "qdrant_nodes"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "redis_nodes"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "storage_node"
+      ],
+      [
+        "vsphere_virtual_machine",
+        "worker_nodes"
+      ]
+    ]
   },
   "pipelines": {
     "deploy": [
@@ -813,6 +2011,12 @@
       "tools.query_cookbook",
       "tools.siem_cookbook"
     ],
+    "analytics/llm_hunter/agents/containment_protocol.py": [
+      "agents.containment_capability",
+      "agents.lateral_movement",
+      "agents.playbook_planner",
+      "agents.target_class"
+    ],
     "analytics/llm_hunter/agents/energy_accounting.py": [
       "agents.controls"
     ],
@@ -847,6 +2051,7 @@
     ],
     "analytics/llm_hunter/agents/response.py": [
       "agents.active_learning",
+      "agents.containment_protocol",
       "agents.controls",
       "agents.energy_accounting",
       "agents.llm_providers",
@@ -867,6 +2072,9 @@
       "agents.llm_providers",
       "state",
       "tools.nexus_config"
+    ],
+    "analytics/llm_hunter/agents/target_class.py": [
+      "agents.lateral_movement"
     ],
     "analytics/llm_hunter/agents/verdict_ledger.py": [
       "agents.controls"
@@ -1356,7 +2564,9 @@
       ]
     },
     "nexus.soar.execute": {
-      "consumers": [],
+      "consumers": [
+        "worker_soar"
+      ],
       "mentioned_by": [
         "llm_hunter_swarm",
         "nats_streams",
@@ -1370,7 +2580,9 @@
       ]
     },
     "nexus.telemetry": {
-      "consumers": [],
+      "consumers": [
+        "lib_siem_core"
+      ],
       "mentioned_by": [
         "lib_siem_core"
       ],
@@ -1386,7 +2598,9 @@
       "streams": []
     },
     "nexus.training.rlhf": {
-      "consumers": [],
+      "consumers": [
+        "worker_rlhf"
+      ],
       "mentioned_by": [
         "worker_rlhf"
       ],

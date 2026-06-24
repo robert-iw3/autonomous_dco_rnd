@@ -101,7 +101,7 @@ flowchart LR
     IMG[staged RAM image<br/>.aff4 / .raw / .lime / .dmp] --> RT{image format}
     RT -->|.aff4| MPF[MemProcFS]
     RT -->|raw/dmp/lime| VOL[Volatility 3]
-    MPF --> AN[existing analyzer<br/>Analyze-Memory{.ps1,-Linux.sh} --adjudicate]
+    MPF --> AN["existing analyzer<br/>Analyze-Memory .ps1 / -Linux.sh --adjudicate"]
     VOL --> AN
     AN --> FIND[Memory_Findings + _status.json]
     FIND --> ENR[nexus.memory.enrichment → swarm]
@@ -141,3 +141,34 @@ flowchart TD
 - Every host action is an **HMAC-signed task**; the agent runs only a fixed bundled playbook from an allowlist.
 - Eradication is **dry-run-journaled and reversible**; a verdict flip triggers `restore`.
 - Tamper-evident verdict lineage + chain-of-custody seal over the evidence manifest.
+
+## 7. Tailored containment protocol (cross-class)
+
+After the verdict, `build_containment_protocol` (analytics/llm_hunter/agents/containment_protocol.py)
+turns the confirmed-TP entities into a per-target, per-entity plan that closes the kill chain
+across target classes, not just the alerting host:
+
+- **Target classes.** Each entity resolves (target_class.py) to a class + environment:
+  endpoint (windows/linux), cloud_instance (aws/azure/gcp), container (k8s), identity
+  (entra/iam/gcp/local), network (cloud SG / on-prem). The host artifacts (pid/hash/file) ride
+  along as eradication params on the host they live on.
+- **Capability contract.** Every step is chosen from operations/infra/capability_matrix.toml, so
+  the planner only ever emits actions an executor can actually run. A (class, environment) with no
+  entry is escalated, never silently dropped.
+- **Tailored verbs.** isolate_host, collect_forensics, eradicate_process/persistence (endpoint);
+  snapshot_volume + isolate (SG) + revoke_instance_role (cloud instance); cordon_node /
+  quarantine_container / kill_pod (container); block_ip + dns_sinkhole (network);
+  disable_user + revoke_sessions (identity).
+- **Coverage gate.** The protocol marks `kill_chain_closed` only when every TP entity has an
+  executable step; anything uncovered is listed in `escalations` for an operator.
+- **Assurance gate ("beyond a shadow of doubt").** A step fires autonomously only when the
+  entity's certainty (malicious < corroborated < confirmed) meets the action's `certainty_floor`;
+  disruptive/destructive actions need corroboration or memory confirmation, else operator approval.
+- **Lateral unification.** Internal peers the host reached are contained in the same protocol
+  (operator-gated, fan-out-capped) rather than as separate incidents.
+- **Reversibility + idempotency.** Each step carries its rollback action (`reversible_by`) and a
+  per (incident, target, action) idempotency key; `build_rollback_protocol` reverses the plan on
+  an FP flip. The HitL breaker forces every step to operator approval rather than dropping the plan.
+
+worker_soar dispatches each step to its executor (signed agent task for endpoint playbooks;
+cloud lambda/function for cloud instances; the Identity/DNS/K8s n8n workflows for the rest).

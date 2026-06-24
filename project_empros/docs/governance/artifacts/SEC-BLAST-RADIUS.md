@@ -2,11 +2,11 @@
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-**Execution chain:** Logic → Effect → Execution
+**Execution chain:** Logic → Effect → Execution → Logic → Effect
 
 **1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
-`analytics/llm_hunter/state.py:L217-L247`
+`analytics/llm_hunter/state.py:L260-L290`
 
 ```python
 def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
@@ -55,10 +55,29 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L77-L79`
+`analytics/llm_hunter/agents/response.py:L78-L80`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
         if av >= 0.9:
             return True, f"Critical infrastructure targeted: {target} (AssetValue={av})"
+```
+
+**4. Logic** — Per-target assurance gate: a containment step fires autonomously only when the entity's certainty meets the action's floor; otherwise it is held for operator approval.
+
+`analytics/llm_hunter/agents/containment_protocol.py:L81-L82`
+
+```python
+    gate = "auto" if meets_floor(level, entry["certainty_floor"]) else "operator_approval"
+    return {
+```
+
+**5. Effect** — Lateral spread is bounded: peers beyond the fan-out cap are escalated to an operator instead of being auto-contained, capping campaign-wide blast radius.
+
+`analytics/llm_hunter/agents/containment_protocol.py:L198-L200`
+
+```python
+            lateral_targets.append(peer)
+        if fan["escalate"]:
+            escalations.append(f"lateral fan-out exceeds cap: {len(fan['overflow'])} more "
 ```

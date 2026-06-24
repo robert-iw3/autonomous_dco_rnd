@@ -54,7 +54,7 @@ AI_PROVENANCE_BANNER = (
 
 **3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
 
-`analytics/llm_hunter/agents/response.py:L140-L142`
+`analytics/llm_hunter/agents/response.py:L141-L143`
 
 ```python
                     # NIST GV-1.3-005: timestamp so the supervisor's recall can

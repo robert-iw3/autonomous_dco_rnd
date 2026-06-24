@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""gen_code_graph.py — generate the codebase dependency/link graph.
+"""gen_code_graph.py - generate the codebase dependency/link graph.
 
 Scans project_empros and emits, from source (so it never drifts):
-  * code_graph.json — machine-readable nodes + edges (fast lookup / jq)
-  * CODE_GRAPH.md    — human guide: the NATS subject bus (the system's nervous
+  * code_graph.json - machine-readable nodes + edges (fast lookup / jq)
+  * CODE_GRAPH.md    - human guide: the NATS subject bus (the system's nervous
                        system, cross-language), a component index, and Python imports.
 
 The rad view here is the NATS subject graph: who PUBLISHES and who CONSUMES each
-subject across Python + Rust services — the fastest way to trace a logic flow.
+subject across Python + Rust services - the fastest way to trace a logic flow.
 Constants (e.g. `ei.INTAKE_SUBJECT`) are resolved; config/default-driven subjects
 that aren't pub/sub literals are still captured as `mentioned_by` so no edge is lost.
 
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent
 GRAPH_JSON = ROOT / "code_graph.json"
 GRAPH_MD = ROOT / "CODE_GRAPH.md"
 
-# path-prefix → (component, language). Most specific first.
+# path-prefix -> (component, language). Most specific first.
 _COMPONENTS = [
     ("analytics/llm_hunter", "llm_hunter_swarm", "python"),
     ("services/core_ingress", "core_ingress", "rust"),
@@ -75,8 +75,8 @@ def _clean_arg(arg: str) -> str:
     return arg.strip().strip('"').split('"')[0].strip()
 
 
-def subject_edges(text: str, consts: dict) -> list:
-    """(subject, role) for explicit pub/sub calls; role ∈ {publish, subscribe}.
+def subject_edges(text: str, consts: dict()) -> list:
+    """(subject, role) for explicit pub/sub calls; role in {publish, subscribe}.
     Resolves a constant arg (bare or module-qualified) via `consts`."""
     edges = []
     for m in _PUBSUB.finditer(text):
@@ -103,12 +103,12 @@ def stream_defs(text: str) -> list:
     return out
 
 
-# Named single-purpose Ansible roles → the runtime component they deploy.
+# Named single-purpose Ansible roles -> the runtime component they deploy.
 _ROLE_COMPONENT = {
     "memory_worker": "worker_memory", "ti_ingest_worker": "worker_ti_ingest",
     "nexus_hunter": "llm_hunter_swarm", "rust_ingress": "core_ingress",
 }
-# Stores (S3 buckets / Qdrant collections) → tokens that mark a component touching them.
+# Stores (S3 buckets / Qdrant collections) -> tokens that mark a component touching them.
 _STORES = {
     "s3_cold_archive":     ("s3", ["nexus-cold-archive", "S3_BUCKET_NAME", '"telemetry/']),
     "s3_quarantine":       ("s3", ["nexus-quarantine"]),
@@ -158,7 +158,7 @@ def section_for(rel: str, triggers) -> str:
 
 
 def ansible_deploy(site_text: str) -> dict:
-    """component → {role, host} from site.yml (worker fleet worker_name + named roles)."""
+    """component -> {role, host} from site.yml (worker fleet worker_name + named roles)."""
     out, host = {}, ""
     for line in site_text.splitlines():
         h = re.match(r'\s*hosts:\s*([^\s#]+)', line)
@@ -184,11 +184,11 @@ def http_calls(text: str) -> set:
 
 
 def _first_purpose(text: str) -> str:
-    """First comment / docstring line — a numbered script's one-line purpose."""
+    """First comment / docstring line - a numbered script's one-line purpose."""
     in_doc = False
     for line in text.splitlines():
         s = line.strip()
-        if not s or s.startswith(("#!", "import ", "from ", "set -", "export ", "source ")):
+        if not s or s.startswith(("#!", "import ", "from ", "set() -", "export ", "source ")):
             continue
         if in_doc:
             return s.strip('"\' ')[:90]
@@ -205,7 +205,7 @@ def _first_purpose(text: str) -> str:
 
 
 def pipeline_stages(entries) -> list:
-    """entries: [(rel, text)] of a numbered-script dir → ordered [id, name, purpose]."""
+    """entries: [(rel, text)] of a numbered-script dir -> ordered [id, name, purpose]."""
     out = []
     for rel, text in entries:
         m = re.match(r'(\d+[a-z]?)[_-]([a-z0-9_-]+)\.(?:sh|py)$', rel.rsplit("/", 1)[-1])
@@ -214,11 +214,68 @@ def pipeline_stages(entries) -> list:
     return sorted(out, key=lambda s: (int(re.match(r'\d+', s[0]).group()), s[0]))
 
 
+# -- CG-2: Rust crate deps, GRC controls, infra inventory, config-driven subjects --
+_CONFIG_SUBJECT = re.compile(r'\bsubject:\s*"((?:nexus|middleware)\.[a-zA-Z0-9_.*>]+)"')
+_TF_RESOURCE = re.compile(r'resource\s+"([a-z_]+)"\s+"([a-z0-9_]+)"')
+
+
+def workspace_members(cargo_text: str) -> list:
+    """Internal crate paths from a workspace Cargo.toml `members = [...]`."""
+    m = re.search(r'members\s*=\s*\[(.*?)\]', cargo_text, re.S)
+    return re.findall(r'"([^"]+)"', m.group(1)) if m else []
+
+
+def cargo_deps(cargo_text: str) -> list:
+    """Dependency crate names from a crate Cargo.toml `[dependencies]` table."""
+    deps, inside = [], False
+    for line in cargo_text.splitlines():
+        s = line.strip()
+        if s.startswith("["):
+            inside = s.startswith("[dependencies]")
+            continue
+        if inside:
+            d = re.match(r'([a-zA-Z0-9_-]+)\s*=', s)
+            if d:
+                deps.append(d.group(1))
+    return deps
+
+
+def config_subjects(text: str) -> list:
+    """Subjects consumed via a durable-worker config field `subject: "nexus..."`."""
+    return _CONFIG_SUBJECT.findall(text)
+
+
+def tf_resources(text: str) -> list:
+    """(type, name) Terraform resources declared in a .tf file."""
+    return _TF_RESOURCE.findall(text)
+
+
+def load_controls(manifest_text: str, evidence_text: str) -> dict:
+    """control_id -> {status, category, components, tests, evidence_files} (GRC join)."""
+    import yaml
+    man = yaml.safe_load(manifest_text) or {}
+    evi = (yaml.safe_load(evidence_text) or {}).get("evidence", {}) or {}
+    out = {}
+    for c in man.get("controls", []):
+        impl = c.get("implementation") or []
+        impl = [impl] if isinstance(impl, str) else impl
+        ev_files = [e["file"] for e in (evi.get(c["id"]) or [])
+                    if isinstance(e, dict) and e.get("file")]
+        comps = sorted({component_of(f)[0] for f in (impl + ev_files)
+                        if f and component_of(f)[0]})
+        tests = c.get("tests") or []
+        tests = [tests] if isinstance(tests, str) else tests
+        out[c["id"]] = {"status": c.get("status", ""), "category": c.get("category", ""),
+                        "components": comps, "tests": list(tests),
+                        "evidence_files": sorted(set(ev_files))}
+    return out
+
+
 def python_local_imports(src: str) -> set:
     """Intra-repo top-level modules imported by a Python file."""
     found = set()
     try:
-        with warnings.catch_warnings():   # scanning is not linting — stay quiet
+        with warnings.catch_warnings():   # scanning is not linting - stay quiet
             warnings.simplefilter("ignore")
             tree = ast.parse(src)
     except SyntaxError:
@@ -247,19 +304,19 @@ def _iter_source_files():
 
 
 def build_graph() -> dict:
-    components: dict = {}
-    subjects: dict = {}
-    imports: dict = {}
-    streams: dict = {}
+    components: dict() = {}
+    subjects: dict() = {}
+    imports: dict() = {}
+    streams: dict() = {}
 
-    comp_text: dict = {}
-    http_endpoints: dict = {}
+    comp_text: dict() = {}
+    http_endpoints: dict() = {}
 
     def comp(name, lang):
         return components.setdefault(name, {
             "language": lang, "paths": [], "publishes": set(), "subscribes": set(),
-            "mentions": set(), "serves": set(), "calls": set(),
-            "deploy": {}, "dockerfile": "", "test_section": ""})
+            "mentions": set(), "serves": set(), "calls": set(), "rust_deps": set(),
+            "controls": set(), "deploy": {}, "dockerfile": "", "test_section": ""})
 
     def subj(s):
         return subjects.setdefault(s, {"producers": set(), "consumers": set(),
@@ -268,7 +325,7 @@ def build_graph() -> dict:
     # Pass 1: read every file once; build a global subject-constant map so a
     # cross-module ref (e.g. `ei.INTAKE_SUBJECT`) resolves to a real edge.
     files = [(rel, path, path.read_text(errors="replace")) for rel, path in _iter_source_files()]
-    global_consts: dict = {}
+    global_consts: dict() = {}
     for _rel, _p, text in files:
         global_consts.update(subject_constants(text))
 
@@ -290,6 +347,8 @@ def build_graph() -> dict:
                 c["publishes"].add(s); node["producers"].add(name)
             else:
                 c["subscribes"].add(s); node["consumers"].add(name)
+        for s in config_subjects(text):          # durable-worker config `subject: "..."`
+            c["subscribes"].add(s); subj(s)["consumers"].add(name)
         for s in _SUBJECT.findall(text):
             subj(s)["mentioned_by"].add(name); c["mentions"].add(s)
         comp_text[name] = comp_text.get(name, "") + "\n" + text
@@ -305,15 +364,15 @@ def build_graph() -> dict:
 
     # -- deploy / build / test wiring per component ---------------------------
     site = ROOT / "infrastructure/ansible/site.yml"
-    deploy = ansible_deploy(site.read_text(errors="replace")) if site.exists() else {}
+    deploy = ansible_deploy(site.read_text(errors="replace")) if site.exists else {}
     rt = ROOT / "tests/run_tests.sh"
-    _secs, triggers = parse_sections(rt.read_text(errors="replace")) if rt.exists() else ({}, [])
+    _secs, triggers = parse_sections(rt.read_text(errors="replace")) if rt.exists else ({}, [])
     for name, c in components.items():
         c["deploy"] = deploy.get(name, {})
         c["test_section"] = section_for(c["paths"][0], triggers) if c["paths"] else ""
         df = ROOT / (c["paths"][0].split("/", 2)[0] + "/" + c["paths"][0].split("/")[1] + "/Dockerfile") \
             if c["paths"] and "/" in c["paths"][0] else None
-        c["dockerfile"] = df.relative_to(ROOT).as_posix() if df and df.exists() else ""
+        c["dockerfile"] = df.relative_to(ROOT).as_posix() if df and df.exists else ""
 
     # -- HTTP endpoint callers ------------------------------------------------
     for path_, ep in http_endpoints.items():
@@ -322,7 +381,7 @@ def build_graph() -> dict:
                 ep["callers"].add(cname)
 
     # -- stores (S3 / Qdrant) touched by each component -----------------------
-    stores: dict = {}
+    stores: dict() = {}
     for sid, (kind, tokens) in _STORES.items():
         touched = sorted(n for n, t in comp_text.items() if any(tok in t for tok in tokens))
         stores[sid] = {"kind": kind, "touched_by": touched}
@@ -334,6 +393,58 @@ def build_graph() -> dict:
         "deploy": pipeline_stages(_stage_entries("orchestration/scripts/")),
         "mlops": pipeline_stages(_stage_entries("mlops/scripts/")),
     }
+
+    # -- Rust internal crate-dep edges (CG-2a) --------------------------------
+    crate_component = {}    # internal crate name -> component
+    for cargo in (ROOT / "Cargo.toml", ROOT / "middleware/Cargo.toml"):
+        if cargo.exists:
+            for member in workspace_members(cargo.read_text(errors="replace")):
+                cname = member.rstrip("/").rsplit("/", 1)[-1]
+                comp_name = component_of(member + "/")[0]
+                crate_component[cname] = comp_name or cname
+    for p in sorted(ROOT.rglob("Cargo.toml")):
+        if any(part in _SKIP for part in p.relative_to(ROOT).parts):
+            continue
+        rel = p.relative_to(ROOT).as_posix()
+        cname = component_of(rel)[0] or ("middleware" if rel.startswith("middleware") else None)
+        if cname not in components:
+            continue
+        for dep in cargo_deps(p.read_text(errors="replace")):
+            if dep in crate_component and crate_component[dep] != cname:
+                components[cname]["rust_deps"].add(crate_component[dep])
+
+    # -- GRC controls join: control -> components + tests (CG-2b) --------------
+    man = ROOT / "docs/governance/controls_manifest.yaml"
+    evm = ROOT / "docs/governance/evidence_map.yaml"
+    controls = load_controls(man.read_text(errors="replace"),
+                             evm.read_text(errors="replace")) if man.exists and evm.exists else {}
+    for cid, info in controls.items():
+        for cn in info["components"]:
+            if cn in components:
+                components[cn]["controls"].add(cid)
+
+    # -- infrastructure inventory (CG-2c) -------------------------------------
+    tf = sorted({(t, n) for p in ROOT.rglob("*.tf")
+                 if not any(x in p.relative_to(ROOT).parts for x in _SKIP)
+                 for t, n in tf_resources(p.read_text(errors="replace"))})
+    roles_dir = ROOT / "infrastructure/ansible/roles"
+    roles = sorted(d.name for d in roles_dir.iterdir() if d.is_dir()) if roles_dir.exists else []
+    cfg_globs = ("*.conf", "*.conf.j2", "*.cfg", "*.cfg.j2")
+    configs = sorted({p.relative_to(ROOT).as_posix() for g in cfg_globs
+                      for p in (ROOT / "infrastructure").rglob(g)}) if (ROOT / "infrastructure").exists else []
+    infrastructure = {
+        "terraform_resources": [[t, n] for t, n in tf],
+        "ansible_roles": roles,
+        "config_files": configs,
+    }
+
+    # -- containment capability matrix: tailored actions per target class --
+    import tomllib
+    cap = ROOT / "operations/infra/capability_matrix.toml"
+    containment = sorted(
+        [e["target_class"], e["environment"], e["action"], e["executor"]]
+        for e in tomllib.loads(cap.read_text()).get("capability", [])
+    ) if cap.exists else []
 
     def _ser(d):
         out = {}
@@ -352,21 +463,32 @@ def build_graph() -> dict:
         "http_endpoints": {k: _ser(v) for k, v in sorted(http_endpoints.items())},
         "stores": {k: _ser(v) for k, v in sorted(stores.items())},
         "pipelines": pipelines,
+        "controls": {k: _ser(v) for k, v in sorted(controls.items())},
+        "infrastructure": infrastructure,
+        "containment": containment,
         "python_imports": dict(sorted(imports.items())),
     }
 
 
-def render_md(g: dict) -> str:
-    L = ["# Code Graph — how Sentinel Nexus is wired together", "",
+def render_md(g: dict()) -> str:
+    L = ["# Code Graph - how Sentinel Nexus is wired together", "",
          "> **Generated** from source by `gen_code_graph.py` (do not edit by hand; "
          "`--check` drift-guards it in CI). Machine-readable twin: `code_graph.json`.", "",
          "## How to use this", "",
          "Start a change by finding the **logic flow**, not the file. This repo is "
          "event-driven across Python + Rust, so the fastest trace is the **NATS subject "
-         "bus** below: pick the subject your change touches → see who *publishes* and who "
-         "*consumes* it → that is the call chain across services. The **component index** "
-         "then maps each service to its path, language, Dockerfile/test section, and the "
-         "subjects it speaks. `code_graph.json` is the same data for `jq`/grep.", "",
+         "bus** below: pick the subject your change touches -> see who *publishes* and who "
+         "*consumes* it -> that is the call chain across services. Then drill in:", "",
+         "- **Subjects** - every event, its producers/consumers/stream.",
+         "- **HTTP endpoints** - synchronous service<->caller edges (`/api/*`).",
+         "- **Stores** - which components read/write each S3 bucket / Qdrant collection.",
+         "- **Component index** - per service: build (Dockerfile), deploy (Ansible role @ "
+         "host), test section, Rust crate deps, and how many GRC controls it carries.",
+         "- **GRC controls** - control -> implementing components -> the tests that prove it.",
+         "- **Infrastructure inventory** - Ansible roles, Terraform resources, config files.",
+         "- **Pipelines** - the ordered `deploy` and `mlops` stages.",
+         "- **Python imports** - intra-repo call chains in the Python planes.", "",
+         "`code_graph.json` is the same data for `jq`/grep.", "",
          "## NATS subject bus (the nervous system)", "",
          "```mermaid", "flowchart LR"]
     # edges producer -->|subject| consumer
@@ -383,41 +505,65 @@ def render_md(g: dict) -> str:
     L += ["```", "", "## Subjects", "",
           "| Subject | Producers | Consumers | Stream | Also mentions |", "|---|---|---|---|---|"]
     for s, n in g["subjects"].items():
-        L.append(f"| `{s}` | {', '.join(n['producers']) or '—'} | "
-                 f"{', '.join(n['consumers']) or '—'} | {', '.join(n['streams']) or '—'} | "
-                 f"{', '.join(sorted(set(n['mentioned_by']) - set(n['producers']) - set(n['consumers']))) or '—'} |")
-    L += ["", "## HTTP endpoints (service ↔ caller)", "",
+        L.append(f"| `{s}` | {', '.join(n['producers']) or '-'} | "
+                 f"{', '.join(n['consumers']) or '-'} | {', '.join(n['streams']) or '-'} | "
+                 f"{', '.join(sorted(set(n['mentioned_by']) - set(n['producers']) - set(n['consumers']))) or '-'} |")
+    L += ["", "## HTTP endpoints (service <-> caller)", "",
           "| Endpoint | Service | Methods | Callers |", "|---|---|---|---|"]
     for path_, ep in g["http_endpoints"].items():
         L.append(f"| `{path_}` | {ep['service']} | {', '.join(ep['methods'])} | "
-                 f"{', '.join(ep['callers']) or '—'} |")
+                 f"{', '.join(ep['callers']) or '-'} |")
     L += ["", "## Stores (who touches each S3 bucket / Qdrant collection)", "",
           "| Store | Kind | Touched by |", "|---|---|---|"]
     for sid, st in g["stores"].items():
-        L.append(f"| `{sid}` | {st['kind']} | {', '.join(st['touched_by']) or '—'} |")
+        L.append(f"| `{sid}` | {st['kind']} | {', '.join(st['touched_by']) or '-'} |")
     L += ["", "## Component index", "",
           "Each component: language, how it's **built** (Dockerfile), **deployed** (Ansible "
           "role + host group), **tested** (run_tests.sh section), and the subjects it speaks.", "",
-          "| Component | Lang | Build | Deploy (role @ host) | Test section | Pub → Sub | Files |",
-          "|---|---|---|---|---|---|---|"]
+          "| Component | Lang | Build | Deploy (role @ host) | Test section | Pub -> Sub | Crate deps | Controls | Files |",
+          "|---|---|---|---|---|---|---|---|---|"]
     for name, c in g["components"].items():
         dep = c.get("deploy") or {}
-        deploy = f"{dep['role']} @ {dep['host']}" if dep else "—"
-        L.append(f"| **{name}** | {c['language']} | {c.get('dockerfile') or '—'} | {deploy} | "
-                 f"{c.get('test_section') or '—'} | {len(c['publishes'])}→{len(c['subscribes'])} | "
+        deploy = f"{dep['role']} @ {dep['host']}" if dep else "-"
+        L.append(f"| **{name}** | {c['language']} | {c.get('dockerfile') or '-'} | {deploy} | "
+                 f"{c.get('test_section') or '-'} | {len(c['publishes'])}->{len(c['subscribes'])} | "
+                 f"{', '.join(c.get('rust_deps') or []) or '-'} | {len(c.get('controls') or [])} | "
                  f"{len(c['paths'])} |")
+    L += ["", "## GRC controls -> components + tests", "",
+          "Joins the governance dossier into the graph: each control's implementing "
+          "components and the tests that prove it.", "",
+          "| Control | Status | Components | Tests |", "|---|---|---|---|"]
+    for cid, info in g["controls"].items():
+        L.append(f"| `{cid}` | {info['status']} | {', '.join(info['components']) or '-'} | "
+                 f"{', '.join(info['tests']) or '-'} |")
+    inf = g["infrastructure"]
+    L += ["", "## Infrastructure inventory", "",
+          f"**Ansible roles** ({len(inf['ansible_roles'])}): "
+          + ", ".join(f"`{r}`" for r in inf["ansible_roles"]), "",
+          f"**Terraform resources** ({len(inf['terraform_resources'])}):", "",
+          "| Type | Name |", "|---|---|"]
+    for t, n in inf["terraform_resources"]:
+        L.append(f"| `{t}` | {n} |")
+    L += ["", f"**Config files** ({len(inf['config_files'])}): "
+          + ", ".join(f"`{c}`" for c in inf["config_files"])]
+    L += ["", "## Containment capability matrix", "",
+          "Tailored containment actions the swarm may plan per target class + "
+          "environment - the contract that keeps the planner and executors in sync.", "",
+          "| Target class | Environment | Action | Executor |", "|---|---|---|---|"]
+    for tc_, env, action, executor in g.get("containment", []):
+        L.append(f"| {tc_} | {env} | `{action}` | {executor} |")
     L += ["", "## Pipelines (ordered stages)", "",
           "End-to-end flows run as numbered scripts: `deploy` (orchestration) and `mlops` "
-          "(train → eval → serve → RSI → benchmark).", ""]
+          "(train -> eval -> serve -> RSI -> benchmark).", ""]
     for pname, stages in g["pipelines"].items():
         L += [f"### {pname}", "", "| Stage | Script | Purpose |", "|---|---|---|"]
         for sid, sname, purpose in stages:
-            L.append(f"| {sid} | `{sname}` | {purpose or '—'} |")
+            L.append(f"| {sid} | `{sname}` | {purpose or '-'} |")
         L.append("")
     L += ["## Python intra-repo imports", "",
-          "Module → local modules it imports (call-chain within the Python planes).", ""]
+          "Module -> local modules it imports (call-chain within the Python planes).", ""]
     for mod, imps in g["python_imports"].items():
-        L.append(f"- `{mod}` → {', '.join(f'`{i}`' for i in imps)}")
+        L.append(f"- `{mod}` -> {', '.join(f'`{i}`' for i in imps)}")
     return "\n".join(L).rstrip() + "\n"
 
 
@@ -431,9 +577,9 @@ def main(argv) -> int:
     outputs = build_outputs()
     if "--check" in argv:
         stale = [p.name for p, exp in outputs.items()
-                 if (p.read_text() if p.exists() else "") != exp]
+                 if (p.read_text() if p.exists else "") != exp]
         if stale:
-            print(f"DRIFT: {stale} out of sync — run gen_code_graph.py", file=sys.stderr)
+            print(f"DRIFT: {stale} out of sync - run gen_code_graph.py", file=sys.stderr)
             return 1
         print("code graph in sync.")
         return 0

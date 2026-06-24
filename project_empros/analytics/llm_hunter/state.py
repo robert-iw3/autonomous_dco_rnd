@@ -26,12 +26,12 @@ FP_CONFIDENCE_GATE = float(os.getenv("NEXUS_FP_CONFIDENCE_GATE", "0.80"))
 
 # Maximum number of times the supervisor's deterministic thoroughness gate may
 # reject a FINISH that left entities unresolved before escalating to manual
-# review (prevents an infinite supervisor↔expert ping-pong on a stuck entity).
+# review (prevents an infinite supervisor<->expert ping-pong on a stuck entity).
 MAX_GATE_OVERRIDES = int(os.getenv("NEXUS_MAX_GATE_OVERRIDES", "2"))
 
 def route_for_source_type(source_type: str) -> str:
     """
-    Deterministic source_type → expert routing. Single source of truth shared by
+    Deterministic source_type -> expert routing. Single source of truth shared by
     the orchestrator's first-hop route and the supervisor's thoroughness-gate
     re-route (importing the orchestrator from an agent would be circular).
     """
@@ -43,7 +43,7 @@ def route_for_source_type(source_type: str) -> str:
     if source_type == "suricata_eve" or "c2" in source_type:
         return "net_expert"
     # Endpoint sensors: sysmon_sensor, windows_deepsensor, linux_sentinel,
-    # macos_sensor, trellix_ens → host_expert
+    # macos_sensor, trellix_ens -> host_expert
     return "host_expert"
 
 # --- Alert Schema (Strictly Typed) ---------------------------------
@@ -55,7 +55,7 @@ class UnifiedAlertSchema(BaseModel):
     # isolation-forest source emitted by worker_qdrant when no finer space is set.
     # NOTE: source_type must match what worker_qdrant writes to Qdrant payload
     # (source_type field set in transmit_batch). Any omission here causes the
-    # orchestrator to term() those alerts as validation errors -- permanently dropped.
+    # orchestrator to term those alerts as validation errors -- permanently dropped.
     source_type: Literal[
         # Endpoint -- Windows
         'sysmon_sensor',        # Sysmon driver (windows_math 6D)
@@ -100,6 +100,42 @@ ALLOWED_RESPONSE_ACTIONS = frozenset({
 })
 
 
+# --- Tailored Containment Protocol --------------------------
+# The swarm synthesizes a per-target, per-entity containment protocol that closes
+# the kill chain across every target class (endpoint/cloud/container/identity/
+# network/saas/datastore) instead of a single host action. Each step is chosen
+# from the Containment Capability Contract (operations/infra/capability_matrix.toml)
+# so it is always executable + reversible, or the entity is escalated.
+class ContainmentStep(BaseModel):
+    """One tailored containment action for one confirmed-TP target."""
+    target: str
+    target_class: str
+    environment: str = ""
+    action: str
+    executor: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+    kill_chain_stage: str = ""            # MITRE tactic this step closes
+    wave: int = Field(default=1, ge=1, le=2)   # 1 contain+collect - 2 eradicate
+    certainty: float = Field(default=0.0, ge=0.0, le=1.0)
+    certainty_level: str = "malicious"    # malicious | corroborated | confirmed
+    reversible_by: str = ""               # rollback action on an FP-flip
+    gate: Literal["auto", "operator_approval"] = "operator_approval"
+    lateral: bool = False                 # a suspected lateral-spread peer, not the epicenter
+    idempotency_key: str = ""             # per (incident, target, action) replay guard
+
+
+class ContainmentProtocol(BaseModel):
+    """The tailored containment playbook for an incident - every confirmed-TP
+    entity/tactic is either contained by an executable, reversible step at/above
+    its certainty floor, or surfaced in `escalations` for an operator."""
+    incident_id: str
+    generated_at: float = 0.0
+    steps: List[ContainmentStep] = Field(default_factory=list)
+    coverage: Dict[str, Any] = Field(default_factory=dict)
+    escalations: List[str] = Field(default_factory=list)
+    kill_chain_closed: bool = False
+
+
 class SoarExecutionSchema(BaseModel):
     """
     OWASP LLM07 & LLM08: Restricts the LLM's agency to a mathematically verifiable
@@ -141,11 +177,18 @@ class SoarExecutionSchema(BaseModel):
     reason: constr(max_length=200) = Field(description="Brief justification for the audit log.")
 
     # --- On-host playbook initiation (DC-N11) ----------------------------------
-    # The ordered host IR playbooks to initiate for this verdict (each → a fixed
+    # The ordered host IR playbooks to initiate for this verdict (each -> a fixed
     # bundled playbook the on-host agent runs). Empty for cloud/network targets and
     # non-contain verdicts. os_family selects .sh vs .ps1; the typed IOC lists are
     # the NEXUS_* params the playbooks consume (response_executor.build_env).
     os_family: Optional[Literal["windows", "linux"]] = None
+    # Generalized target descriptor. os_family stays for on-host playbook
+    # selection; environment/target_class drive cross-class executor routing.
+    environment: Optional[str] = None
+    target_class: Optional[str] = None
+    # The tailored cross-class containment protocol (worker_soar dispatches each
+    # step to its executor). Empty => legacy single action_type + response_actions.
+    containment_steps: List[ContainmentStep] = Field(default_factory=list, max_length=64)
     response_actions: List[str] = Field(default_factory=list, max_length=8)
     c2_ips: List[str] = Field(default_factory=list, max_length=64)
     c2_domains: List[str] = Field(default_factory=list, max_length=64)
@@ -167,7 +210,7 @@ class SoarExecutionSchema(BaseModel):
         # defense in depth: a poisoned/unknown action can never reach the agent.
         return [a for a in v if a in ALLOWED_RESPONSE_ACTIONS]
 
-# --- Live Acquisition Request (host_expert → Det Chamber) ----------
+# --- Live Acquisition Request (host_expert -> Det Chamber) ----------
 class AcquisitionRequestSchema(BaseModel):
     """The validated request the host_expert's acquire_and_detonate tool emits on
     nexus.acquire.request. First-line path safety lives here (the deterministic

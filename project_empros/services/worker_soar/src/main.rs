@@ -142,6 +142,37 @@ struct ContainmentPayload {
     #[serde(default)] hashes: Vec<String>,
     #[serde(default)] file_paths: Vec<String>,
     #[serde(default)] mgmt_ips: Vec<String>,
+    /// Tailored cross-class containment protocol. When non-empty, worker_soar
+    /// dispatches each step to its executor instead of the single action_type:
+    /// agent_task steps are signed + enqueued; provider steps (cloud/idp/dns/k8s/
+    /// firewall) render their provider action body. operator_approval steps are
+    /// never auto-executed.
+    #[serde(default)] containment_steps: Vec<ContainmentStep>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct ContainmentStep {
+    target: String,
+    action: String,
+    #[serde(default)] target_class: String,
+    #[serde(default)] environment: String,
+    #[serde(default)] executor: String,
+    #[serde(default)] params: HashMap<String, Value>,
+    #[serde(default)] gate: String,
+    #[serde(default)] reversible_by: String,
+    #[serde(default)] idempotency_key: String,
+}
+
+impl ContainmentStep {
+    fn is_auto(&self) -> bool { self.gate == "auto" }
+    /// Pull a typed IOC list out of the step params (e.g. "pids", "c2_ips").
+    fn ioc(&self, key: &str) -> Vec<String> {
+        match self.params.get(key) {
+            Some(Value::Array(a)) => a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string)).collect(),
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -301,12 +332,55 @@ impl SiemAdapter for SoarAdapter {
 
             // -- 1. Build n8n ExecutionPlan --------------------------------
             let mut steps = Vec::new();
+            let protocol_mode = !payload.containment_steps.is_empty();
 
-            // Cloud source types bypass on-prem EDR/firewall and route to a
-            // cloud-specific provider (aws_containment_v1, azure_containment_v1,
-            // or gcp_containment_v1) whose endpoint is the Cloud_Containment n8n
-            // webhook or directly to the cloud provider API.
-            let active_provider_key = if let Some(cloud_provider) = self
+            // Tailored containment protocol: render each auto provider step
+            // (cloud / identity / dns / k8s / firewall) to its provider action.
+            // Agent-task steps and operator-gated steps are handled separately.
+            if protocol_mode {
+                let agent_exec = &self.containment_config.global.active_agent_executor;
+                for st in &payload.containment_steps {
+                    if !st.is_auto() || &st.executor == agent_exec {
+                        continue;
+                    }
+                    if let Some(provider) = self.containment_config.providers.get(&st.executor) {
+                        if let Some(schema) = provider.actions.get(&st.action) {
+                            let url = self.jinja_env
+                                .render_str(&schema.endpoint, context!(target => st.target.clone()))
+                                .unwrap_or_else(|_| schema.endpoint.clone());
+                            let raw_body = self.jinja_env
+                                .render_str(&schema.body_template, context!(
+                                    target => st.target.clone(),
+                                    incident_id => payload.incident_id.clone(),
+                                    environment => st.environment.clone(),
+                                    reason => payload.reason.clone()))
+                                .unwrap_or_else(|_| "{}".into());
+                            let mut resolved_headers = HashMap::new();
+                            for (k, v) in &schema.headers {
+                                let resolved = if v.starts_with("${") && v.ends_with('}') {
+                                    std::env::var(&v[2..v.len() - 1]).unwrap_or_else(|_| "UNRESOLVED_SECRET".into())
+                                } else {
+                                    v.clone()
+                                };
+                                resolved_headers.insert(k.clone(), resolved);
+                            }
+                            steps.push(ExecutionStep {
+                                step_name: st.action.clone(),
+                                method: schema.method.clone(),
+                                url,
+                                headers: resolved_headers,
+                                body: serde_json::from_str(&raw_body).unwrap_or(serde_json::json!({})),
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Legacy single-action provider dispatch. Disabled in protocol mode
+            // (an empty provider key resolves to no provider, so no double action).
+            let active_provider_key = if protocol_mode {
+                ""
+            } else if let Some(cloud_provider) = self
                 .containment_config
                 .cloud_routing
                 .provider_for(&payload.source_type)
@@ -371,7 +445,7 @@ impl SiemAdapter for SoarAdapter {
                 .cloud_routing
                 .provider_for(&payload.source_type)
                 .is_some();
-            if !is_cloud && !agent_exec.is_empty() && agent_task::is_response_action(&payload.action_type) {
+            if !protocol_mode && !is_cloud && !agent_exec.is_empty() && agent_task::is_response_action(&payload.action_type) {
                 match (std::env::var("NEXUS_TASK_SECRET"), &self.nats) {
                     (Ok(secret), Some(nats)) if !secret.is_empty() => {
                         let created = std::time::SystemTime::now()
@@ -431,6 +505,57 @@ impl SiemAdapter for SoarAdapter {
                 }
             }
 
+            // Protocol-mode agent tasks: sign one task per auto endpoint step,
+            // each carrying that step's typed IOC params (the on-host playbook reads
+            // the right IR_* values). Operator-gated steps are never auto-signed.
+            if protocol_mode && !agent_exec.is_empty() {
+                match (std::env::var("NEXUS_TASK_SECRET"), &self.nats) {
+                    (Ok(secret), Some(nats)) if !secret.is_empty() => {
+                        let created = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs() as i64)
+                            .unwrap_or(0);
+                        let empty: Vec<String> = Vec::new();
+                        for st in &payload.containment_steps {
+                            if st.executor != agent_exec || !st.is_auto()
+                                || !agent_task::is_response_action(&st.action) {
+                                continue;
+                            }
+                            let host = &st.target;
+                            // bind IOC lists so the returned params can borrow them
+                            let (c2_ips, c2_domains, pids) = (st.ioc("c2_ips"), st.ioc("c2_domains"), st.ioc("pids"));
+                            let (processes, hashes) = (st.ioc("processes"), st.ioc("hashes"));
+                            let (file_paths, mgmt_ips) = (st.ioc("file_paths"), st.ioc("mgmt_ips"));
+                            let (targets, params) = agent_task::action_targets_and_params(
+                                &st.action, host, &empty,
+                                &c2_ips, &c2_domains, &pids,
+                                &processes, &hashes, &file_paths, &mgmt_ips,
+                            );
+                            let task = agent_task::build_signed_task(
+                                &payload.incident_id, host, &st.environment,
+                                &st.action, targets, &params, created, secret.as_bytes(),
+                            );
+                            let body = serde_json::to_vec(&task).unwrap_or_default();
+                            match nats.publish("nexus.agent.tasks".to_string(), Bytes::from(body)).await {
+                                Ok(_) => {
+                                    counter!("nexus_soar_agent_tasks_enqueued_total").increment(1);
+                                    info!(incident = %payload.incident_id, host = %host,
+                                          action = %st.action, "protocol agent task signed + published");
+                                }
+                                Err(e) => {
+                                    error!(error = %e, host = %host, action = %st.action,
+                                           "failed to publish protocol agent task");
+                                    n8n_failures += 1;
+                                }
+                            }
+                        }
+                    }
+                    (Ok(secret), None) if !secret.is_empty() =>
+                        warn!("protocol agent steps present but no NATS client -- dropped"),
+                    _ => warn!("protocol agent steps present but NEXUS_TASK_SECRET unset -- skipped"),
+                }
+            }
+
             // n8n dispatch -- INSIDE the batch result path (not fire-and-forget)
             if !steps.is_empty() {
                 let plan = ExecutionPlan {
@@ -457,7 +582,11 @@ impl SiemAdapter for SoarAdapter {
             }
 
             // -- 2. Native API fallback (parallel per target) -------------
-            for target_ip in payload.targets {
+            // Skipped in protocol mode: the tailored steps above already dispatched
+            // each target to its correct executor, so this blunt per-target isolate
+            // would double-act.
+            let native_targets = if protocol_mode { Vec::new() } else { payload.targets };
+            for target_ip in native_targets {
                 let client = self.http_client.clone();
                 let edr_url = format!("{}/api/v1/isolate", self.edr_url);
                 let fw_url = format!("{}/api/v1/isolate", self.fw_url);

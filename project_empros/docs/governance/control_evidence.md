@@ -162,7 +162,7 @@ AI_PROVENANCE_BANNER = (
 
 **3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
 
-`analytics/llm_hunter/agents/response.py:L140-L142`
+`analytics/llm_hunter/agents/response.py:L141-L143`
 
 ```python
                     # NIST GV-1.3-005: timestamp so the supervisor's recall can
@@ -202,7 +202,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **2. Execution** — Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted.
 
-`analytics/llm_hunter/agents/response.py:L236-L238`
+`analytics/llm_hunter/agents/response.py:L237-L239`
 
 ```python
     # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
@@ -545,7 +545,7 @@ def run_bias_audit(records: List[Dict[str, Any]], dimension: str = "source_type"
 
 **1. Invocation** — Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L168-L178`
+`analytics/llm_hunter/agents/response.py:L169-L179`
 
 ```python
     try:
@@ -617,7 +617,7 @@ def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
 
 **1. Invocation** — Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L183-L187`
+`analytics/llm_hunter/agents/response.py:L184-L188`
 
 ```python
     try:
@@ -865,7 +865,7 @@ def record_reliance(verdict: dict, operator_action: str,
 
 **1. Invocation** — Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L194-L199`
+`analytics/llm_hunter/agents/response.py:L195-L200`
 
 ```python
         if grounding_violations:
@@ -941,11 +941,11 @@ def capture(verdict: dict, operator_disposition: Optional[str] = None,
 
 *Implementation: `analytics/llm_hunter/state.py`*
 
-**Execution chain:** Logic → Effect → Execution
+**Execution chain:** Logic → Effect → Execution → Logic → Effect
 
 **1. Logic** — Entity state is a monotonic, conflict-resolving state machine; GLOBAL_DO_NOT_PIVOT entities are dropped at merge and containment status only escalates.
 
-`analytics/llm_hunter/state.py:L217-L247`
+`analytics/llm_hunter/state.py:L260-L290`
 
 ```python
 def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
@@ -994,12 +994,31 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L77-L79`
+`analytics/llm_hunter/agents/response.py:L78-L80`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
         if av >= 0.9:
             return True, f"Critical infrastructure targeted: {target} (AssetValue={av})"
+```
+
+**4. Logic** — Per-target assurance gate: a containment step fires autonomously only when the entity's certainty meets the action's floor; otherwise it is held for operator approval.
+
+`analytics/llm_hunter/agents/containment_protocol.py:L81-L82`
+
+```python
+    gate = "auto" if meets_floor(level, entry["certainty_floor"]) else "operator_approval"
+    return {
+```
+
+**5. Effect** — Lateral spread is bounded: peers beyond the fan-out cap are escalated to an operator instead of being auto-contained, capping campaign-wide blast radius.
+
+`analytics/llm_hunter/agents/containment_protocol.py:L198-L200`
+
+```python
+            lateral_targets.append(peer)
+        if fan["escalate"]:
+            escalations.append(f"lateral fan-out exceeds cap: {len(fan['overflow'])} more "
 ```
 
 \newpage
@@ -1078,7 +1097,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
 
-`analytics/llm_hunter/agents/response.py:L337-L337`
+`analytics/llm_hunter/agents/response.py:L349-L349`
 
 ```python
     reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
@@ -1210,7 +1229,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
 
-`analytics/llm_hunter/agents/response.py:L216-L217`
+`analytics/llm_hunter/agents/response.py:L217-L218`
 
 ```python
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
@@ -1227,18 +1246,18 @@ def build_failover_chain(temperature: float = 0.0):
 
 **1. Logic** — Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute.
 
-`analytics/llm_hunter/agents/response.py:L354-L357`
+`analytics/llm_hunter/agents/response.py:L373-L376`
 
 ```python
-        "users": iocs["users"],
-        # Audit / idempotency extras (ignored by the schema, kept for the SOAR log):
+        "containment_escalations": protocol["escalations"],
+        "containment_coverage": protocol["coverage"],
         "idempotency_key": f"iso-{target}-{int(float(alert.get('timestamp', 0) or 0) // 900)}",
         "source_type": alert.get("source_type", ""),
 ```
 
 **2. Execution** — The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor.
 
-`services/worker_soar/src/main.rs:L283-L286`
+`services/worker_soar/src/main.rs:L314-L317`
 
 ```rust
                 let mut dedup = self.dedup.write().await;
@@ -1308,7 +1327,7 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **1. Logic** — SOAR actions must satisfy a strict Pydantic contract (enumerated action, blast-radius-capped validated targets).
 
-`analytics/llm_hunter/state.py:L103-L138`
+`analytics/llm_hunter/state.py:L139-L174`
 
 ```python
 class SoarExecutionSchema(BaseModel):
@@ -1370,7 +1389,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             targets=action.get("targets", []),
             confidence=float(action.get("confidence", 0.0)),
             reason=action.get("reason", "")[:200],
-            # On-host playbook initiation (DC-N11) — carried through to worker_soar,
+            # On-host playbook initiation (DC-N11) - carried through to worker_soar,
 ```
 
 \newpage

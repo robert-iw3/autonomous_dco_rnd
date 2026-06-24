@@ -208,6 +208,10 @@ evidence:
        caption: "In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation."}
     - {file: analytics/llm_hunter/agents/response.py, step: Execution, anchor: "if av >= 0.9", before: 1, after: 1,
        caption: "At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts."}
+    - {file: analytics/llm_hunter/agents/containment_protocol.py, step: Logic, anchor: "gate = \"auto\" if meets_floor", after: 1,
+       caption: "Per-target assurance gate: a containment step fires autonomously only when the entity's certainty meets the action's floor; otherwise it is held for operator approval."}
+    - {file: analytics/llm_hunter/agents/containment_protocol.py, step: Effect, anchor: "lateral fan-out exceeds cap", before: 2,
+       caption: "Lateral spread is bounded: peers beyond the fan-out cap are escalated to an operator instead of being auto-contained, capping campaign-wide blast radius."}
 
   SEC-FAILOVER:
     - {file: analytics/llm_hunter/agents/expert_base.py, step: Invocation, anchor: "build_failover_chain(temperature)", before: 0, after: 0,

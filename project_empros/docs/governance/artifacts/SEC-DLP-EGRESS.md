@@ -28,7 +28,7 @@
 
 **2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
 
-`analytics/llm_hunter/agents/response.py:L337-L337`
+`analytics/llm_hunter/agents/response.py:L349-L349`
 
 ```python
     reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]

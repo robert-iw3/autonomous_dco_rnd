@@ -1,0 +1,94 @@
+{
+  "name": "DNS_Containment",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dns-containment",
+        "responseMode": "lastNode",
+        "options": { "rawBody": true }
+      },
+      "id": "dns-webhook",
+      "name": "DNS Containment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the worker_soar DNS step and select the resolver/DNS-firewall API.\nconst body = $input.first().json.body || $input.first().json;\nconst env = (body.environment || 'onprem').toLowerCase();\nconst action = body.action || 'dns_sinkhole';\nconst urls = {\n  onprem: $env.DNS_RPZ_WEBHOOK_URL,\n  aws:    $env.AWS_DNS_FIREWALL_URL,\n  azure:  $env.AZURE_DNS_FIREWALL_URL,\n  gcp:    $env.GCP_DNS_POLICY_URL,\n};\nreturn [{ json: {\n  incident_id: body.incident_id || 'UNKNOWN',\n  environment: env,\n  target: body.target || '',\n  action: action,\n  api_url: urls[env] || urls.onprem,\n  api_body: JSON.stringify({ incident_id: body.incident_id, environment: env, domain: body.target, action, sinkhole_ip: $env.DNS_SINKHOLE_IP || '0.0.0.0' }),\n} }];"
+      },
+      "id": "build-request",
+      "name": "Build DNS Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.api_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Nexus-Signature", "value": "={{ $env.NEXUS_HMAC_SECRET }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.api_body }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "call-dns",
+      "name": "Call DNS API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [440, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build DNS Request').first().json;\nreturn [{ json: { incident_id: ctx.incident_id, target: ctx.target, environment: ctx.environment, action: ctx.action, status: 'CONTAINED', detail: JSON.stringify($input.first().json), timestamp: new Date().toISOString() } }];"
+      },
+      "id": "normalize-result",
+      "name": "Normalize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build DNS Request').first().json;\nreturn [{ json: { incident_id: ctx.incident_id, target: ctx.target, environment: ctx.environment, action: ctx.action, status: 'FAILED', detail: 'DNS API call failed: ' + JSON.stringify($input.first().json), timestamp: new Date().toISOString() } }];"
+      },
+      "id": "handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NATS_HTTP_URL }}/publish/nexus.soar.callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "signal-soar",
+      "name": "Signal SOAR via NATS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [880, 0],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "DNS Containment Webhook": { "main": [[{ "node": "Build DNS Request", "type": "main", "index": 0 }]] },
+    "Build DNS Request": { "main": [[{ "node": "Call DNS API", "type": "main", "index": 0 }]] },
+    "Call DNS API": {
+      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
+      "error": [[{ "node": "Handle Error", "type": "main", "index": 0 }]]
+    },
+    "Normalize Result": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] },
+    "Handle Error": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

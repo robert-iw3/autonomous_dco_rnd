@@ -20,8 +20,13 @@ active_agent_executor = "agent_task_v1"
 # SSH/WinRM playbook executor -- LEGACY fallback for hosts the platform can reach
 # inbound (managed jump-host); deprecated for outbound-only endpoints.
 active_playbook_executor = "ssh_playbook_v1"
+# Identity + DNS containment: disable accounts / revoke sessions across the
+# IdP that owns the credential, and sinkhole malicious C2 domains. Both route via
+# an n8n workflow that dispatches by `environment`.
+active_idp_provider = "idp_containment_v1"
+active_dns_provider = "dns_containment_v1"
 
-# ── Cloud Provider Routing ─────────────────────────────────────────────────────
+# -- Cloud Provider Routing -----------------------------------------------------
 # worker_soar checks source_type against this table to select the cloud provider.
 # Populated by Terraform outputs (operations/infra/terraform/containment/outputs.tf).
 # The n8n Cloud_Containment workflow handles the actual API dispatch.
@@ -58,7 +63,7 @@ active_azure_provider  = "azure_containment_v1"
 active_gcp_provider    = "gcp_containment_v1"
 active_vmware_provider = "vmware_containment_v1"
 
-# ── EDR Provider: Host Isolation ──
+# -- EDR Provider: Host Isolation --
 [providers.custom_edr_v1.actions.isolate_host]
 method = "POST"
 endpoint = "https://api.internal-edr.local/v2/devices/isolate"
@@ -78,7 +83,7 @@ body_template = """
 required_fields = ["target", "incident_id", "reason"]
 target_format = "ipv4"
 
-# ── EDR Provider: Release Isolation ──
+# -- EDR Provider: Release Isolation --
 [providers.custom_edr_v1.actions.release_host]
 method = "POST"
 endpoint = "https://api.internal-edr.local/v2/devices/release"
@@ -97,7 +102,7 @@ body_template = """
 required_fields = ["target", "incident_id"]
 target_format = "ipv4"
 
-# ── Firewall Provider: Block IP ──
+# -- Firewall Provider: Block IP --
 [providers.custom_fw_v1.actions.block_ip]
 method = "PUT"
 endpoint = "https://firewall.local/api/v1/objects/address/{{target}}"
@@ -117,7 +122,7 @@ body_template = """
 required_fields = ["target", "incident_id"]
 target_format = "ipv4"
 
-# ── Firewall Provider: Unblock IP ──
+# -- Firewall Provider: Unblock IP --
 [providers.custom_fw_v1.actions.unblock_ip]
 method = "DELETE"
 endpoint = "https://firewall.local/api/v1/objects/address/{{target}}"
@@ -353,10 +358,6 @@ timeout_seconds  = 30
 retryable        = false
 success_codes    = [200]
 body_template = """
-
-[providers.aws_containment_v1.actions.unblock_ip.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "incident_id": "{{incident_id}}",
   "target_ip":   "{{target}}",
@@ -364,6 +365,10 @@ target_format   = "ipv4"
   "source":      "worker_soar"
 }
 """
+
+[providers.aws_containment_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
 
 # ==============================================================================
 # Cloud Provider: Azure
@@ -397,16 +402,16 @@ timeout_seconds  = 120
 retryable        = false
 success_codes    = [200, 202]
 body_template = """
-
-[providers.azure_containment_v1.actions.release_host.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "IncidentId": "{{incident_id}}",
   "TargetIp":   "{{target}}",
   "Action":     "release"
 }
 """
+
+[providers.azure_containment_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
 
 [providers.azure_containment_v1.actions.block_ip]
 method           = "POST"
@@ -416,10 +421,6 @@ timeout_seconds  = 120
 retryable        = false
 success_codes    = [200, 202]
 body_template = """
-
-[providers.azure_containment_v1.actions.block_ip.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "IncidentId": "{{incident_id}}",
   "TargetIp":   "{{target}}",
@@ -427,6 +428,30 @@ target_format   = "ipv4"
   "BlockMode":  "ip_only"
 }
 """
+
+[providers.azure_containment_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+[providers.azure_containment_v1.actions.unblock_ip]
+method           = "POST"
+endpoint         = "${AZURE_NSG_WEBHOOK_URL}"
+headers          = { "Content-Type" = "application/json" }
+timeout_seconds  = 120
+retryable        = false
+success_codes    = [200, 202]
+body_template = """
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "release",
+  "BlockMode":  "ip_only"
+}
+"""
+
+[providers.azure_containment_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
 
 # ==============================================================================
 # Cloud Provider: GCP
@@ -460,16 +485,16 @@ timeout_seconds  = 60
 retryable        = false
 success_codes    = [200]
 body_template = """
-
-[providers.gcp_containment_v1.actions.release_host.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "incident_id": "{{incident_id}}",
   "target_ip":   "{{target}}",
   "action":      "release"
 }
 """
+
+[providers.gcp_containment_v1.actions.release_host.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
 
 [providers.gcp_containment_v1.actions.block_ip]
 method           = "POST"
@@ -479,16 +504,16 @@ timeout_seconds  = 60
 retryable        = false
 success_codes    = [200]
 body_template = """
-
-[providers.gcp_containment_v1.actions.block_ip.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "incident_id": "{{incident_id}}",
   "target_ip":   "{{target}}",
   "action":      "isolate"
 }
 """
+
+[providers.gcp_containment_v1.actions.block_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
 
 [providers.gcp_containment_v1.actions.unblock_ip]
 method           = "POST"
@@ -498,13 +523,326 @@ timeout_seconds  = 60
 retryable        = false
 success_codes    = [200]
 body_template = """
-
-[providers.gcp_containment_v1.actions.unblock_ip.validation]
-required_fields = ["target", "incident_id"]
-target_format   = "ipv4"
 {
   "incident_id": "{{incident_id}}",
   "target_ip":   "{{target}}",
   "action":      "release"
 }
 """
+
+[providers.gcp_containment_v1.actions.unblock_ip.validation]
+required_fields = ["target", "incident_id"]
+target_format   = "ipv4"
+
+# ==============================================================================
+# Identity Provider containment - disable the account / revoke active
+# sessions across the IdP that owns the credential (Entra ID, AWS IAM, GCP IAM,
+# on-prem AD). One n8n Identity_Containment workflow routes by `environment`;
+# reversible via enable_user on an FP-flip.
+# ==============================================================================
+[providers.idp_containment_v1.actions.disable_user]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/identity-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "environment": "{{environment}}",
+  "target":      "{{target}}",
+  "action":      "disable_user"
+}
+"""
+
+[providers.idp_containment_v1.actions.disable_user.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.idp_containment_v1.actions.revoke_sessions]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/identity-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "environment": "{{environment}}",
+  "target":      "{{target}}",
+  "action":      "revoke_sessions"
+}
+"""
+
+[providers.idp_containment_v1.actions.revoke_sessions.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.idp_containment_v1.actions.enable_user]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/identity-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "environment": "{{environment}}",
+  "target":      "{{target}}",
+  "action":      "enable_user"
+}
+"""
+
+[providers.idp_containment_v1.actions.enable_user.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+# ==============================================================================
+# DNS containment - sinkhole a malicious C2 domain at the resolver / cloud
+# DNS firewall. One n8n DNS_Containment workflow routes by `environment`;
+# reversible via unsinkhole on an FP-flip.
+# ==============================================================================
+[providers.dns_containment_v1.actions.dns_sinkhole]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/dns-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "environment": "{{environment}}",
+  "target":      "{{target}}",
+  "action":      "dns_sinkhole"
+}
+"""
+
+[providers.dns_containment_v1.actions.dns_sinkhole.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.dns_containment_v1.actions.unsinkhole]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/dns-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "environment": "{{environment}}",
+  "target":      "{{target}}",
+  "action":      "unsinkhole"
+}
+"""
+
+[providers.dns_containment_v1.actions.unsinkhole.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+# ==============================================================================
+# Cloud-native workload containment: evidence-first volume snapshot + IAM role
+# revocation for a compromised instance, dispatched through the existing cloud
+# providers (the n8n Cloud_Containment workflow routes by action).
+# ==============================================================================
+[providers.aws_containment_v1.actions.snapshot_volume]
+method = "POST"
+endpoint = "${AWS_ISOLATE_LAMBDA_URL}"
+headers = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds = 120
+retryable = true
+success_codes = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "snapshot_volume",
+  "source":      "worker_soar"
+}
+"""
+
+[providers.aws_containment_v1.actions.snapshot_volume.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.aws_containment_v1.actions.revoke_instance_role]
+method = "POST"
+endpoint = "${AWS_ISOLATE_LAMBDA_URL}"
+headers = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds = 60
+retryable = false
+success_codes = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "revoke_instance_role",
+  "source":      "worker_soar"
+}
+"""
+
+[providers.aws_containment_v1.actions.revoke_instance_role.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.azure_containment_v1.actions.snapshot_volume]
+method = "POST"
+endpoint = "${AZURE_NSG_WEBHOOK_URL}"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 120
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "snapshot_volume"
+}
+"""
+
+[providers.azure_containment_v1.actions.snapshot_volume.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.azure_containment_v1.actions.revoke_instance_role]
+method = "POST"
+endpoint = "${AZURE_NSG_WEBHOOK_URL}"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = false
+success_codes = [200, 202]
+body_template = """
+{
+  "IncidentId": "{{incident_id}}",
+  "TargetIp":   "{{target}}",
+  "Action":     "revoke_instance_role"
+}
+"""
+
+[providers.azure_containment_v1.actions.revoke_instance_role.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.gcp_containment_v1.actions.snapshot_volume]
+method = "POST"
+endpoint = "${GCP_ISOLATE_FUNCTION_URL}"
+headers = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds = 120
+retryable = true
+success_codes = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "snapshot_volume"
+}
+"""
+
+[providers.gcp_containment_v1.actions.snapshot_volume.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.gcp_containment_v1.actions.revoke_instance_role]
+method = "POST"
+endpoint = "${GCP_ISOLATE_FUNCTION_URL}"
+headers = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
+timeout_seconds = 60
+retryable = false
+success_codes = [200]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target_ip":   "{{target}}",
+  "action":      "revoke_instance_role"
+}
+"""
+
+[providers.gcp_containment_v1.actions.revoke_instance_role.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+# ==============================================================================
+# Kubernetes containment: cordon the node, quarantine the pod with a deny-all
+# NetworkPolicy, or kill the pod. One n8n K8s_Containment workflow routes by
+# action; uncordon_node reverses a cordon on an FP-flip.
+# ==============================================================================
+[providers.k8s_containment_v1.actions.cordon_node]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/k8s-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target":      "{{target}}",
+  "action":      "cordon_node"
+}
+"""
+
+[providers.k8s_containment_v1.actions.cordon_node.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.k8s_containment_v1.actions.quarantine_container]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/k8s-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target":      "{{target}}",
+  "action":      "quarantine_container"
+}
+"""
+
+[providers.k8s_containment_v1.actions.quarantine_container.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.k8s_containment_v1.actions.kill_pod]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/k8s-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = false
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target":      "{{target}}",
+  "action":      "kill_pod"
+}
+"""
+
+[providers.k8s_containment_v1.actions.kill_pod.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"
+
+[providers.k8s_containment_v1.actions.uncordon_node]
+method = "POST"
+endpoint = "http://n8n:5678/webhook/k8s-containment"
+headers = { "Content-Type" = "application/json" }
+timeout_seconds = 60
+retryable = true
+success_codes = [200, 202]
+body_template = """
+{
+  "incident_id": "{{incident_id}}",
+  "target":      "{{target}}",
+  "action":      "uncordon_node"
+}
+"""
+
+[providers.k8s_containment_v1.actions.uncordon_node.validation]
+required_fields = ["target", "incident_id"]
+target_format = "any"

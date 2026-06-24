@@ -1,0 +1,98 @@
+# ==============================================================================
+# Containment Capability Contract
+#
+# Single source of truth the swarm's containment planner reads so every planned
+# step is EXECUTABLE in the target's environment. Keyed by (target_class, environment, action). Only
+# actions listed here may be planned; a (target_class, environment) with no entry
+# is intentionally uncovered -> the coverage gate escalates it to an operator
+# rather than emitting an action no executor can run.
+#
+# Reconciled against operations/infra/containment.toml + the on-host
+# response_executor allowlist by tests/lab_operations_contracts/test_containment_capability.py.
+#
+# Fields:
+#   target_class    endpoint | cloud_instance | container | identity | network | saas | datastore
+#   environment     windows|linux | aws|azure|gcp|vmware | k8s | entra|iam|gcp|local | onprem | m365|gws|okta
+#   action          the containment verb
+#   executor        agent_task_v1 | <provider>_containment_v1 | custom_fw_v1 | ... (must exist downstream)
+#   wave            1 = contain + capture volatile evidence - 2 = eradicate (held until certainty)
+#   certainty_floor malicious < corroborated < confirmed  (per-entity assurance gate)
+#   reversible_by   the rollback action for an FP-flip ("" = irreversible / N/A)
+#   required        params the executor needs present on the step
+# ==============================================================================
+
+capability = [
+  # -- endpoint - windows --
+  { target_class="endpoint", environment="windows", action="collect_forensics",    executor="agent_task_v1", wave=1, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="windows", action="isolate_host",         executor="agent_task_v1", wave=1, certainty_floor="corroborated", reversible_by="restore",     required=["target","incident_id"] },
+  { target_class="endpoint", environment="windows", action="block_ip",             executor="agent_task_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="windows", action="eradicate_process",    executor="agent_task_v1", wave=2, certainty_floor="confirmed",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="windows", action="eradicate_persistence",executor="agent_task_v1", wave=2, certainty_floor="confirmed",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="windows", action="restore",              executor="agent_task_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+
+  # -- endpoint - linux --
+  { target_class="endpoint", environment="linux", action="collect_forensics",      executor="agent_task_v1", wave=1, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="linux", action="isolate_host",           executor="agent_task_v1", wave=1, certainty_floor="corroborated", reversible_by="restore",     required=["target","incident_id"] },
+  { target_class="endpoint", environment="linux", action="block_ip",               executor="agent_task_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="linux", action="eradicate_process",      executor="agent_task_v1", wave=2, certainty_floor="confirmed",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="linux", action="eradicate_persistence",  executor="agent_task_v1", wave=2, certainty_floor="confirmed",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="endpoint", environment="linux", action="restore",                executor="agent_task_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+
+  # -- cloud_instance - aws / azure / gcp  (isolate_host = SG/NSG quarantine) --
+  # block_ip is a network-class action (the malicious peer IP); an instance is
+  # isolated, not "ip-blocked", so cloud_instance carries isolate/release only.
+  { target_class="cloud_instance", environment="aws",   action="isolate_host", executor="aws_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="release_host", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="aws",   action="release_host", executor="aws_containment_v1",   wave=2, certainty_floor="malicious",    reversible_by="",             required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="azure", action="isolate_host", executor="azure_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="release_host", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="azure", action="release_host", executor="azure_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",             required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="gcp",   action="isolate_host", executor="gcp_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="release_host", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="gcp",   action="release_host", executor="gcp_containment_v1",   wave=2, certainty_floor="malicious",    reversible_by="",             required=["target","incident_id"] },
+
+  # -- cloud_instance - evidence-first snapshot + IAM role revocation --
+  { target_class="cloud_instance", environment="aws",   action="snapshot_volume",       executor="aws_containment_v1",   wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="aws",   action="revoke_instance_role",  executor="aws_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="azure", action="snapshot_volume",       executor="azure_containment_v1", wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="azure", action="revoke_instance_role",  executor="azure_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="gcp",   action="snapshot_volume",       executor="gcp_containment_v1",   wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
+  { target_class="cloud_instance", environment="gcp",   action="revoke_instance_role",  executor="gcp_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
+
+  # -- container - cordon node, quarantine pod, kill pod (k8s netpol + API) --
+  { target_class="container", environment="k8s", action="cordon_node",          executor="k8s_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="uncordon_node", required=["target","incident_id"] },
+  { target_class="container", environment="k8s", action="quarantine_container", executor="k8s_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="",              required=["target","incident_id"] },
+  { target_class="container", environment="k8s", action="kill_pod",             executor="k8s_containment_v1", wave=2, certainty_floor="confirmed",    reversible_by="",              required=["target","incident_id"] },
+  { target_class="container", environment="k8s", action="uncordon_node",        executor="k8s_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",              required=["target","incident_id"] },
+
+  # -- network - cloud SG/NSG + on-prem firewall --
+  { target_class="network", environment="aws",    action="block_ip",   executor="aws_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unblock_ip", required=["target","incident_id"] },
+  { target_class="network", environment="aws",    action="unblock_ip", executor="aws_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="gcp",    action="block_ip",   executor="gcp_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="unblock_ip", required=["target","incident_id"] },
+  { target_class="network", environment="gcp",    action="unblock_ip", executor="gcp_containment_v1",   wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="azure",  action="block_ip",   executor="azure_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unblock_ip", required=["target","incident_id"] },
+  { target_class="network", environment="azure",  action="unblock_ip", executor="azure_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="onprem", action="block_ip",   executor="custom_fw_v1",       wave=1, certainty_floor="corroborated", reversible_by="unblock_ip", required=["target","incident_id"] },
+  { target_class="network", environment="onprem", action="unblock_ip", executor="custom_fw_v1",       wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+
+  # -- network - DNS sinkhole for malicious C2 domains --
+  { target_class="network", environment="onprem", action="dns_sinkhole", executor="dns_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unsinkhole", required=["target","incident_id"] },
+  { target_class="network", environment="onprem", action="unsinkhole",   executor="dns_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="aws",    action="dns_sinkhole", executor="dns_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unsinkhole", required=["target","incident_id"] },
+  { target_class="network", environment="aws",    action="unsinkhole",   executor="dns_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="azure",  action="dns_sinkhole", executor="dns_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unsinkhole", required=["target","incident_id"] },
+  { target_class="network", environment="azure",  action="unsinkhole",   executor="dns_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+  { target_class="network", environment="gcp",    action="dns_sinkhole", executor="dns_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="unsinkhole", required=["target","incident_id"] },
+  { target_class="network", environment="gcp",    action="unsinkhole",   executor="dns_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",           required=["target","incident_id"] },
+
+  # -- identity - disable account / revoke sessions across the owning IdP --
+  { target_class="identity", environment="entra", action="disable_user",    executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="enable_user", required=["target","incident_id"] },
+  { target_class="identity", environment="entra", action="revoke_sessions", executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="entra", action="enable_user",     executor="idp_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="iam",   action="disable_user",    executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="enable_user", required=["target","incident_id"] },
+  { target_class="identity", environment="iam",   action="revoke_sessions", executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="iam",   action="enable_user",     executor="idp_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="gcp",   action="disable_user",    executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="enable_user", required=["target","incident_id"] },
+  { target_class="identity", environment="gcp",   action="revoke_sessions", executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="gcp",   action="enable_user",     executor="idp_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="local", action="disable_user",    executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="enable_user", required=["target","incident_id"] },
+  { target_class="identity", environment="local", action="revoke_sessions", executor="idp_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="",            required=["target","incident_id"] },
+  { target_class="identity", environment="local", action="enable_user",     executor="idp_containment_v1", wave=2, certainty_floor="malicious",    reversible_by="",            required=["target","incident_id"] },
+]

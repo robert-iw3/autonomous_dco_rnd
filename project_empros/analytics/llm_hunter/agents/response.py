@@ -20,6 +20,7 @@ from agents.llm_providers import (build_failover_chain, get_embedder,
                                    circuit_is_callable, record_call_success, record_call_failure)
 from agents.controls import stamp_ai_provenance
 from agents.playbook_planner import build_playbook_plan
+from agents.containment_protocol import build_containment_protocol
 import agents.verdict_ledger as verdict_ledger
 import agents.energy_accounting as energy_accounting
 import agents.active_learning as active_learning
@@ -307,27 +308,38 @@ async def response_agent(state: InvestigativeState):
     all_targets = all_targets[:MAX_SOAR_TARGETS]  # honour ATLAS AML.T0016 cap
 
     # -- 4. Plan the on-host IR playbooks to initiate (DC-N11), evidence-first --
-    # The swarm's typed entities → os_family + IOC params + the wave to run now.
-    # First pass: wave 1 (isolate + collect_forensics) — contain spread and capture
+    # The swarm's typed entities -> os_family + IOC params + the wave to run now.
+    # First pass: wave 1 (isolate + collect_forensics) - contain spread and capture
     # the RAM image, which worker_memory analyses and returns as enrichment. The
     # memory-enriched re-entry runs wave 2 (block_ip + eradicate_*) only once the
     # memory ground truth confirms the threat. Cloud/network targets initiate none.
     mem = state.get("memory_enrichment") or {}
+    entities = state.get("entities_of_interest", {}) or {}
     plan = build_playbook_plan(
-        alert, verdict, state.get("entities_of_interest", {}) or {},
+        alert, verdict, entities,
         memory_enriched=bool(mem), memory_threat=bool(mem.get("memory_threat")),
     )
     iocs = plan["iocs"]
 
+    # the tailored cross-class containment protocol - per-entity, capability-
+    # aware, evidence-first, with a kill-chain coverage gate + per-entity assurance
+    # gate. Closes the kill chain across endpoint/cloud/network/identity, or surfaces
+    # the uncovered entities as escalations (never a silent gap).
+    protocol = build_containment_protocol(alert, verdict, entities, mem, now=time.time())
+
     # -- 5. HitL circuit breaker --
     demote, demote_reason = await should_demote_to_manual(all_targets, action_type)
     if demote:
-        logger.warning(f"[CIRCUIT BREAKER] Demoting '{action_type}' → 'manual_review_required' "
+        logger.warning(f"[CIRCUIT BREAKER] Demoting '{action_type}' -> 'manual_review_required' "
                        f"for {target}. Reason: {demote_reason}")
         action_type = "manual_review_required"
         # A demoted incident initiates NO autonomous host playbook -- it goes to
         # the manual-review queue for an operator, never to the on-host agent.
         plan["response_actions"] = []
+        # Keep the full containment plan for the operator, but force every step to
+        # require approval -- nothing auto-fires once the blast-radius breaker trips.
+        for _s in protocol["steps"]:
+            _s["gate"] = "operator_approval"
     else:
         logger.info(f"[GOVERNANCE] Action '{action_type}' for {target} passed circuit breaker. "
                     f"Reason: {demote_reason}")
@@ -343,7 +355,7 @@ async def response_agent(state: InvestigativeState):
         "targets": all_targets,
         "confidence": float(verdict.get("confidence", 0.0)),
         "reason": reason,
-        # On-host playbook initiation (consumed by worker_soar → signed agent task):
+        # On-host playbook initiation (consumed by worker_soar -> signed agent task):
         "os_family": plan["os_family"],
         "response_actions": plan["response_actions"],
         "c2_ips": iocs["c2_ips"],
@@ -352,7 +364,14 @@ async def response_agent(state: InvestigativeState):
         "hashes": iocs["hashes"],
         "file_paths": iocs["file_paths"],
         "users": iocs["users"],
+        # tailored containment protocol (cross-class steps worker_soar dispatches):
+        "environment": protocol.get("environment"),
+        "target_class": protocol.get("target_class"),
+        "containment_steps": protocol["steps"],
         # Audit / idempotency extras (ignored by the schema, kept for the SOAR log):
+        "kill_chain_closed": protocol["kill_chain_closed"],
+        "containment_escalations": protocol["escalations"],
+        "containment_coverage": protocol["coverage"],
         "idempotency_key": f"iso-{target}-{int(float(alert.get('timestamp', 0) or 0) // 900)}",
         "source_type": alert.get("source_type", ""),
         "governance_reason": demote_reason,
