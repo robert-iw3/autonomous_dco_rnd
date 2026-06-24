@@ -6,7 +6,7 @@
 
 **1. Logic** — Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute.
 
-`analytics/llm_hunter/agents/response.py:L373-L376`
+`analytics/llm_hunter/agents/response.py:L374-L377`
 
 ```python
         "containment_escalations": protocol["escalations"],
@@ -17,7 +17,7 @@
 
 **2. Execution** — The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor.
 
-`services/worker_soar/src/main.rs:L314-L317`
+`services/worker_soar/src/main.rs:L335-L338`
 
 ```rust
                 let mut dedup = self.dedup.write().await;

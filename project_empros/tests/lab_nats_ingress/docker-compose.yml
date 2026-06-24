@@ -34,6 +34,9 @@ services:
       - MAX_CONCURRENT_REQUESTS=256
       - REQUEST_TIMEOUT_SECS=10
       - NEXUS_BAN_LIST_DIR=/tmp/nexus-ban
+      # Low limit so the anti-DoS flood test is observable (prod uses generous values).
+      - INGRESS_RATE_LIMIT_RPS=50
+      - INGRESS_RATE_LIMIT_BURST=100
     ports:
       - "8080:8080"
     depends_on:

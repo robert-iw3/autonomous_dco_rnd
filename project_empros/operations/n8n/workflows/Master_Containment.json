@@ -283,6 +283,19 @@
         -400
       ],
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Inbound auth (threat-model F-2): the request must carry a valid HMAC-SHA256 of\n// the raw body in X-Nexus-Signature, keyed by NEXUS_HMAC_SECRET. Reject otherwise,\n// so a deepnet-reachable attacker cannot drive containment by POSTing to the webhook.\nconst crypto = require('crypto');\nconst item = $input.first().json;\nconst raw = (item.rawBody !== undefined && item.rawBody !== null)\n  ? (typeof item.rawBody === 'string' ? item.rawBody : JSON.stringify(item.rawBody))\n  : JSON.stringify(item.body || {});\nconst headers = item.headers || {};\nconst provided = headers['x-nexus-signature'] || headers['X-Nexus-Signature'] || '';\nconst expected = crypto.createHmac('sha256', $env.NEXUS_HMAC_SECRET || '').update(raw).digest('hex');\nif (!provided || provided.length !== expected.length || provided !== expected) {\n  throw new Error('invalid X-Nexus-Signature -- refusing containment');\n}\nreturn [{ json: item.body || item }];"
+      },
+      "id": "verify-nexus-signature",
+      "name": "Verify Nexus Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        110,
+        260
+      ]
     }
   ],
   "connections": {
@@ -290,7 +303,7 @@
       "main": [
         [
           {
-            "node": "Initialize Tracker",
+            "node": "Verify Nexus Signature",
             "type": "main",
             "index": 0
           }
@@ -453,6 +466,17 @@
         [
           {
             "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Nexus Signature": {
+      "main": [
+        [
+          {
+            "node": "Initialize Tracker",
             "type": "main",
             "index": 0
           }

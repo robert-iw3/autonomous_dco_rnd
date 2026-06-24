@@ -5,13 +5,18 @@
       "parameters": {
         "path": "dns-containment",
         "responseMode": "lastNode",
-        "options": { "rawBody": true }
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "dns-webhook",
       "name": "DNS Containment Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -21,7 +26,10 @@
       "name": "Build DNS Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -29,18 +37,28 @@
         "url": "={{ $json.api_url }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "X-Nexus-Signature", "value": "={{ $env.NEXUS_HMAC_SECRET }}" }]
+          "parameters": [
+            {
+              "name": "X-Nexus-Signature",
+              "value": "={{ $env.NEXUS_HMAC_SECRET }}"
+            }
+          ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.api_body }}",
-        "options": { "timeout": 60000 }
+        "options": {
+          "timeout": 60000
+        }
       },
       "id": "call-dns",
       "name": "Call DNS API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "onError": "continueErrorOutput"
     },
     {
@@ -51,7 +69,10 @@
       "name": "Normalize Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, -120]
+      "position": [
+        660,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -61,7 +82,10 @@
       "name": "Handle Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 120]
+      "position": [
+        660,
+        120
+      ]
     },
     {
       "parameters": {
@@ -70,25 +94,112 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "signal-soar",
       "name": "Signal SOAR via NATS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [880, 0],
+      "position": [
+        880,
+        0
+      ],
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Inbound auth (threat-model F-2): the request must carry a valid HMAC-SHA256 of\n// the raw body in X-Nexus-Signature, keyed by NEXUS_HMAC_SECRET. Reject otherwise,\n// so a deepnet-reachable attacker cannot drive containment by POSTing to the webhook.\nconst crypto = require('crypto');\nconst item = $input.first().json;\nconst raw = (item.rawBody !== undefined && item.rawBody !== null)\n  ? (typeof item.rawBody === 'string' ? item.rawBody : JSON.stringify(item.rawBody))\n  : JSON.stringify(item.body || {});\nconst headers = item.headers || {};\nconst provided = headers['x-nexus-signature'] || headers['X-Nexus-Signature'] || '';\nconst expected = crypto.createHmac('sha256', $env.NEXUS_HMAC_SECRET || '').update(raw).digest('hex');\nif (!provided || provided.length !== expected.length || provided !== expected) {\n  throw new Error('invalid X-Nexus-Signature -- refusing containment');\n}\nreturn [{ json: item.body || item }];"
+      },
+      "id": "verify-nexus-signature",
+      "name": "Verify Nexus Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        110,
+        260
+      ]
     }
   ],
   "connections": {
-    "DNS Containment Webhook": { "main": [[{ "node": "Build DNS Request", "type": "main", "index": 0 }]] },
-    "Build DNS Request": { "main": [[{ "node": "Call DNS API", "type": "main", "index": 0 }]] },
-    "Call DNS API": {
-      "main":  [[{ "node": "Normalize Result", "type": "main", "index": 0 }]],
-      "error": [[{ "node": "Handle Error", "type": "main", "index": 0 }]]
+    "DNS Containment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Nexus Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Normalize Result": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] },
-    "Handle Error": { "main": [[{ "node": "Signal SOAR via NATS", "type": "main", "index": 0 }]] }
+    "Build DNS Request": {
+      "main": [
+        [
+          {
+            "node": "Call DNS API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call DNS API": {
+      "main": [
+        [
+          {
+            "node": "Normalize Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Result": {
+      "main": [
+        [
+          {
+            "node": "Signal SOAR via NATS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error": {
+      "main": [
+        [
+          {
+            "node": "Signal SOAR via NATS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Nexus Signature": {
+      "main": [
+        [
+          {
+            "node": "Build DNS Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

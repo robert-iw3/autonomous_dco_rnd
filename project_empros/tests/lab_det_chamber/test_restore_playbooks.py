@@ -17,7 +17,7 @@ Contract proven here:
 import tomllib
 from pathlib import Path
 
-PB = Path(__file__).resolve().parents[2] / "operations" / "playbooks"
+PB = Path(__file__).resolve().parents[2] / "operations" / "playbooks" / "playbooks"
 LINUX_RESTORE = PB / "linux" / "06_restore.sh"
 WIN_RESTORE = PB / "windows" / "06_Restore-Host.ps1"
 LINUX_ERAD = PB / "linux" / "02_eradicate_process.sh"
@@ -41,7 +41,7 @@ def test_windows_eradication_writes_rollback_journal():
 
 # --- Linux restore -----------------------------------------------------------
 def test_linux_restore_exists_and_reverses_isolation():
-    assert LINUX_RESTORE.exists(), "operations/playbooks/linux/06_restore.sh must exist"
+    assert LINUX_RESTORE.exists(), "operations/playbooks/playbooks/linux/06_restore.sh must exist"
     t = LINUX_RESTORE.read_text()
     assert "iptables-restore" in t or "nft -f" in t, "must restore the saved firewall ruleset"
     assert "iptables-pre-" in t or "nftables-pre-" in t, "must read the pre-containment backup 01 saved"
@@ -60,7 +60,7 @@ def test_linux_restore_is_non_destructive():
 
 # --- Windows restore ---------------------------------------------------------
 def test_windows_restore_exists_and_reverses_isolation():
-    assert WIN_RESTORE.exists(), "operations/playbooks/windows/06_Restore-Host.ps1 must exist"
+    assert WIN_RESTORE.exists(), "operations/playbooks/playbooks/windows/06_Restore-Host.ps1 must exist"
     t = WIN_RESTORE.read_text()
     assert "netsh advfirewall import" in t, "must import the firewall backup 01 saved"
     assert "firewall-pre-" in t

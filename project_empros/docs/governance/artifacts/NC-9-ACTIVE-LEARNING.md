@@ -6,7 +6,7 @@
 
 **1. Invocation** — Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L195-L200`
+`analytics/llm_hunter/agents/response.py:L196-L201`
 
 ```python
         if grounding_violations:

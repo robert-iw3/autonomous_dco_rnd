@@ -523,3 +523,42 @@ class TestNatsDelivery:
             assert forwarded_sid == sid, f"Sensor-Id not forwarded: {forwarded_sid}"
 
         asyncio.run(_run())
+
+
+# ── Suite: anti-DoS rate limiting (threat-model F-16) ─────────────────────────
+# The pre-auth per-IP token bucket must shed a single-source flood (429) BEFORE it
+# reaches JWT/HMAC verification, while legitimate (spaced, signed) telemetry still
+# flows. Lab compose sets a low INGRESS_RATE_LIMIT_RPS/BURST so the burst is
+# observable; production uses generous values + the per-sensor adaptive baseline.
+import concurrent.futures as _cf
+
+
+class TestRateLimitAntiDoS:
+    def test_single_source_flood_is_shed_with_429(self):
+        # fire a tight concurrent burst of cheap (unauthenticated) requests, far
+        # above the configured burst capacity, from one source.
+        def _hit(_):
+            try:
+                return requests.post(f"{INGRESS_URL}{TELEMETRY_PATH}", data=b"x", timeout=5).status_code
+            except Exception:
+                return 0
+        with _cf.ThreadPoolExecutor(max_workers=50) as ex:
+            codes = list(ex.map(_hit, range(600)))
+        throttled = codes.count(429)
+        assert throttled > 0, f"flood was not rate-limited at all: {set(codes)}"
+        # a meaningful fraction must be shed (anti-DoS), not all processed
+        assert throttled >= 100, f"only {throttled}/600 shed - limiter too weak to stop a flood"
+        # the burst capacity still let some through (limiter is not a hard block)
+        assert any(c not in (429, 0) for c in codes), "limiter blocked everything (no burst headroom)"
+
+    def test_legitimate_spaced_telemetry_not_throttled(self):
+        # let the bucket refill, then send valid signed telemetry at a sane cadence:
+        # it must never be 429 (telemetry must keep flowing, even mid-incident).
+        time.sleep(3.0)
+        buf = make_parquet([SYSMON_RECORD])
+        seen = []
+        for i in range(5):
+            h = make_headers(buf, "sysmon_sensor", sensor_id=f"rl-legit-{i}", sequence=1)
+            seen.append(post_telemetry(buf, h).status_code)
+            time.sleep(0.4)
+        assert 429 not in seen, f"legitimate spaced telemetry was throttled: {seen}"

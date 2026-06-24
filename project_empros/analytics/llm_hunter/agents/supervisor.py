@@ -23,7 +23,8 @@ from qdrant_client import AsyncQdrantClient
 
 logger = logging.getLogger("nexus-supervisor")
 
-async_qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_HTTP_URL", "http://qdrant:6333"))
+async_qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_HTTP_URL", "http://qdrant:6333"),
+                                 api_key=os.getenv("QDRANT_API_KEY") or None)
 
 MEMORY_COLLECTION = "nexus_swarm_memory"
 IMMUNITY_THRESHOLD = float(os.getenv("NEXUS_IMMUNITY_THRESHOLD", "0.90"))

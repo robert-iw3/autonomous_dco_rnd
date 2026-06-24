@@ -12,8 +12,8 @@ import tomllib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-LINUX = REPO / "operations" / "playbooks" / "linux" / "05_acquire_artifact.sh"
-WIN = REPO / "operations" / "playbooks" / "windows" / "05_Acquire-Artifact.ps1"
+LINUX = REPO / "operations" / "playbooks" / "playbooks" / "linux" / "05_acquire_artifact.sh"
+WIN = REPO / "operations" / "playbooks" / "playbooks" / "windows" / "05_Acquire-Artifact.ps1"
 CONTAINMENT = REPO / "operations" / "infra" / "containment.toml"
 
 
@@ -23,7 +23,7 @@ def test_linux_agent_hashes_zips_manifests():
     assert "sha256sum" in t, "must compute SHA256 for chain of custody"
     assert "zip" in t.lower(), "must package the artifact"
     assert "manifest" in t.lower(), "must write a manifest"
-    assert "NEXUS_INCIDENT_ID" in t, "must take incident context like the other playbooks"
+    assert "IR_INCIDENT_ID" in t, "must take incident context like the other playbooks"
 
 
 def test_linux_agent_never_executes_sample():
@@ -45,7 +45,7 @@ def test_windows_agent_hashes_zips_manifests():
     assert "Get-FileHash" in t and "SHA256" in t
     assert "Compress-Archive" in t
     assert "manifest" in t.lower()
-    assert "NEXUS_INCIDENT_ID" in t or "IncidentId" in t
+    assert "IR_INCIDENT_ID" in t or "IncidentId" in t
 
 
 def test_windows_agent_never_executes_sample():

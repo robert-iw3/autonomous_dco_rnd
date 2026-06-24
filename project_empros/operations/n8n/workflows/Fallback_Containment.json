@@ -5,34 +5,47 @@
       "parameters": {
         "path": "fallback-containment",
         "responseMode": "lastNode",
-        "options": { "rawBody": true }
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "fallback-webhook",
       "name": "Fallback Containment Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Parse the ExecutionPlan from worker_soar and enrich with workspace IOCs.\n// Fields available from worker_soar body_template (SoarExecutionSchema-derived):\n//   incident_id, target, targets[], action, action_type, source_type, reason\nconst fs = require('fs');\nconst body = $input.first().json.body || $input.first().json;\n\nconst incidentId = body.incident_id || 'UNKNOWN';\nconst target     = body.target || body.target_sensor || '';\nconst targets    = (Array.isArray(body.targets) ? body.targets : [target]).filter(Boolean);\nconst actionType = body.action_type || body.action || 'isolate_host';\nconst sourceType = body.source_type || '';\nconst reason     = body.reason || '';\n\n// Derive platform and cloud provider from source_type\nconst AWS_SOURCES   = ['aws_cloudtrail','aws_vpc_flow','aws_guardduty'];\nconst AZURE_SOURCES = ['azure_entraid','azure_activity','azure_nsg_flow'];\nconst GCP_SOURCES   = ['gcp_audit','gcp_scc','gcp_vpc_flow'];\n\nconst isWindows = sourceType.toLowerCase().startsWith('windows') ||\n                  (body.platform || '').toLowerCase() === 'windows';\nconst isCloud   = (body.platform || '').toLowerCase() === 'cloud' ||\n                  AWS_SOURCES.includes(sourceType) ||\n                  AZURE_SOURCES.includes(sourceType) ||\n                  GCP_SOURCES.includes(sourceType);\n\nlet cloudProvider = body.cloud_provider || '';\nif (!cloudProvider) {\n  if (AWS_SOURCES.includes(sourceType))        cloudProvider = 'aws';\n  else if (AZURE_SOURCES.includes(sourceType)) cloudProvider = 'azure';\n  else if (GCP_SOURCES.includes(sourceType))   cloudProvider = 'gcp';\n}\n\nconst platform = isCloud ? 'cloud' : (isWindows ? 'windows' : 'linux');\n\n// Read incident context injected by trigger-incident.sh via shared volume.\n// The n8n Dockerfile exposes /incident-context → ../webui/data.\nlet context = [];\ntry {\n  const raw = fs.readFileSync('/incident-context/workspace_context.json', 'utf8');\n  const parsed = JSON.parse(raw);\n  if (Array.isArray(parsed.context)) context = parsed.context;\n} catch (e) {\n  // Context unavailable -- proceed with payload-derived IOCs only\n}\n\n// Extract IOCs from every context record (swarm-enriched telemetry)\nconst c2IPs        = new Set();\nconst maliciousPids = new Set();\nconst maliciousProcs = new Set();\nconst maliciousHashes = new Set();\nconst maliciousPaths = new Set();\nconst c2Domains    = new Set();\n\nconst rfc1918 = /^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|127\\.)/;\n\nfor (const r of context) {\n  if (r.dst_ip && !rfc1918.test(r.dst_ip)) c2IPs.add(r.dst_ip);\n  if (r.pid)            maliciousPids.add(String(r.pid));\n  if (r.comm)           maliciousProcs.add(r.comm);\n  if (r.process_name)   maliciousProcs.add(r.process_name);\n  if (r.process_hash && r.process_hash.length === 64) maliciousHashes.add(r.process_hash);\n  if (r.target_file)    maliciousPaths.add(r.target_file);\n  if (r.path)           maliciousPaths.add(r.path);\n  if (r.dns_query)      c2Domains.add(r.dns_query);\n}\n\n// Merge any additional IOCs worker_soar packed into the payload body\nif (body.c2_ips)    body.c2_ips.split(',').forEach(ip => { const t = ip.trim(); if (t) c2IPs.add(t); });\nif (body.c2_domains) body.c2_domains.split(',').forEach(d => { const t = d.trim(); if (t) c2Domains.add(t); });\nif (body.malicious_pids) body.malicious_pids.split(',').forEach(p => { const t = p.trim(); if (t) maliciousPids.add(t); });\n\nreturn [{\n  json: {\n    incident_id:      incidentId,\n    action_type:      actionType,\n    platform,\n    cloud_provider:   cloudProvider,\n    source_type:      sourceType,\n    reason,\n    targets,\n    total_targets:    targets.length,\n    c2_ips:           [...c2IPs].filter(Boolean),\n    c2_domains:       [...c2Domains].filter(Boolean),\n    malicious_pids:   [...maliciousPids].filter(Boolean),\n    malicious_procs:  [...maliciousProcs].filter(Boolean),\n    malicious_hashes: [...maliciousHashes].filter(Boolean),\n    malicious_paths:  [...maliciousPaths].filter(Boolean)\n  }\n}];"
+        "jsCode": "// Parse the ExecutionPlan from worker_soar and enrich with workspace IOCs.\n// Fields available from worker_soar body_template (SoarExecutionSchema-derived):\n//   incident_id, target, targets[], action, action_type, source_type, reason\nconst fs = require('fs');\nconst body = $input.first().json.body || $input.first().json;\n\nconst incidentId = body.incident_id || 'UNKNOWN';\nconst target     = body.target || body.target_sensor || '';\nconst targets    = (Array.isArray(body.targets) ? body.targets : [target]).filter(Boolean);\nconst actionType = body.action_type || body.action || 'isolate_host';\nconst sourceType = body.source_type || '';\nconst reason     = body.reason || '';\n\n// Derive platform and cloud provider from source_type\nconst AWS_SOURCES   = ['aws_cloudtrail','aws_vpc_flow','aws_guardduty'];\nconst AZURE_SOURCES = ['azure_entraid','azure_activity','azure_nsg_flow'];\nconst GCP_SOURCES   = ['gcp_audit','gcp_scc','gcp_vpc_flow'];\n\nconst isWindows = sourceType.toLowerCase().startsWith('windows') ||\n                  (body.platform || '').toLowerCase() === 'windows';\nconst isCloud   = (body.platform || '').toLowerCase() === 'cloud' ||\n                  AWS_SOURCES.includes(sourceType) ||\n                  AZURE_SOURCES.includes(sourceType) ||\n                  GCP_SOURCES.includes(sourceType);\n\nlet cloudProvider = body.cloud_provider || '';\nif (!cloudProvider) {\n  if (AWS_SOURCES.includes(sourceType))        cloudProvider = 'aws';\n  else if (AZURE_SOURCES.includes(sourceType)) cloudProvider = 'azure';\n  else if (GCP_SOURCES.includes(sourceType))   cloudProvider = 'gcp';\n}\n\nconst platform = isCloud ? 'cloud' : (isWindows ? 'windows' : 'linux');\n\n// Read incident context injected by trigger-incident.sh via shared volume.\n// The n8n Dockerfile exposes /incident-context \u2192 ../webui/data.\nlet context = [];\ntry {\n  const raw = fs.readFileSync('/incident-context/workspace_context.json', 'utf8');\n  const parsed = JSON.parse(raw);\n  if (Array.isArray(parsed.context)) context = parsed.context;\n} catch (e) {\n  // Context unavailable -- proceed with payload-derived IOCs only\n}\n\n// Extract IOCs from every context record (swarm-enriched telemetry)\nconst c2IPs        = new Set();\nconst maliciousPids = new Set();\nconst maliciousProcs = new Set();\nconst maliciousHashes = new Set();\nconst maliciousPaths = new Set();\nconst c2Domains    = new Set();\n\nconst rfc1918 = /^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|127\\.)/;\n\nfor (const r of context) {\n  if (r.dst_ip && !rfc1918.test(r.dst_ip)) c2IPs.add(r.dst_ip);\n  if (r.pid)            maliciousPids.add(String(r.pid));\n  if (r.comm)           maliciousProcs.add(r.comm);\n  if (r.process_name)   maliciousProcs.add(r.process_name);\n  if (r.process_hash && r.process_hash.length === 64) maliciousHashes.add(r.process_hash);\n  if (r.target_file)    maliciousPaths.add(r.target_file);\n  if (r.path)           maliciousPaths.add(r.path);\n  if (r.dns_query)      c2Domains.add(r.dns_query);\n}\n\n// Merge any additional IOCs worker_soar packed into the payload body\nif (body.c2_ips)    body.c2_ips.split(',').forEach(ip => { const t = ip.trim(); if (t) c2IPs.add(t); });\nif (body.c2_domains) body.c2_domains.split(',').forEach(d => { const t = d.trim(); if (t) c2Domains.add(t); });\nif (body.malicious_pids) body.malicious_pids.split(',').forEach(p => { const t = p.trim(); if (t) maliciousPids.add(t); });\n\nreturn [{\n  json: {\n    incident_id:      incidentId,\n    action_type:      actionType,\n    platform,\n    cloud_provider:   cloudProvider,\n    source_type:      sourceType,\n    reason,\n    targets,\n    total_targets:    targets.length,\n    c2_ips:           [...c2IPs].filter(Boolean),\n    c2_domains:       [...c2Domains].filter(Boolean),\n    malicious_pids:   [...maliciousPids].filter(Boolean),\n    malicious_procs:  [...maliciousProcs].filter(Boolean),\n    malicious_hashes: [...maliciousHashes].filter(Boolean),\n    malicious_paths:  [...maliciousPaths].filter(Boolean)\n  }\n}];"
       },
       "id": "parse-and-enrich",
       "name": "Parse Payload & Enrich IOCs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
         "fieldToSplitOut": "targets",
-        "options": { "destinationFieldName": "current_target" }
+        "options": {
+          "destinationFieldName": "current_target"
+        }
       },
       "id": "split-targets",
       "name": "Split Targets",
       "type": "n8n-nodes-base.itemLists",
       "typeVersion": 3,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -42,7 +55,10 @@
       "name": "Build SSH Command",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -52,7 +68,10 @@
       "name": "Execute Containment Playbooks",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
-      "position": [880, 0],
+      "position": [
+        880,
+        0
+      ],
       "onError": "continueErrorOutput"
     },
     {
@@ -63,7 +82,10 @@
       "name": "Track Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, -80]
+      "position": [
+        1100,
+        -80
+      ]
     },
     {
       "parameters": {
@@ -73,7 +95,10 @@
       "name": "Track Failure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 80]
+      "position": [
+        1100,
+        80
+      ]
     },
     {
       "parameters": {
@@ -83,7 +108,10 @@
       "name": "Aggregate Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     },
     {
       "parameters": {
@@ -92,42 +120,139 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"incident_id\": \"{{ $json.incident_id }}\",\n  \"status\": \"{{ $json.status }}\",\n  \"completed\": {{ $json.completed }},\n  \"failed\": {{ $json.failed }},\n  \"total_steps\": {{ $json.total_targets }},\n  \"errors\": {{ JSON.stringify($json.errors) }},\n  \"source\": \"{{ $json.source }}\",\n  \"timestamp\": \"{{ $json.timestamp }}\"\n}",
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "signal-orchestrator",
       "name": "Signal Orchestrator",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Inbound auth (threat-model F-2): the request must carry a valid HMAC-SHA256 of\n// the raw body in X-Nexus-Signature, keyed by NEXUS_HMAC_SECRET. Reject otherwise,\n// so a deepnet-reachable attacker cannot drive containment by POSTing to the webhook.\nconst crypto = require('crypto');\nconst item = $input.first().json;\nconst raw = (item.rawBody !== undefined && item.rawBody !== null)\n  ? (typeof item.rawBody === 'string' ? item.rawBody : JSON.stringify(item.rawBody))\n  : JSON.stringify(item.body || {});\nconst headers = item.headers || {};\nconst provided = headers['x-nexus-signature'] || headers['X-Nexus-Signature'] || '';\nconst expected = crypto.createHmac('sha256', $env.NEXUS_HMAC_SECRET || '').update(raw).digest('hex');\nif (!provided || provided.length !== expected.length || provided !== expected) {\n  throw new Error('invalid X-Nexus-Signature -- refusing containment');\n}\nreturn [{ json: item.body || item }];"
+      },
+      "id": "verify-nexus-signature",
+      "name": "Verify Nexus Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        110,
+        260
+      ]
     }
   ],
   "connections": {
     "Fallback Containment Webhook": {
-      "main": [[{"node": "Parse Payload & Enrich IOCs", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Verify Nexus Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Payload & Enrich IOCs": {
-      "main": [[{"node": "Split Targets", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Split Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Targets": {
-      "main": [[{"node": "Build SSH Command", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Build SSH Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build SSH Command": {
-      "main": [[{"node": "Execute Containment Playbooks", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Execute Containment Playbooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Execute Containment Playbooks": {
       "main": [
-        [{"node": "Track Success", "type": "main", "index": 0}],
-        [{"node": "Track Failure", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Track Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Track Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Track Success": {
-      "main": [[{"node": "Aggregate Results", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Track Failure": {
-      "main": [[{"node": "Aggregate Results", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate Results": {
-      "main": [[{"node": "Signal Orchestrator", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Signal Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Nexus Signature": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload & Enrich IOCs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,

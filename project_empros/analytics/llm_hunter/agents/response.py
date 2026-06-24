@@ -32,7 +32,8 @@ logger = logging.getLogger("nexus-response")
 # (NC-11, NIST MS-2.12-003); overridable per deployment via the env var.
 NEXUS_AVG_POWER_W = float(os.getenv("NEXUS_AVG_POWER_W", "700.0"))
 
-async_qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_HTTP_URL", "http://qdrant:6333"))
+async_qdrant = AsyncQdrantClient(url=os.getenv("QDRANT_HTTP_URL", "http://qdrant:6333"),
+                                 api_key=os.getenv("QDRANT_API_KEY") or None)
 redis_client = Redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"), decode_responses=True)
 MEMORY_COLLECTION = "nexus_swarm_memory"
 

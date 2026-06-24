@@ -2,9 +2,10 @@ use async_nats::HeaderMap;
 use axum::{
     body::Bytes,
     error_handling::HandleErrorLayer,
-    extract::{DefaultBodyLimit, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Request, State},
     http::{header, StatusCode},
-    response::IntoResponse,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -15,7 +16,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore};
 use opentelemetry::propagation::Injector;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::{IpAddr, SocketAddr}, sync::Arc, time::{Duration, Instant}};
 use tokio::signal::unix::{signal, SignalKind};
 use tower::{BoxError, ServiceBuilder};
 use tracing::{error, info, info_span, warn, Level};
@@ -43,6 +44,102 @@ struct Claims {
     exp: usize,
 }
 
+// -- Anti-DoS rate limiter (F-16) ---------------------------------------------
+// Per-client-IP token bucket, applied as the OUTERMOST layer so a flood is
+// dropped with 429 before it consumes JWT/HMAC verification, concurrency slots,
+// or body parsing. `/healthz` is exempt. Capacity = burst, refill = rps/sec.
+struct RateLimiter {
+    buckets: DashMap<IpAddr, (f64, Instant)>,
+    rps: f64,
+    burst: f64,
+}
+
+impl RateLimiter {
+    fn new(rps: f64, burst: f64) -> Self {
+        Self { buckets: DashMap::new(), rps, burst: burst.max(1.0) }
+    }
+    /// Take one token for `ip`; false when the bucket is empty (request denied).
+    fn allow(&self, ip: IpAddr) -> bool {
+        let now = Instant::now();
+        let mut e = self.buckets.entry(ip).or_insert((self.burst, now));
+        let (tokens, last) = *e;
+        let refilled = (tokens + now.duration_since(last).as_secs_f64() * self.rps).min(self.burst);
+        if refilled >= 1.0 {
+            *e = (refilled - 1.0, now);
+            true
+        } else {
+            *e = (refilled, now);
+            false
+        }
+    }
+}
+
+/// Best-effort client IP: first hop of X-Forwarded-For (behind a terminator),
+/// else the peer socket address.
+fn client_ip(req: &Request, peer: SocketAddr) -> IpAddr {
+    req.headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .and_then(|s| s.trim().parse::<IpAddr>().ok())
+        .unwrap_or_else(|| peer.ip())
+}
+
+async fn rate_limit_mw(
+    State(rl): State<Arc<RateLimiter>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.uri().path() == "/healthz" {
+        return next.run(req).await;
+    }
+    if !rl.allow(client_ip(&req, peer)) {
+        counter!("nexus_ingress_rate_limited_total").increment(1);
+        return (StatusCode::TOO_MANY_REQUESTS, "rate limit exceeded").into_response();
+    }
+    next.run(req).await
+}
+
+// -- Per-sensor adaptive ingest baseline (F-16, telemetry-aware) ---------------
+// Telemetry is high-volume and bursty by design: during an incident, honest
+// sensors legitimately emit far more events. So authenticated telemetry is NEVER
+// dropped on volume here. Instead each sensor's arrival rate is tracked as an EWMA
+// and an extreme deviation from ITS OWN baseline is surfaced as a surge signal
+// (metric + log) for the SOC to judge "attack on the ingress" vs "the estate is
+// under attack". The hard drop is the pre-auth per-IP flood guard above.
+struct SensorBaseline {
+    rates: DashMap<String, (f64, f64)>, // sensor_id -> (ewma_rps, last_seen_secs)
+    alpha: f64,
+    surge_factor: f64,
+    floor_rps: f64,
+}
+
+/// One EWMA step. Returns (new_ewma, is_surge). A surge is an instantaneous rate
+/// far above the sensor's own learned baseline AND above an absolute floor (so a
+/// quiet sensor's first couple of events never read as an attack). Pure for tests.
+fn surge_step(ewma: f64, last: f64, now: f64, alpha: f64, factor: f64, floor: f64) -> (f64, bool) {
+    let dt = (now - last).max(1e-3);
+    let inst = 1.0 / dt;
+    let new_ewma = if ewma <= 0.0 { inst } else { alpha * inst + (1.0 - alpha) * ewma };
+    let surge = ewma > 0.0 && inst > ewma * factor && inst > floor;
+    (new_ewma, surge)
+}
+
+impl SensorBaseline {
+    fn new(alpha: f64, surge_factor: f64, floor_rps: f64) -> Self {
+        Self { rates: DashMap::new(), alpha, surge_factor, floor_rps }
+    }
+    /// Record an arrival for `sensor` at `now` (epoch secs); true if it is a surge.
+    fn observe(&self, sensor: &str, now: f64) -> bool {
+        let mut e = self.rates.entry(sensor.to_string()).or_insert((0.0, now));
+        let (ewma, last) = *e;
+        let (new_ewma, surge) = surge_step(ewma, last, now, self.alpha, self.surge_factor, self.floor_rps);
+        *e = (new_ewma, now);
+        surge
+    }
+}
+
 // -- Application State --------------------------------------------------------
 
 struct AppState {
@@ -64,6 +161,8 @@ struct AppState {
     /// subject. worker_soar publishes signed tasks to `nexus.agent.tasks`; the
     /// subscriber files them here; GET /api/v1/tasks drains them on the agent poll.
     task_store: Arc<DashMap<String, Vec<serde_json::Value>>>,
+    /// Per-sensor adaptive ingest baseline (surge signal, never a drop).
+    baseline: SensorBaseline,
 }
 
 struct NatsHeaderInjector<'a>(&'a mut HeaderMap);
@@ -87,6 +186,10 @@ struct StartupConfig {
     max_payload_bytes: usize,
     max_evidence_bytes: usize,
     metrics_port: u16,
+    /// Per-client-IP request rate (tokens/sec) and burst capacity for the
+    /// anti-DoS limiter. Generous defaults; tune per deployment.
+    rate_limit_rps: f64,
+    rate_limit_burst: f64,
 }
 
 impl StartupConfig {
@@ -117,6 +220,10 @@ impl StartupConfig {
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(8_589_934_592),
             metrics_port: std::env::var("METRICS_PORT")
                 .ok().and_then(|v| v.parse().ok()).unwrap_or(9000),
+            rate_limit_rps: std::env::var("INGRESS_RATE_LIMIT_RPS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(200.0),
+            rate_limit_burst: std::env::var("INGRESS_RATE_LIMIT_BURST")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(400.0),
         }
     }
 }
@@ -218,6 +325,9 @@ async fn main() {
         max_evidence_bytes: cfg.max_evidence_bytes,
         evidence_store,
         task_store,
+        // Surge baseline: ~10x a sensor's EWMA rate and above a 50 rps floor reads
+        // as a surge worth surfacing (tunable; never drops authenticated telemetry).
+        baseline: SensorBaseline::new(0.2, 10.0, 50.0),
     });
 
     let app = Router::new()
@@ -245,6 +355,11 @@ async fn main() {
                 .timeout(Duration::from_secs(cfg.request_timeout_secs))
                 .concurrency_limit(cfg.max_concurrent_requests),
         )
+        // Outermost: drop floods with 429 before any verification / concurrency use.
+        .layer(middleware::from_fn_with_state(
+            Arc::new(RateLimiter::new(cfg.rate_limit_rps, cfg.rate_limit_burst)),
+            rate_limit_mw,
+        ))
         .with_state(state);
 
     info!(
@@ -267,7 +382,7 @@ async fn main() {
         };
     };
 
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(graceful_shutdown)
         .await
         .unwrap();
@@ -399,6 +514,18 @@ async fn handle_binary_telemetry(
     }
 
     counter!("nexus_ingress_integrity_verified_total").increment(1);
+
+    // 6b. Adaptive per-sensor ingest baseline (F-16). Verified telemetry is never
+    // dropped on volume -- a surge may mean the estate is under attack -- but an
+    // extreme deviation from this sensor's own baseline is surfaced for the SOC.
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+    if state.baseline.observe(sensor_id, now_secs) {
+        counter!("nexus_ingress_sensor_surge_total").increment(1);
+        warn!(sensor_id, "ingest surge far above sensor baseline -- attack on ingress or estate under attack?");
+    }
 
     // 7. Dynamic NATS topic routing
     let subject = format!("nexus.{sensor_type}.telemetry");
@@ -651,5 +778,44 @@ fn log_violation(v: &IntegrityViolation, sensor_id: &str, seq: u64, sensor_type:
         IntegrityViolation::MissingHeaders => {
             counter!("nexus_ingress_missing_headers_total").increment(1);
         }
+    }
+}
+#[cfg(test)]
+mod ratelimit_tests {
+    use super::{surge_step, RateLimiter};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    fn ip(n: u8) -> IpAddr { IpAddr::V4(Ipv4Addr::new(10, 0, 0, n)) }
+
+    #[test]
+    fn flood_from_one_ip_is_throttled_after_burst() {
+        // capacity 5, no refill within the burst -> first 5 allowed, rest denied.
+        let rl = RateLimiter::new(0.0, 5.0);
+        let allowed = (0..100).filter(|_| rl.allow(ip(1))).count();
+        assert_eq!(allowed, 5, "burst capacity must cap a single-source flood");
+    }
+
+    #[test]
+    fn fleet_wide_traffic_is_isolated_per_ip() {
+        // each distinct sensor IP gets its own bucket: a fleet surge does not trip.
+        let rl = RateLimiter::new(0.0, 5.0);
+        let denied = (0..50).filter(|n| !rl.allow(ip(*n as u8))).count();
+        assert_eq!(denied, 0, "distinct sources must not share a bucket");
+    }
+
+    #[test]
+    fn surge_detector_flags_extreme_deviation_not_normal_growth() {
+        // baseline ~1 rps; a 2x bump is normal growth (no surge), a 100x spike is.
+        let (ewma, _) = surge_step(0.0, 0.0, 1.0, 0.2, 10.0, 50.0);   // seed at 1 rps
+        let (_, normal) = surge_step(ewma, 1.0, 1.5, 0.2, 10.0, 50.0); // ~2 rps
+        assert!(!normal, "a modest increase must not read as an attack");
+        let (_, surge) = surge_step(ewma, 1.0, 1.005, 0.2, 10.0, 50.0); // ~200 rps
+        assert!(surge, "an extreme spike above baseline + floor must surge");
+    }
+
+    #[test]
+    fn quiet_sensor_first_events_never_surge() {
+        let (_, s) = surge_step(0.0, 0.0, 0.001, 0.2, 10.0, 50.0);
+        assert!(!s, "no baseline yet -> never a surge");
     }
 }

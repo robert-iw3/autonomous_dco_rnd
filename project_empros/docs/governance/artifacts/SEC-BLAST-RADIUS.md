@@ -44,7 +44,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
 
-`analytics/llm_hunter/agents/supervisor.py:L196-L199`
+`analytics/llm_hunter/agents/supervisor.py:L197-L200`
 
 ```python
     if len(entities) > MAX_ENTITIES:
@@ -55,7 +55,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L78-L80`
+`analytics/llm_hunter/agents/response.py:L79-L81`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)

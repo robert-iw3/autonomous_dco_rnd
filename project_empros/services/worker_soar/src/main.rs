@@ -175,6 +175,27 @@ impl ContainmentStep {
     }
 }
 
+/// HMAC-SHA256 hex of a rendered body keyed by NEXUS_HMAC_SECRET. This is the
+/// signature the n8n containment webhooks verify on inbound, so a deepnet-reachable
+/// attacker cannot drive containment without the secret.
+fn sign_payload(body: &str) -> String {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let secret = std::env::var("NEXUS_HMAC_SECRET").unwrap_or_default();
+    match Hmac::<Sha256>::new_from_slice(secret.as_bytes()) {
+        Ok(mut mac) => { mac.update(body.as_bytes()); hex::encode(mac.finalize().into_bytes()) }
+        Err(_) => String::new(),
+    }
+}
+
+/// Reject a target that would traverse or redirect a provider URL when templated
+/// into the endpoint path. Allows ipv4 and simple host / resource identifiers only;
+/// blocks '/', ':', '@', '?', whitespace, and '..'.
+fn safe_url_target(t: &str) -> bool {
+    !t.is_empty() && t.len() <= 255 && !t.contains("..")
+        && t.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
 #[derive(Serialize, Debug)]
 struct ExecutionPlan {
     incident_id: String,
@@ -345,6 +366,12 @@ impl SiemAdapter for SoarAdapter {
                     }
                     if let Some(provider) = self.containment_config.providers.get(&st.executor) {
                         if let Some(schema) = provider.actions.get(&st.action) {
+                            // F-3: a target templated into the URL path must be safe.
+                            if schema.endpoint.contains("{{target}}") && !safe_url_target(&st.target) {
+                                warn!(target = %st.target, action = %st.action,
+                                      "unsafe target for URL-templated provider -- dropping step");
+                                continue;
+                            }
                             let url = self.jinja_env
                                 .render_str(&schema.endpoint, context!(target => st.target.clone()))
                                 .unwrap_or_else(|_| schema.endpoint.clone());
@@ -363,6 +390,10 @@ impl SiemAdapter for SoarAdapter {
                                     v.clone()
                                 };
                                 resolved_headers.insert(k.clone(), resolved);
+                            }
+                            // F-2: sign the body so n8n webhook executors can authenticate it.
+                            if url.contains("/webhook/") {
+                                resolved_headers.insert("X-Nexus-Signature".to_string(), sign_payload(&raw_body));
                             }
                             steps.push(ExecutionStep {
                                 step_name: st.action.clone(),
@@ -401,6 +432,12 @@ impl SiemAdapter for SoarAdapter {
             if let Some(provider) = self.containment_config.providers.get(active_provider_key) {
                 if let Some(schema) = provider.actions.get(&payload.action_type) {
                     for target in &payload.targets {
+                        // F-3: a target templated into the URL path must be safe.
+                        if schema.endpoint.contains("{{target}}") && !safe_url_target(target) {
+                            warn!(target = %target, action = %payload.action_type,
+                                  "unsafe target for URL-templated provider -- dropping");
+                            continue;
+                        }
                         let url = self.jinja_env
                             .render_str(&schema.endpoint, context!(target => target))
                             .unwrap_or_else(|_| schema.endpoint.clone());
@@ -421,6 +458,10 @@ impl SiemAdapter for SoarAdapter {
                                 v.clone()
                             };
                             resolved_headers.insert(k.clone(), resolved);
+                        }
+                        // F-2: sign the body so n8n webhook executors can authenticate it.
+                        if url.contains("/webhook/") {
+                            resolved_headers.insert("X-Nexus-Signature".to_string(), sign_payload(&raw_body));
                         }
 
                         steps.push(ExecutionStep {
@@ -697,4 +738,24 @@ async fn main() {
     };
 
     start_durable_worker(SoarAdapter::initialize(&config_path, publish_client), worker_cfg).await;
+}
+#[cfg(test)]
+mod security_tests {
+    use super::safe_url_target;
+
+    #[test]
+    fn url_target_validation_blocks_traversal_and_redirect() {
+        // legitimate targets that get templated into provider URL paths
+        assert!(safe_url_target("10.0.0.5"));
+        assert!(safe_url_target("dc-prod-01"));
+        assert!(safe_url_target("i-0abc123"));
+        // F-3 attack inputs must be rejected
+        assert!(!safe_url_target("../../admin"));
+        assert!(!safe_url_target("http://evil.example/x"));
+        assert!(!safe_url_target("a/b"));
+        assert!(!safe_url_target("host:8080"));
+        assert!(!safe_url_target("a b"));
+        assert!(!safe_url_target("user@host"));
+        assert!(!safe_url_target(""));
+    }
 }

@@ -1072,3 +1072,38 @@ class TestWorkerSoarProtocolDispatch:
         assert "if !st.is_auto() || &st.executor == agent_exec" in src
         assert "if protocol_mode && !agent_exec.is_empty()" in src
         assert "build_signed_task(" in src
+
+
+class TestWorkerSoarContainmentSecurity:
+    """Threat-model F-2/F-3: worker_soar signs n8n-bound bodies (so webhook
+    executors can authenticate) and refuses unsafe URL-templated targets."""
+
+    def _src(self) -> str:
+        return SOAR_MAIN.read_text()
+
+    def test_signs_webhook_bound_bodies(self):
+        src = self._src()
+        assert "fn sign_payload(" in src and "Hmac::<Sha256>" in src
+        # the signature is attached for n8n webhook executors
+        assert 'url.contains("/webhook/")' in src
+        assert 'resolved_headers.insert("X-Nexus-Signature".to_string(), sign_payload' in src
+
+    def test_validates_url_templated_target(self):
+        src = self._src()
+        assert "fn safe_url_target(" in src
+        # applied before rendering, in both protocol and legacy provider paths
+        assert src.count('schema.endpoint.contains("{{target}}") && ') >= 2 \
+            or src.count("!safe_url_target(") >= 2
+
+
+class TestWorkerSoarAllowlistedDispatch:
+    """Threat-model F-8: even a forged SOAR command can only reach executors and
+    actions that exist in the containment config -- worker_soar looks both up and
+    skips on miss, so an attacker cannot name an arbitrary executor/action."""
+
+    def test_executor_and_action_are_config_gated(self):
+        src = SOAR_MAIN.read_text()
+        assert "self.containment_config.providers.get(&st.executor)" in src
+        assert "provider.actions.get(&st.action)" in src
+        # protocol agent steps are also gated to allowlisted on-host playbooks
+        assert "agent_task::is_response_action(&st.action)" in src

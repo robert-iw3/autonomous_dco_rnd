@@ -47,7 +47,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
 
-`analytics/llm_hunter/agents/response.py:L217-L218`
+`analytics/llm_hunter/agents/response.py:L218-L219`
 
 ```python
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:

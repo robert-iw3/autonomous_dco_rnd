@@ -102,6 +102,20 @@ class TestReconciliation:
         missing = referenced - defined
         assert not missing, f"containment.toml references n8n webhooks with no workflow: {sorted(missing)}"
 
+    def test_external_endpoints_are_https_or_env(self):
+        # F-4: a containment endpoint that leaves the deepnet must be https or an
+        # env placeholder (never a plaintext hardcoded URL that could be redirected).
+        bad = []
+        for pname, prov in CONTAINMENT.get("providers", {}).items():
+            for aname, action in prov.get("actions", {}).items():
+                ep = action.get("endpoint", "")
+                if "n8n:5678" in ep:
+                    continue  # internal deepnet webhook (network-isolated)
+                if ep.startswith(("${", "https://", "taskstore://")):
+                    continue
+                bad.append(f"{pname}.{aname}: {ep}")
+        assert not bad, f"plaintext/insecure external containment endpoints: {bad}"
+
     def test_cloud_providers_referenced_exist(self):
         # vmware is intentionally uncovered (no [providers.vmware_containment_v1])
         envs = {env for (_tc, env, _a) in CAPS}

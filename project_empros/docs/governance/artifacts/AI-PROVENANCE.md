@@ -28,7 +28,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **2. Execution** — Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted.
 
-`analytics/llm_hunter/agents/response.py:L237-L239`
+`analytics/llm_hunter/agents/response.py:L238-L240`
 
 ```python
     # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as

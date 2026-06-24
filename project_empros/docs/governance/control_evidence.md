@@ -150,7 +150,7 @@ AI_PROVENANCE_BANNER = (
 
 **2. Execution** — Wired into recall: a high-similarity historical FP may short-circuit the swarm only while its memory has not expired.
 
-`analytics/llm_hunter/agents/supervisor.py:L235-L239`
+`analytics/llm_hunter/agents/supervisor.py:L236-L240`
 
 ```python
             if hits and memory_is_actionable(hits[0].payload, time.time()):
@@ -162,7 +162,7 @@ AI_PROVENANCE_BANNER = (
 
 **3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
 
-`analytics/llm_hunter/agents/response.py:L141-L143`
+`analytics/llm_hunter/agents/response.py:L142-L144`
 
 ```python
                     # NIST GV-1.3-005: timestamp so the supervisor's recall can
@@ -202,7 +202,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **2. Execution** — Wired into the response agent: every analyst-facing incident report is provenance-stamped before it is returned or persisted.
 
-`analytics/llm_hunter/agents/response.py:L237-L239`
+`analytics/llm_hunter/agents/response.py:L238-L240`
 
 ```python
     # AI-origin disclosure (NIST MP-5.1-003): stamp every analyst-facing report as
@@ -545,7 +545,7 @@ def run_bias_audit(records: List[Dict[str, Any]], dimension: str = "source_type"
 
 **1. Invocation** — Wired into the terminal node: every investigation hands its final verdict to the lineage append (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L169-L179`
+`analytics/llm_hunter/agents/response.py:L170-L180`
 
 ```python
     try:
@@ -617,7 +617,7 @@ def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
 
 **1. Invocation** — Wired into the terminal node: every investigation records a per-run energy/carbon estimate over the measured inference window (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L184-L188`
+`analytics/llm_hunter/agents/response.py:L185-L189`
 
 ```python
     try:
@@ -865,7 +865,7 @@ def record_reliance(verdict: dict, operator_action: str,
 
 **1. Invocation** — Wired into the terminal node: on every run a confabulated (grounding-violated) verdict is handed to the capture path (fail-soft).
 
-`analytics/llm_hunter/agents/response.py:L195-L200`
+`analytics/llm_hunter/agents/response.py:L196-L201`
 
 ```python
         if grounding_violations:
@@ -983,7 +983,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **2. Effect** — In-node enforcement: exceeding the entity cap forces FINISH with a conservative verdict, hard-capping the blast radius of any single investigation.
 
-`analytics/llm_hunter/agents/supervisor.py:L196-L199`
+`analytics/llm_hunter/agents/supervisor.py:L197-L200`
 
 ```python
     if len(entities) > MAX_ENTITIES:
@@ -994,7 +994,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — At dispatch, a TIER-1 critical-asset target forces manual review — autonomous containment never fires on crown-jewel hosts.
 
-`analytics/llm_hunter/agents/response.py:L78-L80`
+`analytics/llm_hunter/agents/response.py:L79-L81`
 
 ```python
         av = ASSET_REGISTRY.get(target, DEFAULT_ASSET_VALUE)
@@ -1097,7 +1097,7 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **2. Execution** — Wired into the response path: the SOAR reason is DLP-scrubbed before it leaves the swarm, enforcing sovereign data isolation.
 
-`analytics/llm_hunter/agents/response.py:L349-L349`
+`analytics/llm_hunter/agents/response.py:L350-L350`
 
 ```python
     reason = CognitiveSanitizer.scrub_outbound_dlp(reason_raw)[:200]
@@ -1229,7 +1229,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **3. Execution** — At runtime each node walks the chain provider-by-provider; total failure emits a safe default (monitor) rather than crashing.
 
-`analytics/llm_hunter/agents/response.py:L217-L218`
+`analytics/llm_hunter/agents/response.py:L218-L219`
 
 ```python
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
@@ -1246,7 +1246,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **1. Logic** — Each SOAR dispatch carries a deterministic idempotency key (target + quantised 15-min window) so a retried response cannot double-execute.
 
-`analytics/llm_hunter/agents/response.py:L373-L376`
+`analytics/llm_hunter/agents/response.py:L374-L377`
 
 ```python
         "containment_escalations": protocol["escalations"],
@@ -1257,7 +1257,7 @@ def build_failover_chain(temperature: float = 0.0):
 
 **2. Execution** — The SOAR worker independently TTL-dedups by (incident, action) and suppresses a duplicate containment even across retries — exactly-once at the executor.
 
-`services/worker_soar/src/main.rs:L314-L317`
+`services/worker_soar/src/main.rs:L335-L338`
 
 ```rust
                 let mut dedup = self.dedup.write().await;

@@ -42,7 +42,7 @@ AI_PROVENANCE_BANNER = (
 
 **2. Execution** — Wired into recall: a high-similarity historical FP may short-circuit the swarm only while its memory has not expired.
 
-`analytics/llm_hunter/agents/supervisor.py:L235-L239`
+`analytics/llm_hunter/agents/supervisor.py:L236-L240`
 
 ```python
             if hits and memory_is_actionable(hits[0].payload, time.time()):
@@ -54,7 +54,7 @@ AI_PROVENANCE_BANNER = (
 
 **3. Persistence** — The write path stamps every persisted memory point with created_at, so the recall-side TTL check above can actually expire stale immunity.
 
-`analytics/llm_hunter/agents/response.py:L141-L143`
+`analytics/llm_hunter/agents/response.py:L142-L144`
 
 ```python
                     # NIST GV-1.3-005: timestamp so the supervisor's recall can

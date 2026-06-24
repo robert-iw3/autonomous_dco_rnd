@@ -26,6 +26,7 @@ DETCHAMBER_COMPOSE = TESTS_DIR / "lab_det_chamber" / "docker-compose.yml"
 # conftest.py / its own runner when executed. Keep this list tight and justified.
 LIVE_OR_HOST = {
     "lab_nats_ingress/test_ingress_pipeline.py",      # live NATS
+    "lab_agentic_siem/test_siem_e2e.py",              # WS-J refinement sandbox (host-run until promoted to a section)
     "lab_qdrant_pipeline/test_qdrant_pipeline.py",    # live NATS + Qdrant
     "lab_middleware/test_middleware_etl.py",          # live ingress + NATS (compose lab)
     "test_model_regression.py",                       # live vLLM endpoint
