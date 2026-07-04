@@ -6,7 +6,7 @@
 
 **1. Logic** — SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
 
-`analytics/llm_hunter/tools/nexus_config.py:L118-L148`
+`analytics/llm_hunter/tools/nexus_config.py:L147-L177`
 
 ```python
 def get_siem_config(config: dict = None) -> dict:

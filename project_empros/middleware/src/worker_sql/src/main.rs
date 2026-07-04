@@ -256,9 +256,16 @@ async fn main() {
     let raw = fs::read_to_string(&config_path).unwrap();
     let conf: Config = toml::from_str(&raw).unwrap();
 
-    let backend = if let Some(url) = &conf.sql.test_webhook_url {
-        if !url.is_empty() {
-            info!("[SQL] TEST MODE → {}", url);
+    // Webhook TEST MODE disables TLS certificate validation, so it must never be
+    // reachable from config alone: a stray test_webhook_url in a production
+    // middleware.toml is refused unless NEXUS_SQL_ALLOW_TEST_MODE=1 is also set.
+    // Fail closed to the real TDS backend.
+    let test_mode_allowed = std::env::var("NEXUS_SQL_ALLOW_TEST_MODE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let backend = match &conf.sql.test_webhook_url {
+        Some(url) if !url.is_empty() && test_mode_allowed => {
+            info!("[SQL] TEST MODE (insecure TLS) → {}", url);
             Backend::Webhook {
                 client: reqwest::Client::builder()
                     .danger_accept_invalid_certs(true)
@@ -267,11 +274,13 @@ async fn main() {
                     .unwrap(),
                 url: url.clone(),
             }
-        } else {
+        }
+        Some(url) if !url.is_empty() => {
+            error!("[SQL] test_webhook_url is set but NEXUS_SQL_ALLOW_TEST_MODE is \
+                    not enabled -- refusing insecure webhook test mode, using TDS.");
             try_build_tds(&conf.sql)
         }
-    } else {
-        try_build_tds(&conf.sql)
+        _ => try_build_tds(&conf.sql),
     };
 
     match &backend {

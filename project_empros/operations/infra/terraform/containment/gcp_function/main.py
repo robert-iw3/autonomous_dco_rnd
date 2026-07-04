@@ -7,11 +7,12 @@ HTTP POST payload:
   {
     "incident_id": "INC-XXXX",
     "target_ip":   "1.2.3.4",
-    "action":      "isolate" | "release",
+    "action":      "isolate" | "release" | "snapshot_volume",
     "network":     "default"   # optional override
   }
 
-Requires: roles/compute.securityAdmin on the project.
+Requires: roles/compute.securityAdmin on the project (firewall rules) and
+roles/compute.storageAdmin (disk snapshots).
 """
 
 import json
@@ -40,7 +41,7 @@ def rule_name(target_ip: str, incident_id: str) -> str:
     return f"{RULE_PREFIX}-{safe_ip}-{safe_inc}"
 
 
-def isolate(service, project: str, target_ip: str, incident_id: str, network: str) -> dict:
+def isolate_ip(service, project: str, target_ip: str, incident_id: str, network: str) -> dict:
     name = rule_name(target_ip, incident_id)
     body = {
         "name": name,
@@ -75,7 +76,7 @@ def isolate(service, project: str, target_ip: str, incident_id: str, network: st
     }
 
 
-def release(service, project: str, target_ip: str, incident_id: str) -> dict:
+def release_ip(service, project: str, target_ip: str, incident_id: str) -> dict:
     name = rule_name(target_ip, incident_id)
     deleted = []
     for rule in [name, f"{name}-egress"]:
@@ -85,6 +86,49 @@ def release(service, project: str, target_ip: str, incident_id: str) -> dict:
         except Exception:
             pass
     return {"status": "RELEASED", "deleted_rules": deleted}
+
+
+def _find_instance(service, project: str, target_ip: str):
+    """Resolve (instance, zone) by internal or NAT IP across all zones."""
+    agg = service.instances().aggregatedList(project=project).execute()
+    for scope, payload in (agg.get("items") or {}).items():
+        for inst in payload.get("instances", []) or []:
+            for nic in inst.get("networkInterfaces", []) or []:
+                nat_ips = [ac.get("natIP") for ac in nic.get("accessConfigs", []) or []]
+                if nic.get("networkIP") == target_ip or target_ip in nat_ips:
+                    zone = inst["zone"].rsplit("/", 1)[-1]
+                    return inst, zone
+    return None, None
+
+
+def _snapshot_name(incident_id: str, disk_name: str) -> str:
+    """RFC1035 snapshot name: lowercase, hyphens, <=62 chars."""
+    safe_inc = "".join(c if c.isalnum() else "-" for c in incident_id.lower())[:20]
+    return f"nexus-{safe_inc}-{disk_name}"[:62].rstrip("-")
+
+
+def snapshot_volume(service, project: str, target_ip: str, incident_id: str) -> dict:
+    """Evidence-first: snapshot every disk attached to the target instance."""
+    inst, zone = _find_instance(service, project, target_ip)
+    if not inst:
+        raise RuntimeError(f"no instance found for ip={target_ip}")
+    snapshots = []
+    for disk in inst.get("disks", []) or []:
+        disk_name = (disk.get("source") or "").rsplit("/", 1)[-1]
+        if not disk_name:
+            continue
+        body = {
+            "name": _snapshot_name(incident_id, disk_name),
+            "description": f"Nexus IR evidence snapshot {incident_id} ({inst['name']})",
+            "labels": {"nexus-managed": "true", "nexus-component": "containment"},
+        }
+        service.disks().createSnapshot(
+            project=project, zone=zone, disk=disk_name, body=body).execute()
+        snapshots.append(body["name"])
+    if not snapshots:
+        raise RuntimeError(f"no disks attached to instance {inst['name']}")
+    return {"status": "SNAPSHOTTED", "instance": inst["name"], "zone": zone,
+            "snapshots": snapshots}
 
 
 @functions_framework.http
@@ -111,9 +155,11 @@ def isolate(request):
         service, project = get_service()
 
         if action == "isolate":
-            result = isolate(service, project, target_ip, incident_id, network)
+            result = isolate_ip(service, project, target_ip, incident_id, network)
         elif action == "release":
-            result = release(service, project, target_ip, incident_id)
+            result = release_ip(service, project, target_ip, incident_id)
+        elif action == "snapshot_volume":
+            result = snapshot_volume(service, project, target_ip, incident_id)
         else:
             return json.dumps({"error": f"unknown action: {action}"}), 400, {"Content-Type": "application/json"}
 

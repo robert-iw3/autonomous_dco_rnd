@@ -6,10 +6,10 @@
 
 **1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
 
-`analytics/llm_hunter/orchestrator.py:L199-L199`
+`analytics/llm_hunter/orchestrator.py:L233-L233`
 
 ```python
-            canary = CognitiveSanitizer.generate_canary()
+        canary = CognitiveSanitizer.generate_canary()
 ```
 
 **2. Logic** — The canary is a unique UUID tripwire — its only legitimate place is the system prompt, so any later appearance downstream is proof of a prompt leak.
@@ -31,11 +31,11 @@
 
 **3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
-`analytics/llm_hunter/orchestrator.py:L260-L263`
+`analytics/llm_hunter/orchestrator.py:L294-L297`
 
 ```python
-            # OWASP LLM01: verify the canary did not leak into any outbound surface.
-            report = final_state.get("incident_report", "") or ""
-            action = final_state.get("action_payload", {}) or {}
-            if canary in report or canary in json.dumps(action):
+        # OWASP LLM01: verify the canary did not leak into any outbound surface.
+        report = final_state.get("incident_report", "") or ""
+        action = final_state.get("action_payload", {}) or {}
+        if canary in report or canary in json.dumps(action):
 ```

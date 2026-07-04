@@ -272,3 +272,13 @@ evidence:
        caption: "Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor."}
     - {file: analytics/llm_hunter/agents/energy_accounting.py, step: Execution, anchor: "def record_run", after: 10,
        caption: "Each run's estimate is appended to an energy ledger the MLOps metric plane rolls up via totals()."}
+
+  NC-7-ENDPOINT-ABUSE:
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def query_volume_anomalies", after: 12,
+       caption: "Per-caller volume spike over the caller's own baseline (or an absolute floor for a cold-start abuser) -- the model-extraction volume signal."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def membership_inference_signal", after: 18,
+       caption: "Systematic near-duplicate probing: mean pairwise token-set Jaccard flags a caller sweeping perturbed prompts to map the decision boundary."}
+    - {file: analytics/llm_hunter/agents/controls.py, step: Logic, anchor: "def endpoint_abuse_report", after: 16,
+       caption: "Combines quota, volume, and probing signals into a per-caller verdict with the tripped axes, for operator throttle/revoke."}
+    - {file: analytics/llm_hunter/agents/endpoint_abuse_monitor.py, step: Execution, anchor: "def collect_and_monitor", after: 6,
+       caption: "Scheduler entry point: pulls the sovereign vLLM access log, runs the abuse audit against the prior-window baseline, and writes a dated report."}

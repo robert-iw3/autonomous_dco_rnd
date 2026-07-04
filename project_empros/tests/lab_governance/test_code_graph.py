@@ -98,6 +98,37 @@ class TestExtractors:
         assert stages[1][2] == "Build inventory."                       # multi-line docstring
 
 
+class TestComponentInventory:
+    def test_middleware_fanout_workers_are_components(self):
+        # the SIEM fanout workers are distinct deployables, not one blob
+        comps = cg.build_graph()["components"]
+        for w in ("worker_splunk", "worker_elastic", "worker_nexus", "worker_sql"):
+            assert w in comps, f"{w} missing from component inventory"
+            assert comps[w]["language"] == "rust"
+
+    def test_looking_glass_web_ui_present(self):
+        comps = cg.build_graph()["components"]
+        assert "looking_glass" in comps, "web UI must appear in the inventory"
+        assert comps["looking_glass"]["language"] == "svelte-ts"
+
+
+class TestVendoredTreesSkipped:
+    def test_vendored_tool_distros_not_scanned(self):
+        # operations/playbooks/tools/ holds vendored third-party distributions
+        # (memprocfs, capa, floss, vol3 wheels...); scanning their thousands of
+        # source files makes the graph build pathological and pollutes edges.
+        rels = [rel for rel, _ in cg._iter_source_files()]
+        vendored = [r for r in rels
+                    if r.startswith("operations/playbooks/tools/")
+                    or "threat_hunting/egress_monitor/tools/" in r]
+        assert not vendored, f"vendored files scanned: {vendored[:5]}"
+
+    def test_own_playbook_source_still_scanned(self):
+        rels = [rel for rel, _ in cg._iter_source_files()]
+        assert any(r.startswith("operations/") for r in rels), \
+            "our own operations source must still be in the graph"
+
+
 # ── real-repo invariants (the graph must reflect the actual wiring) ─────────
 class TestRealGraph:
     G = cg.build_graph()

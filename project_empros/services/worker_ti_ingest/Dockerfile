@@ -16,11 +16,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY *.py .
 
+RUN groupadd -g 10073 nexus \
+    && useradd -u 10073 -g nexus -s /usr/sbin/nologin -M nexus \
+    && mkdir -p /opt/ti_index \
+    && chown -R nexus:nexus /app /opt/ti_index
+
 # Pre-downloaded model volumes are mounted at these paths:
 #   /opt/models/bge-m3          -- BAAI/bge-m3 embedding model
 #   /opt/models/reranker        -- cross-encoder/ms-marco-MiniLM-L-6-v2
 #   /opt/ti_index/              -- TurboVec .tq index (optional, rebuilt from Qdrant if missing)
 VOLUME ["/opt/models", "/opt/ti_index"]
+
+USER nexus
 
 EXPOSE 8010
 

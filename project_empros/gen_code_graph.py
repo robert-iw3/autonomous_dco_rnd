@@ -38,8 +38,12 @@ _COMPONENTS = [
     ("services/worker_s3_archive", "worker_s3_archive", "rust"),
     ("services/worker_rlhf", "worker_rlhf", "rust"),
     ("services/worker_ti_ingest", "worker_ti_ingest", "python"),
-    ("services/looking_glass", "looking_glass", "rust"),
+    ("services/looking_glass", "looking_glass", "svelte-ts"),
     ("libs/lib_siem_core", "lib_siem_core", "rust"),
+    ("middleware/src/worker_splunk", "worker_splunk", "rust"),
+    ("middleware/src/worker_elastic", "worker_elastic", "rust"),
+    ("middleware/src/worker_nexus", "worker_nexus", "rust"),
+    ("middleware/src/worker_sql", "worker_sql", "rust"),
     ("middleware/src", "middleware", "rust"),
     ("operations/agent", "on_host_agent", "python"),
     ("operations/playbooks", "ir_playbooks", "mixed"),
@@ -47,8 +51,20 @@ _COMPONENTS = [
     ("det_chamber", "det_chamber", "python"),
     ("infrastructure/nats", "nats_streams", "shell"),
 ]
-_SCAN_EXT = {".py", ".rs", ".sh"}
+_SCAN_EXT = {".py", ".rs", ".sh", ".ts", ".svelte"}
 _SKIP = {"tests", "target", "data", "__pycache__", "node_modules", ".git", "img", "archive"}
+# Vendored third-party distributions: present in the tree but not our source.
+_SKIP_PREFIXES = ("operations/playbooks/tools/",)
+_SKIP_SUBPATHS = ("threat_hunting/egress_monitor/tools/",)
+
+
+def _skipped(rel_path) -> bool:
+    rel = rel_path.as_posix() if hasattr(rel_path, "as_posix") else str(rel_path)
+    if rel.startswith(_SKIP_PREFIXES):
+        return True
+    if any(sub in rel for sub in _SKIP_SUBPATHS):
+        return True
+    return any(part in _SKIP for part in rel.split("/"))
 
 _SUBJECT = re.compile(r'"((?:nexus|middleware)\.[a-zA-Z0-9_.*>]+)"')
 _CONST_DEF = re.compile(
@@ -298,7 +314,7 @@ def _iter_source_files():
         if p.suffix not in _SCAN_EXT or not p.is_file():
             continue
         rel = p.relative_to(ROOT).as_posix()
-        if any(part in _SKIP for part in p.relative_to(ROOT).parts):
+        if _skipped(p.relative_to(ROOT)):
             continue
         yield rel, p
 
@@ -403,7 +419,7 @@ def build_graph() -> dict:
                 comp_name = component_of(member + "/")[0]
                 crate_component[cname] = comp_name or cname
     for p in sorted(ROOT.rglob("Cargo.toml")):
-        if any(part in _SKIP for part in p.relative_to(ROOT).parts):
+        if _skipped(p.relative_to(ROOT)):
             continue
         rel = p.relative_to(ROOT).as_posix()
         cname = component_of(rel)[0] or ("middleware" if rel.startswith("middleware") else None)
@@ -425,7 +441,7 @@ def build_graph() -> dict:
 
     # -- infrastructure inventory (CG-2c) -------------------------------------
     tf = sorted({(t, n) for p in ROOT.rglob("*.tf")
-                 if not any(x in p.relative_to(ROOT).parts for x in _SKIP)
+                 if not _skipped(p.relative_to(ROOT))
                  for t, n in tf_resources(p.read_text(errors="replace"))})
     roles_dir = ROOT / "infrastructure/ansible/roles"
     roles = sorted(d.name for d in roles_dir.iterdir() if d.is_dir()) if roles_dir.exists else []

@@ -65,6 +65,9 @@ STACK_ALERT_EXTEND_S = int(os.getenv("NEXUS_STACK_ALERT_EXTEND_SECONDS", "3600")
 STACK_MONITOR_INTERVAL_S = 60  # lifecycle poll cadence
 
 _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
+# Retain scheduled investigation tasks: asyncio keeps only weak references, so a
+# fire-and-forget task can be garbage-collected mid-flight without this set.
+_inflight_investigations: set = set()
 
 METRIC_ANOMALIES = Counter('nexus_hunter_anomalies_detected_total', 'Total vector anomalies detected', ['source'])
 METRIC_ALERTS = Counter('nexus_hunter_alerts_dispatched_total', 'Total swarm alerts dispatched')
@@ -75,7 +78,7 @@ METRIC_STACK_TEARDOWNS = Counter('nexus_stack_teardowns_total', 'Stack teardowns
 async def bootstrap_swarm_memory():
     """Ensure the Swarm's long-term RAG memory collection exists on startup."""
     try:
-        response = await async_qdrant.get_collections
+        response = await async_qdrant.get_collections()
         existing = [c.name for c in response.collections]
         if MEMORY_COLLECTION not in existing:
             logger.info("First run detected. Bootstrapping Swarm RAG Memory...")
@@ -183,101 +186,132 @@ async def _broadcast_hud(alert: UnifiedAlertSchema, nc_client):
 
 
 async def trigger_swarm(alert: UnifiedAlertSchema, js_client, nc_client, graph):
-    """Execute the LangGraph DAG for one alert, then dispatch governed action."""
+    """Execute the LangGraph DAG for one alert, then dispatch governed action.
+
+    Public entry for direct/standalone callers: acquires admission itself so the
+    concurrency bound (DoS guard) always holds. The NATS/Redis consumers instead
+    admit-then-schedule via `_schedule_investigation` so backpressure reaches the
+    fetch loop before an alert is acked."""
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
-        await _broadcast_hud(alert, nc_client)
-        _t0 = time.monotonic()
-        with METRIC_LLM_LATENCY.time():
-            initial_entities = (
-                {alert.sensor_id: {"type": "ip", "status": "pending", "notes": "Initial alert target"}}
-                if alert.sensor_id else {}
-            )
-            kickoff_msg = HumanMessage(
-                content=f"New high-severity alert on {alert.sensor_id}. "
-                        f"Begin investigation and delegate queries to experts."
-            )
-            canary = CognitiveSanitizer.generate_canary()
+        await _investigate(alert, js_client, nc_client, graph)
 
-            # raw_event is kept as a structured dict; it is neutralized at render time.
-            initial_state = {
-                "alert": alert.model_dump(),
-                "messages": [kickoff_msg],
-                "entities_of_interest": initial_entities,
-                "next_agent": _initial_route(alert.source_type),
-                "verdict": None,
-                "action_payload": None,
-                "incident_report": None,
-                "canary": canary,
-                "gate_overrides": 0,
-                "analysis_complete": None,
+
+async def _schedule_investigation(alert: UnifiedAlertSchema, js_client, nc_client, graph):
+    """Admit one investigation (blocking on the concurrency bound) then spawn it.
+
+    Awaiting the semaphore here is the backpressure: when MAX_CONCURRENT are in
+    flight the calling consumer stops fetching/acking new alerts instead of
+    parking an unbounded pile of tasks. The task reference is retained so it is
+    not garbage-collected, and the permit is released when the DAG completes."""
+    await _investigation_sema.acquire()
+    task = asyncio.create_task(_investigate_and_release(alert, js_client, nc_client, graph))
+    _inflight_investigations.add(task)
+    task.add_done_callback(_inflight_investigations.discard)
+    return task
+
+
+async def _investigate_and_release(alert: UnifiedAlertSchema, js_client, nc_client, graph):
+    try:
+        await _investigate(alert, js_client, nc_client, graph)
+    finally:
+        _investigation_sema.release()
+
+
+async def _investigate(alert: UnifiedAlertSchema, js_client, nc_client, graph):
+    """The investigation DAG body. Admission is owned by the caller."""
+    await _broadcast_hud(alert, nc_client)
+    _t0 = time.monotonic()
+    with METRIC_LLM_LATENCY.time():
+        initial_entities = (
+            {alert.sensor_id: {"type": "ip", "status": "pending", "notes": "Initial alert target"}}
+            if alert.sensor_id else {}
+        )
+        kickoff_msg = HumanMessage(
+            content=f"New high-severity alert on {alert.sensor_id}. "
+                    f"Begin investigation and delegate queries to experts."
+        )
+        canary = CognitiveSanitizer.generate_canary()
+
+        # raw_event is kept as a structured dict; it is neutralized at render time.
+        initial_state = {
+            "alert": alert.model_dump(),
+            "messages": [kickoff_msg],
+            "entities_of_interest": initial_entities,
+            "next_agent": _initial_route(alert.source_type),
+            "verdict": None,
+            "action_payload": None,
+            "incident_report": None,
+            "canary": canary,
+            "gate_overrides": 0,
+            "analysis_complete": None,
+        }
+
+        config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
+        logger.info(f"Launch sequence initiated for Event {alert.event_id}...")
+
+        try:
+            final_state = await asyncio.wait_for(
+                graph.ainvoke(initial_state, config=config_opts),
+                timeout=INVESTIGATION_TIMEOUT_S,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                f"TIMEOUT: Swarm DAG for {alert.event_id} exceeded "
+                f"{INVESTIGATION_TIMEOUT_S}s. Escalating to MANUAL_REVIEW -- "
+                f"never silently discard a timed-out investigation."
+            )
+            timeout_action = {
+                "incident_id":   alert.event_id,
+                "action_type":   "manual_review_required",
+                "target_sensor": alert.sensor_id,
+                "targets":       [alert.sensor_id],
+                "confidence":    0.0,
+                "reason":        (
+                    f"Swarm DAG timed out after {int(INVESTIGATION_TIMEOUT_S)}s "
+                    f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f}). "
+                    f"Requires human review."
+                )[:200],
             }
+            await _dispatch_soar(alert, timeout_action, js_client)
+            return
+        except GraphRecursionError:
+            fault_reason = (
+                f"GraphRecursionError: DAG hit recursion_limit={RECURSION_LIMIT} "
+                f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f})."
+            )
+            logger.error(f"[!] COGNITIVE FAULT -- {fault_reason} Event={alert.event_id}")
+            await _publish_cognitive_dlq(alert, fault_reason, js_client)
+            return
+        except Exception as exc:
+            fault_reason = (
+                f"Unhandled cognitive fault ({type(exc).__name__}): {str(exc)[:120]} "
+                f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f})."
+            )
+            logger.error(f"[!] COGNITIVE FAULT -- {fault_reason} Event={alert.event_id}")
+            await _publish_cognitive_dlq(alert, fault_reason, js_client)
+            return
 
-            config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
-            logger.info(f"Launch sequence initiated for Event {alert.event_id}...")
+        # OWASP LLM01: verify the canary did not leak into any outbound surface.
+        report = final_state.get("incident_report", "") or ""
+        action = final_state.get("action_payload", {}) or {}
+        if canary in report or canary in json.dumps(action):
+            logger.critical(f"CANARY LEAK DETECTED in Event {alert.event_id}. "
+                            f"Halting SOAR pipeline.")
+            return
 
-            try:
-                final_state = await asyncio.wait_for(
-                    graph.ainvoke(initial_state, config=config_opts),
-                    timeout=INVESTIGATION_TIMEOUT_S,
-                )
-            except asyncio.TimeoutError:
-                logger.error(
-                    f"TIMEOUT: Swarm DAG for {alert.event_id} exceeded "
-                    f"{INVESTIGATION_TIMEOUT_S}s. Escalating to MANUAL_REVIEW -- "
-                    f"never silently discard a timed-out investigation."
-                )
-                timeout_action = {
-                    "incident_id":   alert.event_id,
-                    "action_type":   "manual_review_required",
-                    "target_sensor": alert.sensor_id,
-                    "targets":       [alert.sensor_id],
-                    "confidence":    0.0,
-                    "reason":        (
-                        f"Swarm DAG timed out after {int(INVESTIGATION_TIMEOUT_S)}s "
-                        f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f}). "
-                        f"Requires human review."
-                    )[:200],
-                }
-                await _dispatch_soar(alert, timeout_action, js_client)
-                return
-            except GraphRecursionError:
-                fault_reason = (
-                    f"GraphRecursionError: DAG hit recursion_limit={RECURSION_LIMIT} "
-                    f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f})."
-                )
-                logger.error(f"[!] COGNITIVE FAULT -- {fault_reason} Event={alert.event_id}")
-                await _publish_cognitive_dlq(alert, fault_reason, js_client)
-                return
-            except Exception as exc:
-                fault_reason = (
-                    f"Unhandled cognitive fault ({type(exc).__name__}): {str(exc)[:120]} "
-                    f"on {alert.source_type} anomaly (score={alert.anomaly_score:.2f})."
-                )
-                logger.error(f"[!] COGNITIVE FAULT -- {fault_reason} Event={alert.event_id}")
-                await _publish_cognitive_dlq(alert, fault_reason, js_client)
-                return
+        verdict = final_state.get("verdict") or {}
+        is_tp = bool(verdict.get("is_true_positive"))
 
-            # OWASP LLM01: verify the canary did not leak into any outbound surface.
-            report = final_state.get("incident_report", "") or ""
-            action = final_state.get("action_payload", {}) or {}
-            if canary in report or canary in json.dumps(action):
-                logger.critical(f"CANARY LEAK DETECTED in Event {alert.event_id}. "
-                                f"Halting SOAR pipeline.")
-                return
+        # Ephemeral ops interface only for CONFIRMED incidents (not raw score).
+        if is_tp and alert.anomaly_score >= 0.85:
+            await manage_ephemeral_interface("trigger", alert.event_id)
 
-            verdict = final_state.get("verdict") or {}
-            is_tp = bool(verdict.get("is_true_positive"))
+        await _dispatch_soar(alert, action, js_client)
 
-            # Ephemeral ops interface only for CONFIRMED incidents (not raw score).
-            if is_tp and alert.anomaly_score >= 0.85:
-                await manage_ephemeral_interface("trigger", alert.event_id)
-
-            await _dispatch_soar(alert, action, js_client)
-
-            # Measurement plane (M-27): emit the per-investigation metrics record,
-            # fire-and-forget - never blocks or fails the SOAR path.
-            await _emit_investigation_metrics(
-                alert, final_state, js_client, int((time.monotonic() - _t0) * 1000))
+        # Measurement plane (M-27): emit the per-investigation metrics record,
+        # fire-and-forget - never blocks or fails the SOAR path.
+        await _emit_investigation_metrics(
+            alert, final_state, js_client, int((time.monotonic() - _t0) * 1000))
 
 
 async def _emit_investigation_metrics(alert, final_state, js_client, wall_ms):
@@ -330,7 +364,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
             "nexus.soar.execute",   # H-I2 fix: was "Nexus_System.SOAR.ManualQueue" -- worker_soar subscribes to nexus.soar.execute (lowercase)
             json.dumps(manual_payload).encode(),
         )
-        METRIC_ALERTS.inc
+        METRIC_ALERTS.inc()
         logger.warning(
             f"[!] MANUAL REVIEW QUEUED: {alert.sensor_id} "
             f"reason={manual_payload['reason'][:80]}"
@@ -376,7 +410,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
         json.dumps(dump).encode(),
         headers={"Nats-Msg-Id": msg_id} if msg_id else None,
     )
-    METRIC_ALERTS.inc
+    METRIC_ALERTS.inc()
     logger.warning(f"[+] CONTAINMENT PUBLISHED to JetStream for {validated.target_sensor} "
                    f"({action_type})")
 
@@ -409,8 +443,10 @@ async def redis_polling_loop(js_client, nc_client, graph):
                 continue
             if not await is_new_anomaly(alert.event_id):
                 continue
-            METRIC_ANOMALIES.labels(source="redis").inc
-            asyncio.create_task(trigger_swarm(alert, js_client, nc_client, graph))
+            METRIC_ANOMALIES.labels(source="redis").inc()
+            # Admit (blocking on the concurrency bound) before popping the next
+            # alert -- backpressure instead of an unbounded task pile.
+            await _schedule_investigation(alert, js_client, nc_client, graph)
         except Exception as e:
             logger.error(f"[!] Redis polling exception: {e}")
             await asyncio.sleep(1)
@@ -444,30 +480,33 @@ async def reactive_alert_consumer(js_client, nc_client, graph):
                 alert = _parse_alert(alert_data)
             except (ValidationError, json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison message TERMinated (will not redeliver): {e}")
-                await msg.term
+                await msg.term()
                 continue
             except Exception as e:
                 logger.error(f"Unexpected parse error; NAK for redelivery: {e}")
-                await msg.nak
+                await msg.nak()
                 continue
 
             try:
                 if not await is_new_anomaly(alert.event_id):
-                    await msg.ack  # already handled; drop the duplicate
+                    await msg.ack()  # already handled; drop the duplicate
                     continue
-                METRIC_ANOMALIES.labels(source="nats").inc
-                asyncio.create_task(trigger_swarm(alert, js_client, nc_client, graph))
-                # At-most-once: ack on successful scheduling. Investigations are
-                # idempotent via thread_id=event_id and the dedup lock above.
-                await msg.ack
+                METRIC_ANOMALIES.labels(source="nats").inc()
+                # Admit before ack: _schedule_investigation blocks on the
+                # concurrency bound, so a saturated pipeline stops fetching
+                # instead of acking alerts it has not started. Ack only after the
+                # investigation is admitted and scheduled; at-least-once redelivery
+                # is idempotent via thread_id=event_id and the dedup lock above.
+                await _schedule_investigation(alert, js_client, nc_client, graph)
+                await msg.ack()
             except Exception as e:
                 logger.error(f"Failed to schedule investigation; NAK: {e}")
-                await msg.nak
+                await msg.nak()
 
 
 async def _teardown_stack(event_id: str, reason: str = "unknown"):
     """Remove a stack from the active set, run teardown, and purge lifecycle state."""
-    METRIC_STACK_TEARDOWNS.labels(reason=reason).inc
+    METRIC_STACK_TEARDOWNS.labels(reason=reason).inc()
     await redis_client.srem("nexus:active_operations_stacks", event_id)
     await manage_ephemeral_interface("teardown", event_id)
     for suffix in ("created_at", "ttl_deadline", "last_alert_at", "status"):
@@ -523,7 +562,7 @@ async def manage_ephemeral_interface(action: str, event_id: str):
             script, event_id,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate
+        stdout, stderr = await process.communicate()
         if process.returncode != 0:
             logger.error(f"Interface {action} script failed: {stderr.decode()}")
             if action == "trigger":
@@ -580,13 +619,13 @@ async def soar_callback_listener(js_client):
                     logger.warning(f"[SOAR] {event_id} reported {soar_status}. TTL extended to "
                                    f"{(new_deadline - now) / 60:.0f}m remaining for operator review.")
 
-                await msg.ack
+                await msg.ack()
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison callback TERMinated: {e}")
-                await msg.term
+                await msg.term()
             except Exception as e:
                 logger.error(f"Callback handling fault; NAK: {e}")
-                await msg.nak
+                await msg.nak()
 
 
 async def detonation_enrichment_listener(js_client):
@@ -622,20 +661,20 @@ async def detonation_enrichment_listener(js_client):
                         validated = SoarExecutionSchema(**action)
                     except ValidationError as e:
                         logger.error(f"Enrichment action failed schema validation; dropping: {e}")
-                        await msg.ack
+                        await msg.ack()
                         continue
                     dump = validated.model_dump()
                     dump["reason"] = CognitiveSanitizer.scrub_outbound_dlp(dump.get("reason", ""))
                     await js_client.publish("nexus.soar.execute", json.dumps(dump).encode())
                     logger.warning(f"[DETONATION] {incident_id}: {validated.action_type} "
                                    f"(verdict-driven follow-up).")
-                await msg.ack
+                await msg.ack()
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error(f"Poison detonation alert TERMinated: {e}")
-                await msg.term
+                await msg.term()
             except Exception as e:
                 logger.error(f"Detonation enrichment fault; NAK: {e}")
-                await msg.nak
+                await msg.nak()
 
 
 async def stack_lifecycle_monitor():
@@ -742,7 +781,7 @@ async def main():
     logger.info("Starting Prometheus Exporter on Port 8000")
     start_http_server(8000)
 
-    await bootstrap_swarm_memory
+    await bootstrap_swarm_memory()
 
     # H-F4 fix: use reconnect-aware connect helper
     nc = await _connect_nats_with_retry(os.getenv("NATS_URL", "nats://nats:4222"))
@@ -753,7 +792,7 @@ async def main():
     # to the constructor and never ran asetup).
     async with AsyncRedisSaver.from_conn_string(REDIS_URL) as checkpointer:
         try:
-            await checkpointer.asetup
+            await checkpointer.asetup()
         except AttributeError:
             pass  # some versions set up lazily
         graph = build_graph(checkpointer)

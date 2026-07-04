@@ -98,7 +98,7 @@ flowchart LR
 | Store | Kind | Touched by |
 |---|---|---|
 | `qdrant_swarm_memory` | qdrant | llm_hunter_swarm |
-| `qdrant_ti_corpus` | qdrant | worker_ti_ingest |
+| `qdrant_ti_corpus` | qdrant | looking_glass, worker_ti_ingest |
 | `s3_cold_archive` | s3 | llm_hunter_swarm, worker_s3_archive |
 | `s3_memory_evidence` | s3 | core_ingress, worker_memory |
 | `s3_quarantine` | s3 | det_chamber |
@@ -111,19 +111,24 @@ Each component: language, how it's **built** (Dockerfile), **deployed** (Ansible
 |---|---|---|---|---|---|---|---|---|
 | **core_ingress** | rust | services/core_ingress/Dockerfile | rust_ingress @ ingress | services | 2->1 | - | 1 | 2 |
 | **det_chamber** | python | det_chamber/agents/Dockerfile | - | detchamber | 2->2 | - | 0 | 14 |
-| **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 88 |
+| **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 223 |
 | **lib_siem_core** | rust | libs/lib_siem_core/Dockerfile | - | services | 0->1 | - | 2 | 2 |
-| **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 4->3 | - | 24 | 37 |
-| **middleware** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 10 |
-| **mlops_pipeline** | python | mlops/scripts/Dockerfile | - | offline | 1->1 | - | 2 | 51 |
+| **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 4->3 | - | 25 | 39 |
+| **looking_glass** | svelte-ts | services/looking_glass/Dockerfile | - | services | 0->0 | - | 0 | 4 |
+| **middleware** | rust | middleware/src/Dockerfile | - | services | 0->0 | - | 0 | 6 |
+| **mlops_pipeline** | python | mlops/scripts/Dockerfile | - | offline | 1->1 | - | 2 | 52 |
 | **nats_streams** | shell | infrastructure/nats/Dockerfile | - | services | 0->0 | - | 0 | 1 |
 | **on_host_agent** | python | operations/agent/Dockerfile | - | services | 0->0 | - | 0 | 2 |
+| **worker_elastic** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
 | **worker_memory** | python | services/worker_memory/Dockerfile | memory_worker @ analytics | memory | 2->2 | - | 0 | 3 |
+| **worker_nexus** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_middleware | 0 | 1 |
 | **worker_qdrant** | rust | services/worker_qdrant/Dockerfile | rust_podman_worker @ workers | services | 1->0 | lib_siem_core | 0 | 1 |
 | **worker_rlhf** | rust | services/worker_rlhf/Dockerfile | rust_podman_worker @ workers | services | 0->1 | lib_siem_core | 1 | 1 |
 | **worker_rules** | rust | services/worker_rules/Dockerfile | rust_podman_worker @ workers | services | 0->0 | lib_siem_core | 0 | 1 |
 | **worker_s3_archive** | rust | services/worker_s3_archive/Dockerfile | rust_podman_worker @ workers | services | 0->0 | - | 0 | 1 |
 | **worker_soar** | rust | services/worker_soar/Dockerfile | rust_podman_worker @ workers | services | 1->1 | lib_siem_core | 1 | 2 |
+| **worker_splunk** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
+| **worker_sql** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
 | **worker_ti_ingest** | python | services/worker_ti_ingest/Dockerfile | ti_ingest_worker @ ti | mlops | 0->0 | - | 0 | 4 |
 
 ## GRC controls -> components + tests
@@ -146,6 +151,7 @@ Joins the governance dossier into the graph: each control's implementing compone
 | `NC-3-FRONTIER-PIN` | implemented | llm_hunter_swarm | tests/lab_governance/test_nist_controls_wave2.py::TestFrontierPinEnforcement |
 | `NC-4-RETENTION` | documented | - | - |
 | `NC-6-ENERGY` | documented | - | - |
+| `NC-7-ENDPOINT-ABUSE` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestEndpointQuota, tests/lab_governance/test_ai_controls.py::TestVolumeAnomaly, tests/lab_governance/test_ai_controls.py::TestMembershipInferenceSignal, tests/lab_governance/test_ai_controls.py::TestEndpointAbuseReport, tests/lab_governance/test_nist_controls_wave4.py::TestEndpointAbuseMonitor |
 | `NC-8-OVER-RELIANCE` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestOverReliance, tests/lab_governance/test_nist_controls_wave4.py::TestRelianceLedger |
 | `NC-9-ACTIVE-LEARNING` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestActiveLearningFailure, tests/lab_governance/test_nist_controls_wave4.py::TestActiveLearning |
 | `SEC-BLAST-RADIUS` | implemented | llm_hunter_swarm | tests/lab_analytics_hunter/test_hunter_contracts.py |
@@ -172,7 +178,7 @@ Joins the governance dossier into the graph: each control's implementing compone
 
 **Ansible roles** (20): `bare_metal_base`, `common_hardening`, `det_chamber_linux`, `det_chamber_sandbox`, `gpu_inference`, `haproxy_node`, `internal_networking`, `looking_glass`, `memory_worker`, `minio_node`, `nats_node`, `nexus_hunter`, `observability_node`, `opencti_node`, `podman_setup`, `qdrant_node`, `redis_node`, `rust_ingress`, `rust_podman_worker`, `ti_ingest_worker`
 
-**Terraform resources** (65):
+**Terraform resources** (66):
 
 | Type | Name |
 |---|---|
@@ -219,6 +225,7 @@ Joins the governance dossier into the graph: each control's implementing compone
 | `google_cloudfunctions_function` | gcp_isolate |
 | `google_cloudfunctions_function_iam_member` | invoker |
 | `google_project_iam_member` | containment_compute_admin |
+| `google_project_iam_member` | containment_storage_admin |
 | `google_service_account` | containment |
 | `google_storage_bucket` | evidence |
 | `google_storage_bucket` | function_source |
@@ -256,11 +263,8 @@ Tailored containment actions the swarm may plan per target class + environment -
 | cloud_instance | aws | `snapshot_volume` | aws_containment_v1 |
 | cloud_instance | azure | `isolate_host` | azure_containment_v1 |
 | cloud_instance | azure | `release_host` | azure_containment_v1 |
-| cloud_instance | azure | `revoke_instance_role` | azure_containment_v1 |
-| cloud_instance | azure | `snapshot_volume` | azure_containment_v1 |
 | cloud_instance | gcp | `isolate_host` | gcp_containment_v1 |
 | cloud_instance | gcp | `release_host` | gcp_containment_v1 |
-| cloud_instance | gcp | `revoke_instance_role` | gcp_containment_v1 |
 | cloud_instance | gcp | `snapshot_volume` | gcp_containment_v1 |
 | container | k8s | `cordon_node` | k8s_containment_v1 |
 | container | k8s | `kill_pod` | k8s_containment_v1 |
@@ -350,6 +354,7 @@ End-to-end flows run as numbered scripts: `deploy` (orchestration) and `mlops` (
 | 07 | `feed_ingest` | 07_feed_ingest.py — Continuous threat feed pipeline (PIPELINE Phase 1) |
 | 08 | `rsi_loop` | 08_rsi_loop.py -- ADDON Phase 4: Closed-Loop Recursive Self-Improvement |
 | 09 | `benchmark_runner` | 09_benchmark_runner.py — WS-A M-26 benchmark runner + registry. |
+| 10 | `freeze_replay_case` | 10_freeze_replay_case.py - freeze closed investigations into replay bench cases. |
 | 11 | `join_outcomes` | 11_join_outcomes.py — WS-A M-27 delayed-ground-truth join. |
 
 ## Python intra-repo imports
@@ -362,6 +367,7 @@ Module -> local modules it imports (call-chain within the Python planes).
 - `analytics/llm_hunter/agents/calibration_ledger.py` -> `agents.controls`
 - `analytics/llm_hunter/agents/cloud_expert.py` -> `agents.expert_base`, `state`, `tools`, `tools.query_cookbook`, `tools.siem_cookbook`
 - `analytics/llm_hunter/agents/containment_protocol.py` -> `agents.containment_capability`, `agents.lateral_movement`, `agents.playbook_planner`, `agents.target_class`
+- `analytics/llm_hunter/agents/endpoint_abuse_monitor.py` -> `agents.controls`
 - `analytics/llm_hunter/agents/energy_accounting.py` -> `agents.controls`
 - `analytics/llm_hunter/agents/expert_base.py` -> `agents.llm_providers`, `tools.sanitizer`
 - `analytics/llm_hunter/agents/host_expert.py` -> `agents.expert_base`, `state`, `tools`, `tools.query_cookbook`, `tools.siem_cookbook`
@@ -370,6 +376,7 @@ Module -> local modules it imports (call-chain within the Python planes).
 - `analytics/llm_hunter/agents/nettap_expert.py` -> `agents.expert_base`, `state`, `tools`, `tools.query_cookbook`, `tools.siem_cookbook`
 - `analytics/llm_hunter/agents/response.py` -> `agents.active_learning`, `agents.containment_protocol`, `agents.controls`, `agents.energy_accounting`, `agents.llm_providers`, `agents.playbook_planner`, `agents.verdict_ledger`, `state`, `tools.sanitizer`
 - `analytics/llm_hunter/agents/review_board.py` -> `agents.controls`, `agents.llm_providers`, `state`, `tools.nexus_config`, `tools.siem_query`
+- `analytics/llm_hunter/agents/scheduled_audits.py` -> `agents`
 - `analytics/llm_hunter/agents/supervisor.py` -> `agents.controls`, `agents.llm_providers`, `state`, `tools.nexus_config`
 - `analytics/llm_hunter/agents/target_class.py` -> `agents.lateral_movement`
 - `analytics/llm_hunter/agents/verdict_ledger.py` -> `agents.controls`

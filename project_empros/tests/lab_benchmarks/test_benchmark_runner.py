@@ -98,6 +98,44 @@ class TestAggregation:
         assert all(r.get("run_id") == "r1" for r in rows)
 
 
+# ── tier-scoped score payload (tier-0 canary file) ───────────────────────────
+class TestTierScorePayload:
+    _REG = {
+        "canary": {"version": "v1", "axis": "a", "target": "swarm-e2e",
+                   "scorer": "replay_graded", "tier": "tier-0", "gates": True},
+        "capability": {"version": "v1", "axis": "a", "target": "model_c",
+                       "scorer": "accuracy", "tier": "tier-1", "gates": True},
+        "trend_canary": {"version": "v1", "axis": "a", "target": "swarm-e2e",
+                         "scorer": "accuracy", "tier": "tier-0", "gates": False},
+    }
+
+    def test_only_gated_benches_of_requested_tier(self):
+        results = [_result("canary", "c1", 0.9), _result("capability", "k1", 0.8),
+                   _result("trend_canary", "t1", 0.5)]
+        t0 = br.tier_score_payload(results, self._REG, "tier-0")
+        assert t0 == {"canary": 0.9}
+
+    def test_empty_when_no_tier_results(self):
+        results = [_result("capability", "k1", 0.8)]
+        assert br.tier_score_payload(results, self._REG, "tier-0") == {}
+
+    def test_cli_writes_tier0_score_file(self, tmp_path):
+        results_f = tmp_path / "results.jsonl"
+        rows = [{"bench_id": "tier0_canary", "case_id": "c1", "score": 0.9},
+                {"bench_id": "hard_negative_heldout", "case_id": "h1", "score": 0.97}]
+        results_f.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        score_f = tmp_path / "latest.json"
+        tier0_f = tmp_path / "tier0.json"
+        rc = br.main(["--results", str(results_f), "--score-file", str(score_f),
+                      "--tier0-score-file", str(tier0_f),
+                      "--runs-ledger", str(tmp_path / "runs.jsonl")])
+        assert rc == 0
+        assert json.loads(tier0_f.read_text()) == {"tier0_canary": 0.9}
+        # the main score file still carries every gate-marked bench
+        full = json.loads(score_f.read_text())
+        assert "hard_negative_heldout" in full and "tier0_canary" in full
+
+
 # ── the point of M-26: activate the dormant M-24 regression gate ────────────
 class TestRegressionGateActivation:
     def test_produced_scores_drive_rsi_regression_gate(self, tmp_path, monkeypatch):

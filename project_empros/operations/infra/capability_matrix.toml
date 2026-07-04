@@ -49,12 +49,14 @@ capability = [
   { target_class="cloud_instance", environment="gcp",   action="release_host", executor="gcp_containment_v1",   wave=2, certainty_floor="malicious",    reversible_by="",             required=["target","incident_id"] },
 
   # -- cloud_instance - evidence-first snapshot + IAM role revocation --
+  # Only actions the target executor actually implements are declared here; an
+  # unimplemented action is deliberately absent so the planner surfaces it as an
+  # operator escalation instead of dispatching a step that silently no-ops.
+  # AWS lambda: snapshot_volume + revoke_instance_role. GCP function:
+  # snapshot_volume. Azure runbook + GCP role-revocation: not yet implemented.
   { target_class="cloud_instance", environment="aws",   action="snapshot_volume",       executor="aws_containment_v1",   wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
   { target_class="cloud_instance", environment="aws",   action="revoke_instance_role",  executor="aws_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
-  { target_class="cloud_instance", environment="azure", action="snapshot_volume",       executor="azure_containment_v1", wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
-  { target_class="cloud_instance", environment="azure", action="revoke_instance_role",  executor="azure_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
   { target_class="cloud_instance", environment="gcp",   action="snapshot_volume",       executor="gcp_containment_v1",   wave=1, certainty_floor="malicious",    reversible_by="", required=["target","incident_id"] },
-  { target_class="cloud_instance", environment="gcp",   action="revoke_instance_role",  executor="gcp_containment_v1",   wave=1, certainty_floor="corroborated", reversible_by="", required=["target","incident_id"] },
 
   # -- container - cordon node, quarantine pod, kill pod (k8s netpol + API) --
   { target_class="container", environment="k8s", action="cordon_node",          executor="k8s_containment_v1", wave=1, certainty_floor="corroborated", reversible_by="uncordon_node", required=["target","incident_id"] },

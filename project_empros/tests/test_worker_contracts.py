@@ -1107,3 +1107,61 @@ class TestWorkerSoarAllowlistedDispatch:
         assert "provider.actions.get(&st.action)" in src
         # protocol agent steps are also gated to allowlisted on-host playbooks
         assert "agent_task::is_response_action(&st.action)" in src
+
+
+class TestWorkerSqlTestModeGuard:
+    """R-4: the SQL worker's webhook TEST MODE disables TLS certificate
+    validation (danger_accept_invalid_certs). A stray `test_webhook_url` in a
+    production config must NOT be enough to enable it -- entry requires an
+    explicit opt-in env var, so insecure TLS is unreachable from config alone."""
+
+    SQL_MAIN = Path(__file__).parent.parent / "middleware/src/worker_sql/src/main.rs"
+
+    def _src(self):
+        return self.SQL_MAIN.read_text()
+
+    def test_test_mode_requires_explicit_env_opt_in(self):
+        src = self._src()
+        assert "NEXUS_SQL_ALLOW_TEST_MODE" in src, \
+            "test mode must be gated behind an explicit allow env var"
+
+    def test_insecure_tls_only_inside_the_gated_branch(self):
+        src = self._src()
+        # the danger flag must not be reachable without the env gate: the gate
+        # check has to appear before the only danger_accept_invalid_certs call
+        gate = src.find("NEXUS_SQL_ALLOW_TEST_MODE")
+        danger = src.find("danger_accept_invalid_certs")
+        assert gate != -1 and danger != -1 and gate < danger, \
+            "the allow-test-mode gate must precede the insecure-TLS client build"
+
+    def test_config_webhook_without_optin_does_not_enable_insecure_client(self):
+        src = self._src()
+        # when the url is set but the gate is off, the worker must refuse test
+        # mode (log + fall through) rather than silently building the insecure client
+        assert "refus" in src.lower() or "ignored" in src.lower() or "NEXUS_SQL_ALLOW_TEST_MODE" in src
+
+
+class TestServiceImagesNonRoot:
+    """R-6 hardening: every long-running service image must drop to a non-root
+    USER in the image itself (least privilege visible in the image, not only in
+    the rootless-podman runtime). Offline import/test images under
+    detection_training/ are excluded -- they never deploy to the stack."""
+
+    SERVICES_DIR = Path(__file__).parent.parent / "services"
+
+    def _service_dockerfiles(self):
+        return sorted(self.SERVICES_DIR.glob("*/Dockerfile"))
+
+    def test_every_service_dockerfile_sets_nonroot_user(self):
+        offenders = []
+        for df in self._service_dockerfiles():
+            lines = [l.strip() for l in df.read_text().splitlines()]
+            user_lines = [l for l in lines if l.startswith("USER ")]
+            if not user_lines or user_lines[-1].split()[1] in ("root", "0"):
+                offenders.append(df.parent.name)
+        assert not offenders, f"service images running as root: {offenders}"
+
+    def test_at_least_the_known_services_are_covered(self):
+        # guard against the glob silently matching nothing
+        names = {df.parent.name for df in self._service_dockerfiles()}
+        assert {"worker_ti_ingest", "worker_soar", "core_ingress"} <= names

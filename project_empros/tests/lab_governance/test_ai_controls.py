@@ -401,3 +401,87 @@ class TestInferenceEnergy:
         base = controls.estimate_inference_energy(3600, 100, pue=1.0)["energy_wh"]
         pue2 = controls.estimate_inference_energy(3600, 100, pue=2.0)["energy_wh"]
         assert pue2 == pytest.approx(2 * base)
+
+
+# ----------- NC-7: inference-endpoint abuse / model-extraction monitoring -----
+class TestEndpointQuota:
+    def test_over_quota_callers_flagged(self):
+        counts = {"analyst-a": 40, "svc-batch": 5000, "svc-eval": 100}
+        over = controls.per_caller_quota_exceeded(counts, quota=1000)
+        assert dict(over) == {"svc-batch": 5000}
+
+    def test_exactly_at_quota_is_allowed(self):
+        assert controls.per_caller_quota_exceeded({"a": 1000}, quota=1000) == []
+
+    def test_empty_or_none_counts(self):
+        assert controls.per_caller_quota_exceeded({}, quota=10) == []
+        assert controls.per_caller_quota_exceeded(None, quota=10) == []
+
+
+class TestVolumeAnomaly:
+    def test_spike_over_baseline_flagged(self):
+        current = {"svc-batch": 1200, "analyst-a": 30}
+        baseline = {"svc-batch": 300.0, "analyst-a": 25.0}
+        anoms = controls.query_volume_anomalies(current, baseline, factor=3.0, min_floor=100)
+        # 1200 > 300*3 + 100 = 1000 -> flagged; analyst-a well under
+        assert [a["caller"] for a in anoms] == ["svc-batch"]
+
+    def test_new_caller_uses_floor_only(self):
+        # no baseline -> only the absolute floor gates a brand-new caller
+        anoms = controls.query_volume_anomalies({"new": 150}, {}, factor=3.0, min_floor=100)
+        assert anoms and anoms[0]["caller"] == "new"
+
+    def test_within_band_not_flagged(self):
+        anoms = controls.query_volume_anomalies({"a": 350}, {"a": 300.0}, factor=3.0, min_floor=100)
+        assert anoms == []
+
+
+class TestMembershipInferenceSignal:
+    def test_systematic_probing_flagged(self):
+        # many near-identical boundary-probing queries = extraction/MI pattern
+        qs = [f"is host 10.0.0.{i} malicious given score 0.5" for i in range(20)]
+        sig = controls.membership_inference_signal(qs, sim_threshold=0.6, min_queries=10)
+        assert sig["flagged"] is True and sig["mean_similarity"] >= 0.6
+
+    def test_diverse_queries_not_flagged(self):
+        qs = ["list failed logins on db01", "show egress to 8.8.8.8",
+              "which users touched s3 bucket X", "kerberoast attempts today",
+              "top processes by cpu on web02", "dns tunneling indicators",
+              "lateral movement from host7", "new admin accounts this week",
+              "powershell downloads last hour", "unusual sudo on prod"]
+        sig = controls.membership_inference_signal(qs, sim_threshold=0.6, min_queries=5)
+        assert sig["flagged"] is False
+
+    def test_below_min_queries_not_flagged(self):
+        sig = controls.membership_inference_signal(["a b c", "a b c"], min_queries=10)
+        assert sig["flagged"] is False and sig["n"] == 2
+
+
+class TestEndpointAbuseReport:
+    def _records(self):
+        # svc-batch: huge volume + repetitive probing; analyst-a: normal
+        recs = [{"caller": "svc-batch", "query": f"score host 10.0.0.{i%5} malicious?"}
+                for i in range(60)]
+        recs += [{"caller": "analyst-a", "query": q} for q in
+                 ["failed logins db01", "egress to 8.8.8.8", "new admins this week"]]
+        return recs
+
+    def test_report_flags_abuser_across_axes(self):
+        rep = controls.endpoint_abuse_report(
+            self._records(), quota=50, baseline={"svc-batch": 5.0, "analyst-a": 3.0},
+            volume_factor=3.0, volume_floor=20, sim_threshold=0.5, min_queries=10)
+        flagged = {c["caller"] for c in rep["flagged"]}
+        assert "svc-batch" in flagged and "analyst-a" not in flagged
+        sb = next(c for c in rep["flagged"] if c["caller"] == "svc-batch")
+        assert set(sb["reasons"]) >= {"quota", "volume", "membership_inference"}
+
+    def test_clean_traffic_produces_no_flags(self):
+        recs = [{"caller": "analyst-a", "query": q} for q in
+                ["failed logins db01", "egress check", "admin audit"]]
+        rep = controls.endpoint_abuse_report(recs, quota=1000,
+                                             baseline={"analyst-a": 100.0})
+        assert rep["flagged"] == [] and rep["total_callers"] == 1
+
+    def test_empty_records(self):
+        rep = controls.endpoint_abuse_report([], quota=100)
+        assert rep["flagged"] == [] and rep["total_callers"] == 0

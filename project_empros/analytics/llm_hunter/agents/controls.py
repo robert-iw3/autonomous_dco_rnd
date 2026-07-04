@@ -503,6 +503,104 @@ def verify_lineage(entries) -> dict:
 # assumptions are documented in governance/environmental_impact_estimate.md.
 # ───────────────────────────────────────────────────────────────────────────
 
+# ---------- NC-7: inference-endpoint abuse / model-extraction monitoring ------
+# The sovereign vLLM endpoints are network-isolated but not rate/anomaly-checked.
+# Model extraction (ATLAS AML.T0024/AML.T0040, OWASP LLM10) and membership
+# inference show up as three signals over a batch of per-caller access records:
+# volume beyond an assigned quota, a spike over the caller's own baseline, and
+# systematic near-duplicate probing. All pure/stdlib; a job feeds real records.
+
+def per_caller_quota_exceeded(counts, quota: int) -> list:
+    """Callers whose request count exceeds the absolute per-caller quota."""
+    return sorted(((c, n) for c, n in (counts or {}).items() if n > quota),
+                  key=lambda kv: -kv[1])
+
+
+def query_volume_anomalies(current, baseline, factor: float = 3.0,
+                           min_floor: int = 100) -> list:
+    """Callers whose current-window volume exceeds max(baseline*factor, floor).
+
+    A caller with no baseline (brand new) is gated by the absolute floor only, so
+    a cold-start abuser is still caught without flagging normal ramp-up."""
+    baseline = baseline or {}
+    out = []
+    for caller, n in (current or {}).items():
+        base = float(baseline.get(caller, 0.0))
+        threshold = base * factor + min_floor if base else float(min_floor)
+        if n > threshold:
+            out.append({"caller": caller, "count": n, "baseline": base,
+                        "threshold": round(threshold, 3)})
+    return sorted(out, key=lambda d: -d["count"])
+
+
+def _token_set(text) -> frozenset:
+    return frozenset(str(text).lower().split())
+
+
+def _jaccard(a: frozenset, b: frozenset) -> float:
+    if not a and not b:
+        return 1.0
+    union = a | b
+    return len(a & b) / len(union) if union else 0.0
+
+
+def membership_inference_signal(queries, sim_threshold: float = 0.85,
+                                min_queries: int = 10, sample_cap: int = 200) -> dict:
+    """Flag systematic probing: a caller issuing many mutually-similar queries.
+
+    Model-extraction / membership-inference campaigns sweep near-duplicate prompts
+    (perturbing an id, an IP, a score) to map the decision boundary. Mean pairwise
+    token-set Jaccard over the caller's queries captures that without embeddings.
+    Below min_queries there is not enough signal to judge."""
+    qs = [q for q in (queries or []) if str(q).strip()]
+    n = len(qs)
+    if n < min_queries:
+        return {"flagged": False, "mean_similarity": 0.0, "n": n}
+    sets = [_token_set(q) for q in qs[:sample_cap]]
+    m = len(sets)
+    total, pairs = 0.0, 0
+    for i in range(m):
+        for j in range(i + 1, m):
+            total += _jaccard(sets[i], sets[j])
+            pairs += 1
+    mean_sim = (total / pairs) if pairs else 0.0
+    return {"flagged": mean_sim >= sim_threshold,
+            "mean_similarity": round(mean_sim, 6), "n": n}
+
+
+def endpoint_abuse_report(records, quota: int = 1000, baseline=None,
+                          volume_factor: float = 3.0, volume_floor: int = 100,
+                          sim_threshold: float = 0.85, min_queries: int = 10) -> dict:
+    """Per-caller abuse verdict over access records [{caller, query}].
+
+    Combines the three signals; a caller is flagged with the axes that tripped so
+    an operator sees why. No single axis is dispositive on its own -- the report
+    surfaces them, the steward/operator decides on throttle vs revoke."""
+    by_caller = {}
+    for r in records or []:
+        by_caller.setdefault(str((r or {}).get("caller", "")), []).append(
+            str((r or {}).get("query", "")))
+    counts = {c: len(q) for c, q in by_caller.items()}
+    over_quota = dict(per_caller_quota_exceeded(counts, quota))
+    vol = {a["caller"]: a for a in query_volume_anomalies(
+        counts, baseline or {}, volume_factor, volume_floor)}
+    flagged = []
+    for caller, queries in by_caller.items():
+        reasons = []
+        if caller in over_quota:
+            reasons.append("quota")
+        if caller in vol:
+            reasons.append("volume")
+        mi = membership_inference_signal(queries, sim_threshold, min_queries)
+        if mi["flagged"]:
+            reasons.append("membership_inference")
+        if reasons:
+            flagged.append({"caller": caller, "count": counts[caller],
+                            "reasons": reasons, "mean_similarity": mi["mean_similarity"]})
+    return {"flagged": sorted(flagged, key=lambda d: -d["count"]),
+            "total_callers": len(by_caller), "quota": quota}
+
+
 def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,
                               grid_gco2_per_kwh: float = 400.0) -> dict:
     """Per-run energy (Wh) and carbon (gCO2e) estimate. Negative inputs clamp to 0."""

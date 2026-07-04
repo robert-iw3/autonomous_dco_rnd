@@ -284,6 +284,28 @@ controls:
       csf_2_0: [GV]
     owner: AI Governance
 
+  - id: NC-7-ENDPOINT-ABUSE
+    title: Inference-endpoint abuse / model-extraction monitoring
+    category: NIST AI 600-1
+    status: implemented
+    description: Per-caller quota, query-volume anomaly vs the caller's own baseline, and a
+      systematic near-duplicate probing heuristic over the sovereign vLLM endpoint access log;
+      flags model-extraction / membership-inference campaigns the network isolation cannot see.
+    implementation: analytics/llm_hunter/agents/endpoint_abuse_monitor.py
+    tests:
+    - tests/lab_governance/test_ai_controls.py::TestEndpointQuota
+    - tests/lab_governance/test_ai_controls.py::TestVolumeAnomaly
+    - tests/lab_governance/test_ai_controls.py::TestMembershipInferenceSignal
+    - tests/lab_governance/test_ai_controls.py::TestEndpointAbuseReport
+    - tests/lab_governance/test_nist_controls_wave4.py::TestEndpointAbuseMonitor
+    frameworks:
+      nist_ai_600_1: [MS-2.10-001]
+      owasp_llm: [LLM10]
+      atlas: [AML.T0024, AML.T0040]
+      sp_800_53: [AC-4, SC-5, SI-4]
+      csf_2_0: [DE, PR]
+    owner: AI Governance
+
   # -- SIEM-federated investigation (WS-G) ------------------------------------
   - id: SIEM-TOOL-GUARD
     title: SIEM query tool — read-only / bounded / allowlist

@@ -112,3 +112,58 @@ class TestFanoutIndexContract:
         assert fanout, "middleware [elastic] index_* not found"
         assert fanout <= declared, (
             f"swarm Elastic nexus_indexes {declared} must cover middleware fanout {fanout}")
+
+
+# -- R-7 hardening: DuckDB SET s3_* values are structurally non-injectable -----
+class TestS3SettingValidation:
+    """DuckDB `SET` cannot bind parameters, so the S3 settings are interpolated.
+    The values are operator/env-sourced, but a value carrying a quote or semicolon
+    would break out of the statement. `_safe_s3_value` makes non-injectability
+    structural rather than situational."""
+
+    def test_clean_values_pass_through(self):
+        assert nexus_config._safe_s3_value("minio:9000", "s3_endpoint") == "minio:9000"
+        assert nexus_config._safe_s3_value("AKIAEXAMPLE", "s3_access_key_id") == "AKIAEXAMPLE"
+
+    def test_quote_semicolon_newline_rejected(self):
+        for bad in ["a'; ATTACH 'evil", 'a"b', "a;b", "a\nb", "a\x00b"]:
+            with pytest.raises(ValueError):
+                nexus_config._safe_s3_value(bad, "s3_endpoint")
+
+    def test_url_style_is_allowlisted(self):
+        assert nexus_config._safe_url_style("path") == "path"
+        assert nexus_config._safe_url_style("vhost") == "vhost"
+        with pytest.raises(ValueError):
+            nexus_config._safe_url_style("path'; DROP")
+
+    def test_apply_s3_settings_rejects_injected_secret(self, monkeypatch):
+        nexus_config.get_s3_settings.cache_clear()
+        monkeypatch.setenv("S3_SECRET_KEY", "x'; ATTACH 'http://evil/db")
+        monkeypatch.setenv("S3_ACCESS_KEY", "ak")
+        monkeypatch.setenv("S3_ENDPOINT", "minio:9000")
+
+        class _Con:
+            def __init__(self): self.stmts = []
+            def execute(self, s): self.stmts.append(s)
+
+        with pytest.raises(ValueError):
+            nexus_config.apply_s3_settings(_Con())
+
+    def test_apply_s3_settings_emits_expected_sets_for_clean_input(self, monkeypatch):
+        nexus_config.get_s3_settings.cache_clear()
+        for k in ("S3_SECRET_KEY", "AWS_SECRET_ACCESS_KEY", "MINIO_SECRET_KEY"):
+            monkeypatch.delenv(k, raising=False)
+        monkeypatch.setenv("S3_ENDPOINT", "minio:9000")
+        monkeypatch.setenv("S3_ACCESS_KEY", "ak")
+        monkeypatch.setenv("S3_SECRET_KEY", "sk")
+
+        class _Con:
+            def __init__(self): self.stmts = []
+            def execute(self, s): self.stmts.append(s)
+
+        con = _Con()
+        nexus_config.apply_s3_settings(con)
+        joined = "\n".join(con.stmts)
+        assert "SET s3_endpoint='minio:9000';" in joined
+        assert "SET s3_access_key_id='ak';" in joined
+        assert "SET s3_url_style='path';" in joined

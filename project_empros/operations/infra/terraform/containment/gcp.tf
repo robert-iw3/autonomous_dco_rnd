@@ -17,6 +17,14 @@ resource "google_project_iam_member" "containment_compute_admin" {
   member  = "serviceAccount:${google_service_account.containment[0].email}"
 }
 
+# Evidence snapshots (disks.createSnapshot + instance/disk reads)
+resource "google_project_iam_member" "containment_storage_admin" {
+  count   = var.enable_gcp ? 1 : 0
+  project = var.gcp_project_id
+  role    = "roles/compute.storageAdmin"
+  member  = "serviceAccount:${google_service_account.containment[0].email}"
+}
+
 # ── Cloud Storage bucket for function source ──────────────────────────────────
 resource "google_storage_bucket" "function_source" {
   count                       = var.enable_gcp ? 1 : 0

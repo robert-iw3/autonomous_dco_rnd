@@ -29,6 +29,15 @@ Overview: **[SOAR_IR_WORKFLOW.md](SOAR_IR_WORKFLOW.md)**.
 
 Cloud/network targets and monitor/dismiss verdicts initiate no on-host playbook.
 
+**In parallel**, `build_containment_protocol(alert, verdict, entities, mem)`
+(`agents/containment_protocol.py`) synthesizes the tailored cross-class protocol: per-TP-entity
+steps chosen from the capability contract (`operations/infra/capability_matrix.toml` — endpoint,
+cloud instance/workload, container, network resource, identity/credential), evidence-first and
+kill-chain ordered, with a coverage gate (`kill_chain_closed` only when every TP entity has an
+executable step or an explicit escalation), a per-entity assurance gate, lateral unification, per
+(incident, target, action) idempotency keys, and a rollback builder for FP-flips.
+See [SOAR_IR_WORKFLOW.md](SOAR_IR_WORKFLOW.md) §7.
+
 ---
 
 ## Stage 2 — Response payload + dispatch
@@ -42,21 +51,32 @@ Cloud/network targets and monitor/dismiss verdicts initiate no on-host playbook.
 | `os_family`, `response_actions` | the wave's ordered host playbooks |
 | `c2_ips · c2_domains · pids · hashes · file_paths · users` | typed IOC params |
 
-HitL circuit breaker (`should_demote_to_manual`) → on trip, `manual_review_required`
-and `response_actions = []`. `orchestrator._dispatch_soar` validates against
-`SoarExecutionSchema` and publishes `model_dump()` to **`nexus.soar.execute`**.
+The payload also carries the protocol fields: `environment`, `target_class`,
+`containment_steps` (the cross-class steps worker_soar dispatches), plus audit extras
+(`kill_chain_closed`, `containment_escalations`, `containment_coverage`).
+
+HitL circuit breaker (`should_demote_to_manual`) → on trip, `manual_review_required`,
+`response_actions = []`, **and every containment step is forced to
+`gate = operator_approval`** — the full plan is preserved for the operator but nothing
+auto-fires. `orchestrator._dispatch_soar` validates against `SoarExecutionSchema` and
+publishes `model_dump()` to **`nexus.soar.execute`**.
 
 ---
 
 ## Stage 3 — worker_soar routing (`services/worker_soar`)
 
-Deserializes `SoarPayload`, TTL-dedups by `(incident_id, action_type)`, routes:
+Deserializes `SoarPayload`, TTL-dedups by `(incident_id, action_type)`, routes.
+**Protocol mode** (`containment_steps` non-empty) supersedes the legacy single-action
+dispatch: each step is rendered to its executor — auto provider steps (cloud lambda /
+Identity-DNS-K8s n8n workflows) and signed agent tasks per on-host step — while
+`operator_approval`-gated steps are logged for the operator, never auto-dispatched.
 
 | Path | Condition | Mechanism |
 |---|---|---|
-| Cloud | cloud `source_type` | n8n cloud-containment provider |
-| On-host agent | on-prem + agent executor + `is_response_action` | one **signed task per `response_action`** → `nexus.agent.tasks` |
-| EDR/firewall n8n | on-prem schema provider | ExecutionPlan steps → n8n |
+| Protocol steps | `containment_steps` non-empty | per-step: auto provider render or signed agent task; legacy single-action disabled |
+| Cloud | cloud `source_type` (legacy mode) | n8n cloud-containment provider |
+| On-host agent | on-prem + agent executor + `is_response_action` (legacy mode) | one **signed task per `response_action`** → `nexus.agent.tasks` |
+| EDR/firewall n8n | on-prem schema provider (legacy mode) | ExecutionPlan steps → n8n |
 | Legacy SSH | fallback | `run_containment.sh` |
 
 `agent_task::build_signed_task` HMAC-signs each task; `action_targets_and_params`

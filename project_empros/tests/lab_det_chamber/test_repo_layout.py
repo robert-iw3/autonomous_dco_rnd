@@ -124,3 +124,16 @@ def test_windows_engine_dockerfile_present_and_complete():
     text = df.read_text()
     for mod in ("malware_sandbox.py", "sandbox_config.py", "targets.py"):
         assert mod in text, f"Windows engine image must COPY {mod}"
+
+
+def test_sandbox_bootstrap_verifies_installer_integrity():
+    """R-8 hardening: the sandbox bootstrap must fetch the Chocolatey installer to
+    disk and verify its SHA-256 before executing -- never pipe an unverified
+    remote script straight into Invoke-Expression."""
+    ps1 = (INFRA / "ansible" / "roles" / "det_chamber_sandbox"
+           / "files" / "provision_sandbox.ps1").read_text()
+    # the install-from-web-into-IEX antipattern must be gone
+    assert "DownloadString('https://community.chocolatey.org/install.ps1')" not in ps1
+    # fetch-to-disk + hash gate + configurable mirror must be present
+    assert "Get-FileHash" in ps1 and "SHA256 mismatch" in ps1
+    assert "$ChocoInstallUrl" in ps1 and "$ChocoInstallSha256" in ps1

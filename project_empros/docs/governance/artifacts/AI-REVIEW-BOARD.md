@@ -6,7 +6,7 @@
 
 **1. Invocation** — The board is wired into the graph as a mandatory node on the path to any response.
 
-`analytics/llm_hunter/orchestrator.py:L137-L137`
+`analytics/llm_hunter/orchestrator.py:L140-L140`
 
 ```python
     builder.add_node("review_board", review_board_node)

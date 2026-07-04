@@ -12,11 +12,11 @@ version: "1.0"
 
 ## Summary
 
-Generated from the master controls manifest: **35 controls**, each mapped to its implementing module, proving tests, and its references across OWASP Top 10 for LLM, MITRE ATLAS, NIST AI 600-1, NIST SP 800-53 Rev. 5, and NIST CSF 2.0.
+Generated from the master controls manifest: **36 controls**, each mapped to its implementing module, proving tests, and its references across OWASP Top 10 for LLM, MITRE ATLAS, NIST AI 600-1, NIST SP 800-53 Rev. 5, and NIST CSF 2.0.
 
 | Status | Count |
 |---|---|
-| implemented | 33 |
+| implemented | 34 |
 | documented | 2 |
 
 | Category | Count |
@@ -24,7 +24,7 @@ Generated from the master controls manifest: **35 controls**, each mapped to its
 | AI Security | 14 |
 | Infrastructure Hardening | 1 |
 | Ingestion Integrity | 3 |
-| NIST AI 600-1 | 13 |
+| NIST AI 600-1 | 14 |
 | SIEM Federation | 4 |
 
 \newpage
@@ -49,6 +49,7 @@ Generated from the master controls manifest: **35 controls**, each mapped to its
 | NC-3-FRONTIER-PIN | Frontier model boot-time version-pin enforcement | implemented | — | — | MP-4.1-007 | SR-3, CM-2 | GV, ID | 1 |
 | NC-4-RETENTION | Data retention & decommissioning policy | documented | — | — | GV-1.7-002, MS-2.10-001 | SC-28, AU-9, SI-12 | GV, PR | 0 |
 | NC-6-ENERGY | Environmental impact estimate | documented | — | — | MS-2.12-003 | — | GV | 0 |
+| NC-7-ENDPOINT-ABUSE | Inference-endpoint abuse / model-extraction monitoring | implemented | LLM10 | AML.T0024, AML.T0040 | MS-2.10-001 | AC-4, SC-5, SI-4 | DE, PR | 5 |
 | NC-8-OVER-RELIANCE | Automation-bias / over-reliance measurement | implemented | — | — | MG-1.3-002, MP-3.4-005 | AU-6, CA-7 | GV, DE | 2 |
 | NC-9-ACTIVE-LEARNING | Active-learning failure capture | implemented | — | — | MG-4.1-004 | CA-7, SI-4 | ID, DE | 2 |
 | SEC-BLAST-RADIUS | Blast-radius cap & entity state machine | implemented | LLM08 | — | — | AC-6, SI-7 | PR, RS | 1 |
@@ -93,6 +94,7 @@ Five lenses on one register — locating a control via any framework surfaces it
 | LLM07 | SEC-OUTPUT-SCHEMA |
 | LLM08 | SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SIEM-TOOL-GUARD |
 | LLM09 | AI-REVIEW-BOARD, SEC-REGRESSION-GATE |
+| LLM10 | NC-7-ENDPOINT-ABUSE |
 
 ### MITRE ATLAS
 
@@ -100,7 +102,9 @@ Five lenses on one register — locating a control via any framework surfaces it
 |---|---|
 | AML.T0015 | SEC-REGRESSION-GATE |
 | AML.T0020 | SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE |
+| AML.T0024 | NC-7-ENDPOINT-ABUSE |
 | AML.T0031 | SEC-RLHF-QUARANTINE |
+| AML.T0040 | NC-7-ENDPOINT-ABUSE |
 | AML.T0042 | SEC-CANARY |
 | AML.T0043 | SEC-REGRESSION-GATE, SEC-SANITIZER |
 | AML.T0044 | SEC-SUPPLY-CHAIN |
@@ -116,7 +120,7 @@ Five lenses on one register — locating a control via any framework surfaces it
 | MP-3.4-005 | NC-8-OVER-RELIANCE |
 | MP-4.1-007 | NC-3-FRONTIER-PIN |
 | MP-5.1-003 | AI-PROVENANCE |
-| MS-2.10-001 | NC-4-RETENTION |
+| MS-2.10-001 | NC-4-RETENTION, NC-7-ENDPOINT-ABUSE |
 | MS-2.11-002 | NC-1-BIAS-AUDIT |
 | MS-2.11-005 | NC-1-BIAS-AUDIT |
 | MS-2.12-003 | NC-11-ENERGY-ACCOUNTING, NC-6-ENERGY |
@@ -130,8 +134,8 @@ Five lenses on one register — locating a control via any framework surfaces it
 |---|---|
 | GV Govern | AI-MEMORY-TTL, AI-PROVENANCE, NC-1-BIAS-AUDIT, NC-11-ENERGY-ACCOUNTING, NC-2-CALIBRATION, NC-3-FRONTIER-PIN, NC-4-RETENTION, NC-6-ENERGY, NC-8-OVER-RELIANCE, SEC-REGRESSION-GATE, SIEM-CONFIG-CONTRACT |
 | ID Identify | NC-3-FRONTIER-PIN, NC-9-ACTIVE-LEARNING, SEC-SUPPLY-CHAIN, SIEM-CONFIG-CONTRACT |
-| PR Protect | AI-MEMORY-TTL, IAC-HARDENING, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, NC-4-RETENTION, SEC-BLAST-RADIUS, SEC-CANARY, SEC-DLP-EGRESS, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SEC-MODEL-DOS, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SANITIZER, SEC-SUPPLY-CHAIN, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM, SIEM-TOOL-GUARD |
-| DE Detect | AI-GROUNDING, AI-REVIEW-BOARD, IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-10-VERDICT-LINEAGE, NC-2-CALIBRATION, NC-8-OVER-RELIANCE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-COUNTERPART-DISPROOF, SIEM-E2E, SIEM-TOOL-GUARD |
+| PR Protect | AI-MEMORY-TTL, IAC-HARDENING, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, NC-4-RETENTION, NC-7-ENDPOINT-ABUSE, SEC-BLAST-RADIUS, SEC-CANARY, SEC-DLP-EGRESS, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SEC-MODEL-DOS, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SANITIZER, SEC-SUPPLY-CHAIN, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM, SIEM-TOOL-GUARD |
+| DE Detect | AI-GROUNDING, AI-REVIEW-BOARD, IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-10-VERDICT-LINEAGE, NC-2-CALIBRATION, NC-7-ENDPOINT-ABUSE, NC-8-OVER-RELIANCE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-COUNTERPART-DISPROOF, SIEM-E2E, SIEM-TOOL-GUARD |
 | RS Respond | AI-REVIEW-BOARD, SEC-BLAST-RADIUS, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA |
 | RC Recover | ING-DLQ-BREAKER, SEC-FAILOVER |
 
@@ -145,12 +149,12 @@ Five lenses on one register — locating a control via any framework surfaces it
 | GV.SC · Cybersecurity Supply Chain Risk Mgmt | NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN |
 | ID.AM · Asset Management | NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT |
 | ID.IM · Improvement | NC-2-CALIBRATION, NC-9-ACTIVE-LEARNING, SEC-REGRESSION-GATE |
-| PR.AA · Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD |
+| PR.AA · Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, NC-7-ENDPOINT-ABUSE, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD |
 | PR.DS · Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM |
 | PR.IR · Technology Infrastructure Resilience | SEC-BLAST-RADIUS, SEC-FAILOVER, SEC-MODEL-DOS |
 | PR.PS · Platform Security | IAC-HARDENING, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-SANITIZER, SEC-SUPPLY-CHAIN |
 | DE.AE · Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, NC-10-VERDICT-LINEAGE, NC-9-ACTIVE-LEARNING, SIEM-COUNTERPART-DISPROOF |
-| DE.CM · Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-8-OVER-RELIANCE, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD |
+| DE.CM · Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-7-ENDPOINT-ABUSE, NC-8-OVER-RELIANCE, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD |
 | RS.AN · Incident Analysis | AI-REVIEW-BOARD |
 | RS.MI · Incident Mitigation | SEC-BLAST-RADIUS, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA |
 | RC.RP · Incident Recovery Plan Execution | ING-DLQ-BREAKER, SEC-FAILOVER |
@@ -161,7 +165,7 @@ Five lenses on one register — locating a control via any framework surfaces it
 |---|---|
 | AC-17 · Remote Access | IAC-HARDENING |
 | AC-3 · Access Enforcement | SEC-DUCKDB-SANDBOX, SIEM-TOOL-GUARD |
-| AC-4 · Information Flow Enforcement | SEC-DLP-EGRESS, SEC-TRAINING-HYGIENE, SIEM-CONFIG-CONTRACT, SIEM-TOOL-GUARD |
+| AC-4 · Information Flow Enforcement | NC-7-ENDPOINT-ABUSE, SEC-DLP-EGRESS, SEC-TRAINING-HYGIENE, SIEM-CONFIG-CONTRACT, SIEM-TOOL-GUARD |
 | AC-6 · Least Privilege | SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX |
 | AC-7 · Unsuccessful Logon Attempts | ING-ZERO-TRUST |
 | AU-10 · Non-repudiation | NC-10-VERDICT-LINEAGE |
@@ -180,7 +184,7 @@ Five lenses on one register — locating a control via any framework surfaces it
 | RA-3 · Risk Assessment | AI-REVIEW-BOARD, NC-1-BIAS-AUDIT |
 | SC-16 · Transmission of Security and Privacy Attributes | ING-ZERO-TRUST |
 | SC-28 · Protection of Information at Rest | AI-MEMORY-TTL, NC-4-RETENTION |
-| SC-5 · Denial-of-service Protection | IAC-HARDENING, SEC-IDEMPOTENT-SOAR, SEC-MODEL-DOS |
+| SC-5 · Denial-of-service Protection | IAC-HARDENING, NC-7-ENDPOINT-ABUSE, SEC-IDEMPOTENT-SOAR, SEC-MODEL-DOS |
 | SC-6 · Resource Availability | SEC-MODEL-DOS |
 | SC-7 · Boundary Protection | IAC-HARDENING, ING-ZERO-TRUST, SEC-DLP-EGRESS |
 | SC-8 · Transmission Confidentiality and Integrity | ING-ZERO-TRUST |
@@ -188,7 +192,7 @@ Five lenses on one register — locating a control via any framework surfaces it
 | SI-12 · Information Management and Retention | NC-4-RETENTION, SEC-TRAINING-HYGIENE |
 | SI-16 · Memory Protection | IAC-HARDENING |
 | SI-3 · Malicious Code Protection | IAC-HARDENING |
-| SI-4 · System Monitoring | ING-DLQ-BREAKER, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-RLHF-QUARANTINE, SIEM-E2E |
+| SI-4 · System Monitoring | ING-DLQ-BREAKER, NC-7-ENDPOINT-ABUSE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-RLHF-QUARANTINE, SIEM-E2E |
 | SI-7 · Software, Firmware, and Information Integrity | AI-GROUNDING, AI-REVIEW-BOARD, IAC-HARDENING, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, SEC-BLAST-RADIUS, SEC-CANARY, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SUPPLY-CHAIN |
 | SR-11 · Component Authenticity | SEC-SUPPLY-CHAIN |
 | SR-3 · Supply Chain Controls and Processes | NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN |
@@ -441,6 +445,14 @@ Training/inference footprint estimate + tracking approach.
 
 - Implementation: `docs/governance/environmental_impact_estimate.md`
 - Tests: _(documentation control)_
+
+**NC-7-ENDPOINT-ABUSE — Inference-endpoint abuse / model-extraction monitoring** *(status: implemented; owner: AI Governance)*
+
+Per-caller quota, query-volume anomaly vs the caller's own baseline, and a systematic near-duplicate probing heuristic over the sovereign vLLM endpoint access log; flags model-extraction / membership-inference campaigns the network isolation cannot see.
+
+- Implementation: `analytics/llm_hunter/agents/endpoint_abuse_monitor.py`
+- Tests: `tests/lab_governance/test_ai_controls.py::TestEndpointQuota`, `tests/lab_governance/test_ai_controls.py::TestVolumeAnomaly`, `tests/lab_governance/test_ai_controls.py::TestMembershipInferenceSignal`, `tests/lab_governance/test_ai_controls.py::TestEndpointAbuseReport`, `tests/lab_governance/test_nist_controls_wave4.py::TestEndpointAbuseMonitor`
+- Code evidence: `artifacts/NC-7-ENDPOINT-ABUSE.md` (extracted snippets)
 
 **NC-8-OVER-RELIANCE — Automation-bias / over-reliance measurement** *(status: implemented; owner: AI Governance)*
 

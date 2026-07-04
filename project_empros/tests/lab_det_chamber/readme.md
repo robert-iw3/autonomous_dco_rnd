@@ -6,7 +6,7 @@ test-first (TDD) and cumulatively: every phase adds tests + the deployment servi
 it needs, and the whole suite must stay green before the next phase lands.
 
 See the build plan and per-phase contracts in
-`project_empros/planning_docs/DET_CHAMBER_INTEGRATION_PLAN.md`.
+`project_empros/planning_docs/archive/DET_CHAMBER_INTEGRATION_PLAN.md`.
 
 ## Run
 

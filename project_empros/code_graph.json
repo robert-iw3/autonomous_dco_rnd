@@ -99,11 +99,25 @@
         "operations/playbooks/docker/entrypoint.sh",
         "operations/playbooks/playbooks/cloud/00_collect_forensics.sh",
         "operations/playbooks/playbooks/cloud/01_contain_host.sh",
+        "operations/playbooks/playbooks/cloud/01_contain_identity.sh",
         "operations/playbooks/playbooks/cloud/02_eradicate_process.sh",
         "operations/playbooks/playbooks/cloud/03_eradicate_persistence.sh",
         "operations/playbooks/playbooks/cloud/04_block_c2.sh",
         "operations/playbooks/playbooks/cloud/05_restore_host.sh",
         "operations/playbooks/playbooks/cloud/adjudicate_cloud.py",
+        "operations/playbooks/playbooks/cloud/cloud_controlplane.py",
+        "operations/playbooks/playbooks/cloud/cloud_coverage.py",
+        "operations/playbooks/playbooks/cloud/cloud_dataplane.py",
+        "operations/playbooks/playbooks/cloud/cloud_detectors.py",
+        "operations/playbooks/playbooks/cloud/cloud_findings.py",
+        "operations/playbooks/playbooks/cloud/cloud_iam.py",
+        "operations/playbooks/playbooks/cloud/cloud_identity.py",
+        "operations/playbooks/playbooks/cloud/cloud_posture.py",
+        "operations/playbooks/playbooks/cloud/collect/aws.sh",
+        "operations/playbooks/playbooks/cloud/collect/azure.sh",
+        "operations/playbooks/playbooks/cloud/collect/gcp.sh",
+        "operations/playbooks/playbooks/cloud/collect/lib.sh",
+        "operations/playbooks/playbooks/cloud/principal_reachability.py",
         "operations/playbooks/playbooks/lib/fw_baseline.sh",
         "operations/playbooks/playbooks/lib/status.sh",
         "operations/playbooks/playbooks/linux/00_collect_forensics.sh",
@@ -114,6 +128,7 @@
         "operations/playbooks/playbooks/linux/05_acquire_artifact.sh",
         "operations/playbooks/playbooks/linux/06_restore.sh",
         "operations/playbooks/playbooks/linux/07_revoke_credentials.sh",
+        "operations/playbooks/playbooks/linux/monitor_egress.sh",
         "operations/playbooks/playbooks/linux/threat_hunting/Analyze-Memory-Linux.sh",
         "operations/playbooks/playbooks/linux/threat_hunting/Build-LinuxSymbols.sh",
         "operations/playbooks/playbooks/linux/threat_hunting/adjudicate.py",
@@ -123,7 +138,16 @@
         "operations/playbooks/playbooks/linux/threat_hunting/journal_analysis.py",
         "operations/playbooks/playbooks/linux/threat_hunting/linux_yara.py",
         "operations/playbooks/playbooks/linux/threat_hunting/linux_yara_worker.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/memory_enrich.py",
         "operations/playbooks/playbooks/linux/threat_hunting/remote_access_triage.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/__init__.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/fops_hooks.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/io_uring.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/kernel_globals.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/kernel_timers.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/namespaces.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/task_creds.py",
+        "operations/playbooks/playbooks/linux/threat_hunting/vol_plugins/linux_ir/text_hooks.py",
         "operations/playbooks/playbooks/reporting/build_iocs.py",
         "operations/playbooks/playbooks/reporting/clock_context.py",
         "operations/playbooks/playbooks/reporting/correlate_campaign.py",
@@ -134,11 +158,68 @@
         "operations/playbooks/playbooks/reporting/llm_incident_review.py",
         "operations/playbooks/playbooks/reporting/merge_findings.py",
         "operations/playbooks/playbooks/run_containment.sh",
+        "operations/playbooks/playbooks/windows/investigation/__init__.py",
+        "operations/playbooks/playbooks/windows/investigation/calibrate_baseline.py",
+        "operations/playbooks/playbooks/windows/investigation/chain_builder.py",
+        "operations/playbooks/playbooks/windows/investigation/correlator.py",
+        "operations/playbooks/playbooks/windows/investigation/engine.py",
+        "operations/playbooks/playbooks/windows/investigation/fp_closure.py",
+        "operations/playbooks/playbooks/windows/investigation/live_runner.py",
+        "operations/playbooks/playbooks/windows/investigation/ml_examples/deep_sensor_ml/src/lib.rs",
+        "operations/playbooks/playbooks/windows/investigation/ml_examples/ml_engine/src/lib.rs",
+        "operations/playbooks/playbooks/windows/investigation/models/__init__.py",
+        "operations/playbooks/playbooks/windows/investigation/models/features.py",
+        "operations/playbooks/playbooks/windows/investigation/models/noise_filter.py",
+        "operations/playbooks/playbooks/windows/investigation/models/windows_noise.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/__init__.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/clr_assembly.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/com_vtable.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/direct_syscall.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/dormant_beacon.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/ekko_sleep.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/injected_memory.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/ntdll_hook.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/peb_decoy.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/ppid_orphan.py",
+        "operations/playbooks/playbooks/windows/investigation/modules/shellcode_thread.py",
+        "operations/playbooks/playbooks/windows/investigation/process_tree.py",
+        "operations/playbooks/playbooks/windows/investigation/ttp_patterns.py",
+        "operations/playbooks/playbooks/windows/investigation/verdict.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/egress_monitor/beacon_classifier.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/egress_monitor/carve_and_scan.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/egress_monitor/egress_monitor.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/egress_monitor/mwcp_scan.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/memory_enrich.py",
         "operations/playbooks/playbooks/windows/threat_hunting/memory_forensic.py",
         "operations/playbooks/playbooks/windows/threat_hunting/memory_yara.py",
         "operations/playbooks/playbooks/windows/threat_hunting/memory_yara_worker.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/AdaptixC2Config.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/AgentTeslaConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/AsyncRATConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/BruteRatelConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/CobaltStrikeConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/DcRATConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/DiscordExfilConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/GenericC2.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/GenericMutex.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/HavocConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/LNKParser.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/MerlinConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/MythicConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/NjRATConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/PoshC2Config.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/PowGratConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/PowerShellDecoder.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/QuasarRATConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/SMTPExfilConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/SliverConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/TelegramC2Config.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_parsers/XWormConfig.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/mwcp_scan.py",
+        "operations/playbooks/playbooks/windows/threat_hunting/vad_query.py",
         "operations/playbooks/test/conftest.py",
         "operations/playbooks/test/fixtures.py",
+        "operations/playbooks/test/lab/mock_env/_lab.py",
         "operations/playbooks/test/run_tests.sh",
         "operations/playbooks/test/test_01_collection.py",
         "operations/playbooks/test/test_02_analysis.py",
@@ -167,18 +248,72 @@
         "operations/playbooks/test/test_25_container_hunt.py",
         "operations/playbooks/test/test_26_evidence_custody.py",
         "operations/playbooks/test/test_27_clock_context.py",
+        "operations/playbooks/test/test_27_cloud_controlplane.py",
+        "operations/playbooks/test/test_28_identity_containment.py",
         "operations/playbooks/test/test_28_memory_linux.py",
+        "operations/playbooks/test/test_29_container_deploy.py",
         "operations/playbooks/test/test_29_memory_orchestrator.py",
+        "operations/playbooks/test/test_30_iam_posture.py",
         "operations/playbooks/test/test_30_symbols_distro.py",
+        "operations/playbooks/test/test_31_blast_radius.py",
         "operations/playbooks/test/test_31_linux_eradication.py",
         "operations/playbooks/test/test_32_memory_yara.py",
         "operations/playbooks/test/test_33_linux_yara.py",
         "operations/playbooks/test/test_34_linux_yara_worker.py",
-        "operations/playbooks/test/workflow_sim.py",
-        "operations/playbooks/tools/memprocfs/memprocfs.py",
-        "operations/playbooks/tools/memprocfs/memprocfs_example.py",
-        "operations/playbooks/tools/memprocfs/memprocfs_pythonexec_example.py",
-        "operations/playbooks/tools/memprocfs/vmmpyplugin.py"
+        "operations/playbooks/test/test_35_egress_monitor.py",
+        "operations/playbooks/test/test_36_memory_enrich.py",
+        "operations/playbooks/test/test_37_binja_carve.py",
+        "operations/playbooks/test/test_37_memory_enrich_linux.py",
+        "operations/playbooks/test/test_38_linux_edr_auth.py",
+        "operations/playbooks/test/test_39_linux_memory_p1.py",
+        "operations/playbooks/test/test_40_lab_scenarios.py",
+        "operations/playbooks/test/test_40_linux_edr_static.py",
+        "operations/playbooks/test/test_41_linux_memory_p2.py",
+        "operations/playbooks/test/test_41_tf_validate_docker.py",
+        "operations/playbooks/test/test_42_eradication_breadth.py",
+        "operations/playbooks/test/test_42_mem_forensic_blindspots.py",
+        "operations/playbooks/test/test_43_p2_blindspots.py",
+        "operations/playbooks/test/test_43_posture.py",
+        "operations/playbooks/test/test_44_cloud_c7_hardening.py",
+        "operations/playbooks/test/test_44_retro_phase1_enrich.py",
+        "operations/playbooks/test/test_44_retro_phase1_forensic.py",
+        "operations/playbooks/test/test_45_retro_phase5_mem_evasion.py",
+        "operations/playbooks/test/test_46_edr_hidden_modules.py",
+        "operations/playbooks/test/test_47_diamorphine_memory.py",
+        "operations/playbooks/test/test_48_edr_kernel_helpers.py",
+        "operations/playbooks/test/test_49_edr_iouring_bpf.py",
+        "operations/playbooks/test/test_50_kernel_globals_memory.py",
+        "operations/playbooks/test/test_51_memory_m234.py",
+        "operations/playbooks/test/test_52_cloud_dataplane.py",
+        "operations/playbooks/test/test_53_mwcp_parsers.py",
+        "operations/playbooks/test/test_egress_beacon_classifier.py",
+        "operations/playbooks/test/tf_validate/validate.sh",
+        "operations/playbooks/test/windows/lab_investigation/__init__.py",
+        "operations/playbooks/test/windows/lab_investigation/generate_telemetry.py",
+        "operations/playbooks/test/windows/lab_investigation/scenarios.py",
+        "operations/playbooks/test/windows/lab_investigation/test_investigation_lab.py",
+        "operations/playbooks/test/windows/lab_mwcp/generate_samples.py",
+        "operations/playbooks/test/windows/memory_detection/_boilerplate.py",
+        "operations/playbooks/test/windows/memory_detection/phase_A_dormant_beacon.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B1_process_hollowing.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B2_apc_suspended.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B3_dr7_hooks.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B4_callstack_spoof.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B5_ntdll_stubs.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B6_ekko_correlation.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B7_token_theft.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B8_kernel_integrity.py",
+        "operations/playbooks/test/windows/memory_detection/phase_B9_peb_cmdline.py",
+        "operations/playbooks/test/windows/memory_detection/phase_C1_dll_sideload.py",
+        "operations/playbooks/test/windows/memory_detection/phase_C2_clr_assembly.py",
+        "operations/playbooks/test/windows/memory_detection/phase_C3_ppid_spoof.py",
+        "operations/playbooks/test/windows/memory_detection/phase_C4_com_vtable.py",
+        "operations/playbooks/test/windows/memory_detection/unit/conftest.py",
+        "operations/playbooks/test/windows/memory_detection/unit/test_A_dormant_beacon.py",
+        "operations/playbooks/test/windows/memory_detection/unit/test_B_advanced.py",
+        "operations/playbooks/test/windows/memory_detection/unit/test_B_execution_evasion.py",
+        "operations/playbooks/test/windows/memory_detection/unit/test_C_additional.py",
+        "operations/playbooks/test/workflow_sim.py"
       ],
       "publishes": [],
       "rust_deps": [],
@@ -226,6 +361,7 @@
         "NC-11-ENERGY-ACCOUNTING",
         "NC-2-CALIBRATION",
         "NC-3-FRONTIER-PIN",
+        "NC-7-ENDPOINT-ABUSE",
         "NC-8-OVER-RELIANCE",
         "NC-9-ACTIVE-LEARNING",
         "SEC-BLAST-RADIUS",
@@ -267,6 +403,7 @@
         "analytics/llm_hunter/agents/containment_capability.py",
         "analytics/llm_hunter/agents/containment_protocol.py",
         "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/endpoint_abuse_monitor.py",
         "analytics/llm_hunter/agents/energy_accounting.py",
         "analytics/llm_hunter/agents/expert_base.py",
         "analytics/llm_hunter/agents/host_expert.py",
@@ -277,6 +414,7 @@
         "analytics/llm_hunter/agents/playbook_planner.py",
         "analytics/llm_hunter/agents/response.py",
         "analytics/llm_hunter/agents/review_board.py",
+        "analytics/llm_hunter/agents/scheduled_audits.py",
         "analytics/llm_hunter/agents/supervisor.py",
         "analytics/llm_hunter/agents/target_class.py",
         "analytics/llm_hunter/agents/verdict_ledger.py",
@@ -312,6 +450,25 @@
       ],
       "test_section": "analytics"
     },
+    "looking_glass": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "services/looking_glass/Dockerfile",
+      "language": "svelte-ts",
+      "mentions": [],
+      "paths": [
+        "services/looking_glass/src/lib/stores.ts",
+        "services/looking_glass/src/routes/+page.svelte",
+        "services/looking_glass/src/routes/api/firehose/+server.ts",
+        "services/looking_glass/src/routes/api/ti/+server.ts"
+      ],
+      "publishes": [],
+      "rust_deps": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
     "middleware": {
       "calls": [
         "/api/v1/telemetry"
@@ -327,17 +484,10 @@
         "middleware/src/core_ingress/src/main.rs",
         "middleware/src/lib_etl/src/lib.rs",
         "middleware/src/lib_etl/src/schema.rs",
-        "middleware/src/lib_middleware/src/lib.rs",
-        "middleware/src/worker_elastic/src/main.rs",
-        "middleware/src/worker_nexus/src/main.rs",
-        "middleware/src/worker_splunk/src/main.rs",
-        "middleware/src/worker_sql/src/main.rs"
+        "middleware/src/lib_middleware/src/lib.rs"
       ],
       "publishes": [],
-      "rust_deps": [
-        "lib_etl",
-        "lib_middleware"
-      ],
+      "rust_deps": [],
       "serves": [
         "/api/v1/telemetry"
       ],
@@ -390,6 +540,7 @@
         "mlops/scripts/07_feed_ingest.py",
         "mlops/scripts/08_rsi_loop.py",
         "mlops/scripts/09_benchmark_runner.py",
+        "mlops/scripts/10_freeze_replay_case.py",
         "mlops/scripts/11_join_outcomes.py",
         "mlops/scripts/build_baseline_windows.py",
         "mlops/scripts/build_model_b_corpus.py",
@@ -484,6 +635,25 @@
       "subscribes": [],
       "test_section": "services"
     },
+    "worker_elastic": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "middleware/src/Dockerfile",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "middleware/src/worker_elastic/src/main.rs"
+      ],
+      "publishes": [],
+      "rust_deps": [
+        "lib_etl",
+        "lib_middleware"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
     "worker_memory": {
       "calls": [
         "/api/v1/evidence"
@@ -517,6 +687,24 @@
         "nexus.memory.intake"
       ],
       "test_section": "memory"
+    },
+    "worker_nexus": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "middleware/src/Dockerfile",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "middleware/src/worker_nexus/src/main.rs"
+      ],
+      "publishes": [],
+      "rust_deps": [
+        "lib_middleware"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
     },
     "worker_qdrant": {
       "calls": [],
@@ -649,6 +837,44 @@
       ],
       "test_section": "services"
     },
+    "worker_splunk": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "middleware/src/Dockerfile",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "middleware/src/worker_splunk/src/main.rs"
+      ],
+      "publishes": [],
+      "rust_deps": [
+        "lib_etl",
+        "lib_middleware"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
+    "worker_sql": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "middleware/src/Dockerfile",
+      "language": "rust",
+      "mentions": [],
+      "paths": [
+        "middleware/src/worker_sql/src/main.rs"
+      ],
+      "publishes": [],
+      "rust_deps": [
+        "lib_etl",
+        "lib_middleware"
+      ],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "services"
+    },
     "worker_ti_ingest": {
       "calls": [],
       "controls": [],
@@ -713,18 +939,6 @@
     ],
     [
       "cloud_instance",
-      "azure",
-      "revoke_instance_role",
-      "azure_containment_v1"
-    ],
-    [
-      "cloud_instance",
-      "azure",
-      "snapshot_volume",
-      "azure_containment_v1"
-    ],
-    [
-      "cloud_instance",
       "gcp",
       "isolate_host",
       "gcp_containment_v1"
@@ -733,12 +947,6 @@
       "cloud_instance",
       "gcp",
       "release_host",
-      "gcp_containment_v1"
-    ],
-    [
-      "cloud_instance",
-      "gcp",
-      "revoke_instance_role",
       "gcp_containment_v1"
     ],
     [
@@ -1195,6 +1403,24 @@
       "evidence_files": [],
       "status": "documented",
       "tests": []
+    },
+    "NC-7-ENDPOINT-ABUSE": {
+      "category": "NIST AI 600-1",
+      "components": [
+        "llm_hunter_swarm"
+      ],
+      "evidence_files": [
+        "analytics/llm_hunter/agents/controls.py",
+        "analytics/llm_hunter/agents/endpoint_abuse_monitor.py"
+      ],
+      "status": "implemented",
+      "tests": [
+        "tests/lab_governance/test_ai_controls.py::TestEndpointQuota",
+        "tests/lab_governance/test_ai_controls.py::TestVolumeAnomaly",
+        "tests/lab_governance/test_ai_controls.py::TestMembershipInferenceSignal",
+        "tests/lab_governance/test_ai_controls.py::TestEndpointAbuseReport",
+        "tests/lab_governance/test_nist_controls_wave4.py::TestEndpointAbuseMonitor"
+      ]
     },
     "NC-8-OVER-RELIANCE": {
       "category": "NIST AI 600-1",
@@ -1735,6 +1961,10 @@
         "containment_compute_admin"
       ],
       [
+        "google_project_iam_member",
+        "containment_storage_admin"
+      ],
+      [
         "google_service_account",
         "containment"
       ],
@@ -1979,6 +2209,11 @@
         "09_benchmark_runner.py \u2014 WS-A M-26 benchmark runner + registry."
       ],
       [
+        "10",
+        "freeze_replay_case",
+        "10_freeze_replay_case.py - freeze closed investigations into replay bench cases."
+      ],
+      [
         "11",
         "join_outcomes",
         "11_join_outcomes.py \u2014 WS-A M-27 delayed-ground-truth join."
@@ -2016,6 +2251,9 @@
       "agents.lateral_movement",
       "agents.playbook_planner",
       "agents.target_class"
+    ],
+    "analytics/llm_hunter/agents/endpoint_abuse_monitor.py": [
+      "agents.controls"
     ],
     "analytics/llm_hunter/agents/energy_accounting.py": [
       "agents.controls"
@@ -2066,6 +2304,9 @@
       "state",
       "tools.nexus_config",
       "tools.siem_query"
+    ],
+    "analytics/llm_hunter/agents/scheduled_audits.py": [
+      "agents"
     ],
     "analytics/llm_hunter/agents/supervisor.py": [
       "agents.controls",
@@ -2222,6 +2463,7 @@
     "qdrant_ti_corpus": {
       "kind": "qdrant",
       "touched_by": [
+        "looking_glass",
         "worker_ti_ingest"
       ]
     },

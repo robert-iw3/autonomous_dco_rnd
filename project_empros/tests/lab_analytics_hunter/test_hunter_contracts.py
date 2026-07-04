@@ -438,3 +438,91 @@ class TestOrchestratorSecurityContracts:
 
     def test_redis_polling_reads_correct_queue(self):
         assert '"nexus:deterministic:alerts"' in ORCHESTRATOR_SRC
+
+
+# -- awaited-but-not-called / silent no-op guards ------------------------------
+class TestBoundMethodInvocationContracts:
+    """`await msg.ack` (no call) raises TypeError at runtime and kills the
+    consumer loop on its first message; `Counter.inc` (no call) silently never
+    increments. Offline mocks cannot catch either, so pin them at source level."""
+
+    def test_nats_ack_family_always_invoked(self):
+        offenders = [
+            m.group(0) for m in
+            re.finditer(r"await\s+msg\.(?:ack|nak|term)\b(?!\()", ORCHESTRATOR_SRC)
+        ]
+        assert not offenders, f"awaited without call: {offenders}"
+
+    def test_prometheus_inc_always_invoked(self):
+        offenders = [
+            f"line {ORCHESTRATOR_SRC[:m.start()].count(chr(10)) + 1}: {m.group(0)}"
+            for m in re.finditer(r"\.inc\b(?!\()", ORCHESTRATOR_SRC)
+        ]
+        assert not offenders, f".inc never called (metric stays 0): {offenders}"
+
+    def test_no_awaited_bare_attributes_anywhere_in_hunter(self):
+        # AST guard for the whole class of dropped-parens bugs: awaiting a bare
+        # Name/Attribute (a bound coroutine method, never invoked) is a runtime
+        # TypeError that kills the awaiting coroutine.
+        import ast
+        offenders = []
+        for f in sorted(HUNTER_DIR.rglob("*.py")):
+            if "__pycache__" in str(f):
+                continue
+            tree = ast.parse(f.read_text())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Await) and isinstance(
+                        node.value, (ast.Attribute, ast.Name)):
+                    offenders.append(
+                        f"{f.name}:{node.lineno}: await {ast.unparse(node.value)}")
+        assert not offenders, f"awaited without call: {offenders}"
+
+
+# -- bounded alert intake (backpressure + retained task refs) ------------------
+class TestAlertIntakeBackpressure:
+    """The consumers must not ack an alert before its investigation is admitted
+    (bounded), and every scheduled task must be retained so it is not GC'd."""
+
+    def test_task_retention_set_exists(self):
+        assert re.search(r"_inflight\w*[^\n=]*=\s*set\(\)", ORCHESTRATOR_SRC), \
+            "a module-level set must retain in-flight investigation tasks"
+
+    def test_scheduled_tasks_are_retained(self):
+        # every create_task for an investigation must be added to the set with a
+        # done-callback discard (asyncio holds only weak refs otherwise)
+        assert re.search(r"\.add_done_callback\(", ORCHESTRATOR_SRC), \
+            "scheduled tasks need add_done_callback(discard) to bound the set"
+
+    def test_admission_acquired_before_scheduling(self):
+        # the bounded scheduler acquires the semaphore (backpressure) rather than
+        # spawning unbounded tasks that park on it after an unconditional ack
+        assert re.search(r"_investigation_sema\.acquire\(\)", ORCHESTRATOR_SRC), \
+            "intake must acquire admission before scheduling (backpressure)"
+
+    def test_nats_consumer_acks_after_admission_not_before(self):
+        # in the nats consumer, the schedule call (which now blocks on admission)
+        # must precede msg.ack -- so a full pipeline stops fetching instead of
+        # acking alerts it has not yet started
+        start = ORCHESTRATOR_SRC.find("async def reactive_alert_consumer(")
+        end = ORCHESTRATOR_SRC.find("\nasync def ", start + 1)
+        body = ORCHESTRATOR_SRC[start:end]
+        sched = body.find("await _schedule_investigation")
+        # the ack that commits a scheduled alert is the one AFTER the schedule
+        # call (an earlier ack drops a duplicate before scheduling)
+        ack = body.find("await msg.ack()", sched)
+        assert sched != -1 and ack != -1 and sched < ack, \
+            "investigation must be scheduled (admitted) before the alert is acked"
+
+
+# -- tool source presence guard -----------------------------------------------
+class TestToolSourcePresent:
+    """The swarm's tool modules (siem_query, nexus_config, sanitizer, ...) must
+    be present on disk. NOTE: tools/.gitignore blanket-ignores this directory by
+    deliberate project decision (the deploy bundle stages it), so the source is
+    NOT under version control -- edits here must be force-added / re-staged or
+    they are lost. This guard at least catches a module physically vanishing."""
+
+    def test_key_tool_modules_present_on_disk(self):
+        tools = HUNTER_DIR / "tools"
+        for mod in ("__init__.py", "siem_query.py", "nexus_config.py", "sanitizer.py"):
+            assert (tools / mod).exists(), f"tool module {mod} missing"

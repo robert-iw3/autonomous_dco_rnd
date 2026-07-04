@@ -14,7 +14,7 @@ trigger + verdict loop live in `analytics/llm_hunter`; the authenticated transpo
 runs through `services/core_ingress` and `operations/`.
 
 > Full design, phase status, and findings ledger:
-> [`planning_docs/DET_CHAMBER_INTEGRATION_PLAN.md`](../planning_docs/DET_CHAMBER_INTEGRATION_PLAN.md).
+> [`planning_docs/archive/DET_CHAMBER_INTEGRATION_PLAN.md`](../planning_docs/archive/DET_CHAMBER_INTEGRATION_PLAN.md).
 
 ## Workflow
 

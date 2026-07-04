@@ -647,7 +647,7 @@ class TestCanaryLeakGuard:
     def test_canary_leak_check_present_in_trigger_swarm(self):
         # Guard must be in trigger_swarm body (lines 175-262), not elsewhere
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert "canary in report" in trigger_body, \
             "Canary leak check missing from trigger_swarm body"
@@ -656,14 +656,14 @@ class TestCanaryLeakGuard:
 
     def test_canary_injected_into_initial_state(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"canary": canary' in trigger_body or "'canary': canary" in trigger_body, \
             "Canary not injected into initial_state"
 
     def test_canary_generated_before_dag_invocation(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         canary_gen_pos = trigger_body.find("generate_canary()")
         dag_invoke_pos = trigger_body.find("graph.ainvoke(")
@@ -672,7 +672,7 @@ class TestCanaryLeakGuard:
 
     def test_leak_check_before_soar_dispatch(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         leak_pos = trigger_body.find("CANARY LEAK DETECTED")
         # Use rfind: the FINAL _dispatch_soar call is the normal-path SOAR dispatch
@@ -688,7 +688,7 @@ class TestCognitiveDLQ:
 
     def test_dlq_published_on_graph_recursion_error(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         recursion_block = trigger_body[trigger_body.find("GraphRecursionError"):]
         assert "_publish_cognitive_dlq" in recursion_block[:600], \
@@ -696,7 +696,7 @@ class TestCognitiveDLQ:
 
     def test_dlq_published_on_unhandled_exception(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         # The catch-all Exception block must also publish to DLQ
         except_all_pos = trigger_body.rfind("except Exception")
@@ -734,7 +734,7 @@ class TestTimeoutEscalation:
 
     def test_timeout_action_type_is_manual_review(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         timeout_block_start = trigger_body.find("asyncio.TimeoutError")
         timeout_block = trigger_body[timeout_block_start:timeout_block_start + 500]
@@ -743,7 +743,7 @@ class TestTimeoutEscalation:
 
     def test_timeout_dispatches_to_soar(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         timeout_block_start = trigger_body.find("asyncio.TimeoutError")
         timeout_block = trigger_body[timeout_block_start:timeout_block_start + 1500]
@@ -752,7 +752,7 @@ class TestTimeoutEscalation:
 
     def test_timeout_does_not_go_to_dlq(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         timeout_block_start = trigger_body.find("asyncio.TimeoutError")
         timeout_end = trigger_body.find("return", timeout_block_start)
@@ -798,37 +798,37 @@ class TestStateSchemaKeys:
 
     def test_initial_state_has_next_agent(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"next_agent"' in trigger_body or "'next_agent'" in trigger_body
 
     def test_initial_state_has_verdict(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"verdict"' in trigger_body or "'verdict'" in trigger_body
 
     def test_initial_state_has_incident_report(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"incident_report"' in trigger_body or "'incident_report'" in trigger_body
 
     def test_initial_state_has_action_payload(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"action_payload"' in trigger_body or "'action_payload'" in trigger_body
 
     def test_initial_state_has_canary(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert '"canary"' in trigger_body or "'canary'" in trigger_body
 
     def test_final_state_verdict_key_used_for_is_tp_check(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert "is_true_positive" in trigger_body
 
@@ -872,7 +872,7 @@ class TestDoSGuard:
 
     def test_semaphore_wraps_trigger_swarm_body(self):
         trigger_start = ORCHESTRATOR_SRC.find("async def trigger_swarm(")
-        next_async = ORCHESTRATOR_SRC.find("\nasync def ", trigger_start + 1)
+        next_async = ORCHESTRATOR_SRC.find("\nasync def _emit_investigation_metrics(")
         trigger_body = ORCHESTRATOR_SRC[trigger_start:next_async]
         assert "_investigation_sema" in trigger_body, \
             "trigger_swarm must use _investigation_sema to bound concurrency"

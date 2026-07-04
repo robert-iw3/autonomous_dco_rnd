@@ -608,3 +608,88 @@ class TestLedgerSourceContracts:
         makefile = makefile_path.read_text()
         assert "rsi-loop:" in makefile
         assert "08_rsi_loop.py" in makefile
+
+
+# ── L. Tier-0 canary gate (fail fast before the alignment gates) ─────────────
+
+_load_tier0_scores = _mod._load_tier0_scores
+_tier0_gate        = _mod._tier0_gate
+
+
+class TestTier0Gate:
+
+    def test_no_scores_is_inert_pass(self):
+        ok, reasons = _tier0_gate({}, {"tier0_canary": 0.9})
+        assert ok and reasons == []
+
+    def test_score_below_floor_fails(self):
+        ok, reasons = _tier0_gate({"tier0_canary": 0.5}, {}, floor=0.7)
+        assert not ok and "tier0_canary" in reasons[0]
+
+    def test_score_at_floor_passes(self):
+        ok, _ = _tier0_gate({"tier0_canary": 0.7}, {}, floor=0.7)
+        assert ok
+
+    def test_regression_vs_deployed_baseline_fails(self):
+        ok, reasons = _tier0_gate({"tier0_canary": 0.75},
+                                  {"tier0_canary": 0.95},
+                                  floor=0.7, epsilon=0.02)
+        assert not ok and "baseline" in reasons[0]
+
+    def test_within_epsilon_of_baseline_passes(self):
+        ok, _ = _tier0_gate({"tier0_canary": 0.94}, {"tier0_canary": 0.95},
+                            floor=0.7, epsilon=0.02)
+        assert ok
+
+    def test_unshared_baseline_metrics_ignored(self):
+        ok, _ = _tier0_gate({"tier0_canary": 0.9}, {"other_bench": 0.99},
+                            floor=0.7)
+        assert ok
+
+    def test_default_floor_is_0_7(self):
+        assert _mod.RSI_TIER0_FLOOR == 0.7
+
+    def test_load_tier0_scores_missing_file_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(_mod, "TIER0_SCORES_FILE", tmp_path / "absent.json")
+        assert _load_tier0_scores() == {}
+
+    def test_load_tier0_scores_reads_flat_floats(self, tmp_path, monkeypatch):
+        f = tmp_path / "tier0.json"
+        f.write_text(json.dumps({"tier0_canary": 0.91, "note": "ignored"}))
+        monkeypatch.setattr(_mod, "TIER0_SCORES_FILE", f)
+        assert _load_tier0_scores() == {"tier0_canary": 0.91}
+
+
+class TestTier0SourceContracts:
+
+    def test_tier0_env_vars_documented(self):
+        assert "RSI_TIER0_SCORES_FILE" in RSI_SRC
+        assert "RSI_TIER0_FLOOR" in RSI_SRC
+
+    def test_tier0_canary_after_training_before_alignment_gate(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        train_pos = fn_body.find("train-ppo")
+        tier0_pos = fn_body.find("_run_tier0_canary(")
+        align_pos = fn_body.find("_run_alignment_gate(")
+        assert train_pos < tier0_pos < align_pos, \
+            "Tier-0 canary must run after training and before the alignment gates"
+
+    def test_tier0_failure_retunes_critic_without_alignment_cost(self):
+        fn_start = RSI_SRC.find("def rsi_loop(")
+        fn_body = RSI_SRC[fn_start:]
+        tier0_block_start = fn_body.find("_run_tier0_canary(")
+        align_pos = fn_body.find("_run_alignment_gate(")
+        tier0_block = fn_body[tier0_block_start:align_pos]
+        assert "critic-loop" in tier0_block and "continue" in tier0_block, \
+            "A tier-0 failure must retune and retry without paying the alignment gates"
+
+    def test_ledger_records_tier0_scores_per_attempt(self):
+        assert "tier0_scores" in RSI_SRC
+        assert '"tier0_scores"' in RSI_SRC, "ledger record must carry tier0_scores"
+
+    def test_makefile_has_bench_tier0_target(self):
+        makefile_path = SCRIPTS_DIR.parent / "Makefile"
+        if not makefile_path.exists():
+            pytest.skip("Makefile not shipped in this test container")
+        assert "bench-tier0:" in makefile_path.read_text()

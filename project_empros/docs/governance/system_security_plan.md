@@ -279,10 +279,10 @@ generator. See the Applicability Determinations document.
 
 | ID | Item | Control | Target |
 |---|---|---|---|
-| POAM-1 | Schedule + alert the bias/homogenization audit, calibration ledger, and over-reliance (automation-bias) jobs on a cron/RSI cadence | AU-6, RA-3 | next sprint |
+| POAM-1 | ✅ DONE (2026-07-03) — bias/homogenization audit, over-reliance, and endpoint-abuse jobs run on a daily systemd timer via `agents/scheduled_audits.py` (fail-soft runner); units `nexus_governance_audits.{service,timer}`. Alerting-to-SIEM is the residual. | AU-6, RA-3 | done (alert wiring residual) |
 | POAM-2 | Formalize external AI-incident reporting pathway | IR-6 | next sprint |
 | POAM-3 | Model registry + steward (pull-based promotion, re-pin rollback) | CM-3, CP-10 | WS-A B2.5 |
-| POAM-4 | RAG-memory retention enforcement + membership-inference review | SC-28, AU-9 | per retention policy |
+| POAM-4 | RAG-memory retention enforcement + membership-inference review (inference-endpoint abuse / model-extraction monitoring ✅ landed as NC-7, 2026-07-03) | SC-28, AU-9 | retention enforcement residual |
 | POAM-5 | Live integration tests in CI (gateway+NATS+Qdrant) | CA-2 | hardware-gated |
 
 ## 7. Roles & Responsibilities
@@ -326,33 +326,34 @@ regenerated, so the SSP can never cite code that no longer exists. The multiple
 - **AI-GROUNDING** — Confabulated-evidence grounding. *Evidence:* artifacts/AI-GROUNDING.md — controls.py L58-L74,L84-L114; review_board.py L279-L289
 - **AI-MEMORY-TTL** — Immunity-memory TTL / expiry. *Evidence:* artifacts/AI-MEMORY-TTL.md — controls.py L147-L175; supervisor.py L236-L240; response.py L142-L144
 - **AI-PROVENANCE** — AI-origin provenance disclosure. *Evidence:* artifacts/AI-PROVENANCE.md — controls.py L178-L192; response.py L238-L240
-- **AI-REVIEW-BOARD** — Adversarial review board (per-expert counterparts). *Evidence:* artifacts/AI-REVIEW-BOARD.md — orchestrator.py L137-L137; review_board.py L266-L275,L189-L217
+- **AI-REVIEW-BOARD** — Adversarial review board (per-expert counterparts). *Evidence:* artifacts/AI-REVIEW-BOARD.md — orchestrator.py L140-L140; review_board.py L266-L275,L189-L217
 - **IAC-HARDENING** — OS / kernel / network hardening baseline. *Evidence:* artifacts/IAC-HARDENING.md — main.yml L20-L22,L30-L32,L34-L35
 - **ING-DLQ-BREAKER** — Durable worker circuit breaker + dead-letter routing. *Evidence:* artifacts/ING-DLQ-BREAKER.md — lib.rs L44-L60,L104-L110,L262-L269
 - **ING-ZERO-TRUST** — Zero-Trust ingestion gateway (HMAC + 3-tier replay defense). *Evidence:* artifacts/ING-ZERO-TRUST.md — integrity.rs L211-L213,L29-L41,L46-L56,L127-L145
 - **NC-1-BIAS-AUDIT** — Bias/disparity + homogenization scheduled audit. *Evidence:* artifacts/NC-1-BIAS-AUDIT.md — controls.py L239-L249,L301-L313; bias_audit.py L41-L63
 - **NC-10-VERDICT-LINEAGE** — Tamper-evident verdict lineage. *Evidence:* artifacts/NC-10-VERDICT-LINEAGE.md — response.py L170-L180; controls.py L480-L483,L486-L496; verdict_ledger.py L37-L46
-- **NC-11-ENERGY-ACCOUNTING** — Per-run inference energy accounting. *Evidence:* artifacts/NC-11-ENERGY-ACCOUNTING.md — response.py L185-L189; controls.py L506-L517; energy_accounting.py L23-L33
+- **NC-11-ENERGY-ACCOUNTING** — Per-run inference energy accounting. *Evidence:* artifacts/NC-11-ENERGY-ACCOUNTING.md — response.py L185-L189; controls.py L604-L615; energy_accounting.py L23-L33
 - **NC-2-CALIBRATION** — Confidence-calibration ledger. *Evidence:* artifacts/NC-2-CALIBRATION.md — controls.py L119-L133; calibration_ledger.py L27-L39,L81-L103
 - **NC-3-FRONTIER-PIN** — Frontier model boot-time version-pin enforcement. *Evidence:* artifacts/NC-3-FRONTIER-PIN.md — controls.py L195-L201; llm_providers.py L175-L178
+- **NC-7-ENDPOINT-ABUSE** — Inference-endpoint abuse / model-extraction monitoring. *Evidence:* artifacts/NC-7-ENDPOINT-ABUSE.md — controls.py L519-L531,L547-L565,L571-L587; endpoint_abuse_monitor.py L120-L126
 - **NC-8-OVER-RELIANCE** — Automation-bias / over-reliance measurement. *Evidence:* artifacts/NC-8-OVER-RELIANCE.md — controls.py L351-L365,L370-L392; calibration_ledger.py L46-L56
 - **NC-9-ACTIVE-LEARNING** — Active-learning failure capture. *Evidence:* artifacts/NC-9-ACTIVE-LEARNING.md — response.py L196-L201; controls.py L429-L438,L441-L455; active_learning.py L23-L35
 - **SEC-BLAST-RADIUS** — Blast-radius cap & entity state machine. *Evidence:* artifacts/SEC-BLAST-RADIUS.md — state.py L260-L290; supervisor.py L197-L200; response.py L79-L81; containment_protocol.py L81-L82,L198-L200
-- **SEC-CANARY** — Canary token prompt-leak tripwire. *Evidence:* artifacts/SEC-CANARY.md — orchestrator.py L199-L199,L260-L263; sanitizer.py L49-L58
+- **SEC-CANARY** — Canary token prompt-leak tripwire. *Evidence:* artifacts/SEC-CANARY.md — orchestrator.py L233-L233,L294-L297; sanitizer.py L49-L58
 - **SEC-DLP-EGRESS** — Outbound DLP / sovereign data isolation. *Evidence:* artifacts/SEC-DLP-EGRESS.md — sanitizer.py L59-L73; response.py L350-L350
 - **SEC-DUCKDB-SANDBOX** — Read-only data-lake query sandbox. *Evidence:* artifacts/SEC-DUCKDB-SANDBOX.md — duckdb_query.py L27-L30,L78-L104
 - **SEC-ENDPOINT-ID** — Endpoint identity injection defense. *Evidence:* artifacts/SEC-ENDPOINT-ID.md — models.rs L14-L20
 - **SEC-FAILOVER** — Cascading LLM failover & sovereign degradation. *Evidence:* artifacts/SEC-FAILOVER.md — expert_base.py L25-L25; llm_providers.py L163-L188; response.py L218-L219
 - **SEC-IDEMPOTENT-SOAR** — Idempotent SOAR execution & deduplication. *Evidence:* artifacts/SEC-IDEMPOTENT-SOAR.md — response.py L374-L377; main.rs L335-L338
-- **SEC-MODEL-DOS** — Model denial-of-service bounding. *Evidence:* artifacts/SEC-MODEL-DOS.md — orchestrator.py L56-L56,L67-L67,L187-L188,L215-L215,L219-L221
-- **SEC-OUTPUT-SCHEMA** — Strict SOAR output-contract enforcement. *Evidence:* artifacts/SEC-OUTPUT-SCHEMA.md — state.py L139-L174; orchestrator.py L311-L312,L341-L348
+- **SEC-MODEL-DOS** — Model denial-of-service bounding. *Evidence:* artifacts/SEC-MODEL-DOS.md — orchestrator.py L56-L56,L67-L67,L195-L196,L249-L249,L253-L255
+- **SEC-OUTPUT-SCHEMA** — Strict SOAR output-contract enforcement. *Evidence:* artifacts/SEC-OUTPUT-SCHEMA.md — state.py L139-L174; orchestrator.py L345-L346,L375-L382
 - **SEC-REGRESSION-GATE** — Deterministic regression / deploy gate. *Evidence:* artifacts/SEC-REGRESSION-GATE.md — 03_eval_model.py L312-L338,L198-L200
 - **SEC-RLHF-QUARANTINE** — Sybil RLHF poisoning quarantine. *Evidence:* artifacts/SEC-RLHF-QUARANTINE.md — main.rs L90-L91,L135-L141,L132-L158
 - **SEC-SANITIZER** — Cognitive boundary isolation & untrusted-payload wrapping. *Evidence:* artifacts/SEC-SANITIZER.md — sanitizer.py L24-L48,L88-L96; expert_base.py L83-L84
 - **SEC-SUPPLY-CHAIN** — Cryptographic model supply-chain integrity (SHA-384). *Evidence:* artifacts/SEC-SUPPLY-CHAIN.md — serve_vllm.sh L48-L66,L68-L69
 - **SEC-TRAINING-HYGIENE** — Training-data hygiene & credential scrubbing. *Evidence:* artifacts/SEC-TRAINING-HYGIENE.md — 01_spool_datasets.py L47-L58
 - **SEC-VECTOR-DIM** — Vector dimensionality validation. *Evidence:* artifacts/SEC-VECTOR-DIM.md — qdrant_search.py L50-L50,L58-L72
-- **SIEM-CONFIG-CONTRACT** — SIEM config ↔ fanout index contract. *Evidence:* artifacts/SIEM-CONFIG-CONTRACT.md — nexus_config.py L118-L148
+- **SIEM-CONFIG-CONTRACT** — SIEM config ↔ fanout index contract. *Evidence:* artifacts/SIEM-CONFIG-CONTRACT.md — nexus_config.py L147-L177
 - **SIEM-COUNTERPART-DISPROOF** — Review-board counterpart SIEM disproof. *Evidence:* artifacts/SIEM-COUNTERPART-DISPROOF.md — review_board.py L117-L127,L128-L156
 - **SIEM-E2E** — SIEM federation end-to-end conservation. *Evidence:* artifacts/SIEM-E2E.md — test_siem_federation_e2e.py L189-L195,L222-L227
 - **SIEM-TOOL-GUARD** — SIEM query tool — read-only / bounded / allowlist. *Evidence:* artifacts/SIEM-TOOL-GUARD.md — siem_query.py L110-L128,L142-L154,L155-L173,L348-L356

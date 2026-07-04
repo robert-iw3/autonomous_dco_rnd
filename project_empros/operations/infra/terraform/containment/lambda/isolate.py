@@ -13,14 +13,20 @@ Payload schema (JSON):
     "incident_id":   "INC-XXXX",
     "target_ip":     "1.2.3.4",          # remote/attacker IP or instance private IP
     "instance_id":   "i-0123456789abcdef" # optional -- if known from GuardDuty
-    "action":        "isolate" | "release",
+    "action":        "isolate" | "release" | "snapshot_volume" | "revoke_instance_role",
     "source":        "n8n" | "worker_soar" | "guardduty_auto"
   }
 
-Returns (JSON):
+Returns a Lambda URL envelope {"statusCode": N, "body": <result JSON>} so that
+dispatch failures are visible to the caller's HTTP status check: 200 on success,
+400 unknown action, 404 no instance resolved, 500 execution error. A plain-dict
+return would always be served as HTTP 200 -- a failed containment step would be
+recorded as done.
+
+Result body:
   {
     "incident_id": "...",
-    "status":      "CONTAINED" | "RELEASED" | "FAILED",
+    "status":      "CONTAINED" | "RELEASED" | "SNAPSHOTTED" | "ROLE_REVOKED" | "FAILED",
     "instance_id": "...",
     "quarantine_sg_id": "...",
     "detail":      "..."
@@ -179,6 +185,59 @@ def release_instance(instance: dict, incident_id: str) -> dict:
     return {"instance_id": instance_id, "status": "released", "restored_sgs": original_sgs}
 
 
+def snapshot_volumes(instance: dict, incident_id: str) -> dict:
+    """Evidence-first: snapshot every attached EBS volume, tagged to the incident."""
+    instance_id = instance["InstanceId"]
+    volume_ids = [
+        bdm["Ebs"]["VolumeId"]
+        for bdm in instance.get("BlockDeviceMappings", [])
+        if "Ebs" in bdm and bdm["Ebs"].get("VolumeId")
+    ]
+    if not volume_ids:
+        raise RuntimeError(f"no EBS volumes attached to {instance_id}")
+    snapshot_ids = []
+    for vol_id in volume_ids:
+        snap = ec2.create_snapshot(
+            VolumeId=vol_id,
+            Description=f"Nexus IR evidence snapshot {incident_id} ({instance_id})",
+            TagSpecifications=[{
+                "ResourceType": "snapshot",
+                "Tags": [
+                    {"Key": "nexus:managed", "Value": "true"},
+                    {"Key": "nexus:component", "Value": "containment"},
+                    {"Key": "nexus:incident", "Value": incident_id},
+                    {"Key": "nexus:source-instance", "Value": instance_id},
+                ],
+            }],
+        )
+        snapshot_ids.append(snap["SnapshotId"])
+    return {"instance_id": instance_id, "volume_ids": volume_ids,
+            "snapshot_ids": snapshot_ids}
+
+
+def revoke_instance_role(instance: dict, incident_id: str) -> dict:
+    """Strip the instance's IAM role so stolen instance credentials stop minting.
+
+    The association id is tagged onto the instance for operator-driven restore;
+    the existing STS sessions expire on their own (max 6h)."""
+    instance_id = instance["InstanceId"]
+    assoc = ec2.describe_iam_instance_profile_associations(
+        Filters=[{"Name": "instance-id", "Values": [instance_id]}]
+    )["IamInstanceProfileAssociations"]
+    if not assoc:
+        return {"instance_id": instance_id, "status": "no_instance_profile"}
+    profile_arn = assoc[0]["IamInstanceProfile"]["Arn"]
+    ec2.disassociate_iam_instance_profile(AssociationId=assoc[0]["AssociationId"])
+    ec2.create_tags(
+        Resources=[instance_id],
+        Tags=[
+            {"Key": f"nexus:pre-revocation-profile-{incident_id}", "Value": profile_arn},
+            {"Key": "nexus:incident", "Value": incident_id},
+        ],
+    )
+    return {"instance_id": instance_id, "revoked_profile_arn": profile_arn}
+
+
 def send_callback(result: dict) -> None:
     """POST result to n8n callback URL with HMAC signature."""
     if not N8N_CALLBACK_URL:
@@ -201,15 +260,43 @@ def send_callback(result: dict) -> None:
         print(f"[callback] failed: {e}")
 
 
+def _respond(status_code: int, result: dict):
+    """Lambda URL envelope: the HTTP status must reflect the real outcome."""
+    send_callback(result)
+    print(f"[isolate] status={status_code} result={json.dumps(result)}")
+    return {"statusCode": status_code, "body": json.dumps(result),
+            "headers": {"Content-Type": "application/json"}}
+
+
+_ACTIONS = {
+    "isolate": (isolate_instance, "CONTAINED"),
+    "release": (release_instance, "RELEASED"),
+    "snapshot_volume": (snapshot_volumes, "SNAPSHOTTED"),
+    "revoke_instance_role": (revoke_instance_role, "ROLE_REVOKED"),
+}
+
+
 def handler(event, context):
     print(f"[isolate] event={json.dumps(event)}")
+
+    # Lambda URL invocations wrap the payload in a body string
+    if isinstance(event.get("body"), str):
+        try:
+            event = {**event, **json.loads(event["body"])}
+        except json.JSONDecodeError:
+            pass
 
     incident_id = event.get("incident_id", "UNKNOWN")
     target_ip   = event.get("target_ip", "")
     instance_id = event.get("instance_id")
     action      = event.get("action", "isolate")
 
-    result = {"incident_id": incident_id, "target_ip": target_ip, "status": "FAILED", "detail": ""}
+    result = {"incident_id": incident_id, "target_ip": target_ip,
+              "action": action, "status": "FAILED", "detail": ""}
+
+    if action not in _ACTIONS:
+        result["detail"] = f"Unknown action: {action}"
+        return _respond(400, result)
 
     try:
         # Resolve instance
@@ -224,22 +311,14 @@ def handler(event, context):
 
         if not instance:
             result["detail"] = f"No EC2 instance found for ip={target_ip} id={instance_id}"
-            send_callback(result)
-            return result
+            return _respond(404, result)
 
-        if action == "isolate":
-            detail = isolate_instance(instance, incident_id)
-            result.update({"status": "CONTAINED", "detail": f"SG replaced with quarantine", **detail})
-        elif action == "release":
-            detail = release_instance(instance, incident_id)
-            result.update({"status": "RELEASED", **detail})
-        else:
-            result["detail"] = f"Unknown action: {action}"
+        fn, ok_status = _ACTIONS[action]
+        detail = fn(instance, incident_id)
+        result.update({"status": ok_status, **detail})
+        return _respond(200, result)
 
     except Exception as e:
         result["detail"] = str(e)
         print(f"[isolate] error: {e}")
-
-    send_callback(result)
-    print(f"[isolate] result={json.dumps(result)}")
-    return result
+        return _respond(500, result)

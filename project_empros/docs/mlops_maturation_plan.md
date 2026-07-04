@@ -1,7 +1,8 @@
 # MLOps Maturation Plan: Embedded Benchmarking, Evaluation QA, Fail-Fast Learning, and Training/Serving Plane Separation
 
-**Status:** IN PROGRESS — **B0 landed** (M-26 runner+registry, M-27 investigation metrics +
-outcome join, `bench` CI section). Per-section status legend below.
+**Status:** IN PROGRESS — **B0 + B1 landed** (M-26 runner+registry, M-27 investigation metrics +
+outcome join, `bench` CI section; M-28 replay-case freezer + graded scorer, M-29 tier-0 canary
+gate in the RSI loop). Per-section status legend below.
 
 **Status legend** (per section / phase):
 - 🧪 **Unit testing completed** — logic implemented + proven offline in `tests/` (test-first).
@@ -117,7 +118,10 @@ Mapped to existing assets so v1 is mostly *formalization*, not new data:
 
 ### 3.3 Investigation Replay Bench (the biggest lever)
 
-*Status: 📋 planned (B1 / M-28 — `10_freeze_replay_case.py`).*
+*Status: 🧪 unit testing completed (M-28, `tests/lab_benchmarks/test_freeze_replay_case.py` —
+adjudication, selection policy, frozen-case integrity, graded scorer, hardest-miss tier-0
+selection, write/manifest, CLI) · ⏳ validating production implementation (artifact extraction
+from the live stores; the CLI currently consumes a pre-extracted artifacts JSONL).*
 
 Every closed investigation already contains everything a benchmark case needs: the
 `UnifiedAlertSchema` trigger, the Parquet slice the experts queried, the entity board with
@@ -232,7 +236,11 @@ judge-weighted promotion until recalibrated.
 
 ## 5. Pillar 3 — Fail Fast, Learn Fast
 
-*Status: 📋 planned (B1/B3 — M-29 tier-0 canary, M-31 micro-batch, M-32 live rollback).*
+*Status: 🧪 M-29 tier-0 canary unit testing completed (`_tier0_gate` + `_run_tier0_canary` in
+`08_rsi_loop.py`, wired after training and before the alignment gates; per-attempt scores in the
+RSI ledger `tier0_scores`; `make bench-tier0`; proven in `test_rsi_loop.py`) · ⏳ validating
+production implementation (100-case canary dataset assembly) · 📋 planned (B3 — M-31 micro-batch,
+M-32 live rollback).*
 
 Current loop latency: miss → operator dismissal → Track 5 spool → ≥50-verdict batch →
 full train → full gates → deploy. Weeks, and the full gate cost is paid even for doomed
@@ -442,9 +450,14 @@ emitting the score file from the *existing* eval scripts; registry.toml + 2 regi
 benches (hard-negative held-out, governance). `bench` CI section. *Acceptance: RSI
 regression gate runs non-vacuously; Grafana shows live agreement/FP-burden panels.*
 
-**Phase B1 — Replay Bench + tier-0 (1–2 sprints)** — 📋 planned
-`10_freeze_replay_case.py` + selection policy; 100-case tier-0 canary assembled; tier-0
-wired into `08_rsi_loop.py` before alignment gates; leakage gate operational.
+**Phase B1 — Replay Bench + tier-0 (1–2 sprints)** — 🧪 unit testing completed · ⏳ validating production implementation
+`10_freeze_replay_case.py` + selection policy (overrides first, escalations, stratified agreed
+sample), frozen-case SHA-384 integrity, graded scorer (verdict/blast-radius/grounding/efficiency),
+hardest-miss tier-0 seed export; tier-0 canary gate wired into `08_rsi_loop.py` after training and
+before the alignment gates (fail ⇒ critic retune immediately, garak/PyRIT cost skipped), per-attempt
+scores recorded in the RSI ledger; `replay_investigations` + `tier0_canary` registered in
+registry.toml; `make bench-tier0`. Remaining for production: artifact extraction from the live
+stores, 100-case canary corpus assembly, and the leakage gate (B2 / Q-20).
 *Acceptance: a deliberately overfit adapter is caught by tier-0 in <5 min; replay cases
 reproduce frozen verdicts bit-stable on the champion.*
 

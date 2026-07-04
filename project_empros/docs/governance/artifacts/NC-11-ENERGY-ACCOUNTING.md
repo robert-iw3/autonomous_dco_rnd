@@ -18,7 +18,7 @@
 
 **2. Logic** — Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor.
 
-`analytics/llm_hunter/agents/controls.py:L506-L517`
+`analytics/llm_hunter/agents/controls.py:L604-L615`
 
 ```python
 def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,

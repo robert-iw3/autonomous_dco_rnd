@@ -690,43 +690,13 @@ body_template = """
 required_fields = ["target", "incident_id"]
 target_format = "any"
 
-[providers.azure_containment_v1.actions.snapshot_volume]
-method = "POST"
-endpoint = "${AZURE_NSG_WEBHOOK_URL}"
-headers = { "Content-Type" = "application/json" }
-timeout_seconds = 120
-retryable = true
-success_codes = [200, 202]
-body_template = """
-{
-  "IncidentId": "{{incident_id}}",
-  "TargetIp":   "{{target}}",
-  "Action":     "snapshot_volume"
-}
-"""
-
-[providers.azure_containment_v1.actions.snapshot_volume.validation]
-required_fields = ["target", "incident_id"]
-target_format = "any"
-
-[providers.azure_containment_v1.actions.revoke_instance_role]
-method = "POST"
-endpoint = "${AZURE_NSG_WEBHOOK_URL}"
-headers = { "Content-Type" = "application/json" }
-timeout_seconds = 60
-retryable = false
-success_codes = [200, 202]
-body_template = """
-{
-  "IncidentId": "{{incident_id}}",
-  "TargetIp":   "{{target}}",
-  "Action":     "revoke_instance_role"
-}
-"""
-
-[providers.azure_containment_v1.actions.revoke_instance_role.validation]
-required_fields = ["target", "incident_id"]
-target_format = "any"
+# Azure snapshot_volume / revoke_instance_role and GCP revoke_instance_role are
+# intentionally NOT declared: the Azure NSG runbook and the GCP function do not
+# implement them yet. Declaring an action whose executor silently no-ops it would
+# let the containment protocol record evidence-preservation / role-revocation as
+# done when it never ran. The capability matrix omits these too, so the planner
+# escalates that entity to an operator rather than dispatching a dead step.
+# (See tests/lab_operations_contracts/test_containment_action_vocabulary.py.)
 
 [providers.gcp_containment_v1.actions.snapshot_volume]
 method = "POST"
@@ -744,25 +714,6 @@ body_template = """
 """
 
 [providers.gcp_containment_v1.actions.snapshot_volume.validation]
-required_fields = ["target", "incident_id"]
-target_format = "any"
-
-[providers.gcp_containment_v1.actions.revoke_instance_role]
-method = "POST"
-endpoint = "${GCP_ISOLATE_FUNCTION_URL}"
-headers = { "Content-Type" = "application/json", "X-Nexus-Signature" = "${NEXUS_HMAC_SECRET}" }
-timeout_seconds = 60
-retryable = false
-success_codes = [200]
-body_template = """
-{
-  "incident_id": "{{incident_id}}",
-  "target_ip":   "{{target}}",
-  "action":      "revoke_instance_role"
-}
-"""
-
-[providers.gcp_containment_v1.actions.revoke_instance_role.validation]
 required_fields = ["target", "incident_id"]
 target_format = "any"
 

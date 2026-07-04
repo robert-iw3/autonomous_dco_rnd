@@ -22,27 +22,27 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **3. Effect** — …acquired before any LLM work, bounding model-DoS blast at the investigation entry point.
 
-`analytics/llm_hunter/orchestrator.py:L187-L188`
+`analytics/llm_hunter/orchestrator.py:L195-L196`
 
 ```python
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
-        await _broadcast_hud(alert, nc_client)
+        await _investigate(alert, js_client, nc_client, graph)
 ```
 
 **4. Execution** — Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…
 
-`analytics/llm_hunter/orchestrator.py:L215-L215`
+`analytics/llm_hunter/orchestrator.py:L249-L249`
 
 ```python
-            config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
+        config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
 ```
 
 **5. Execution** — …and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm.
 
-`analytics/llm_hunter/orchestrator.py:L219-L221`
+`analytics/llm_hunter/orchestrator.py:L253-L255`
 
 ```python
-                final_state = await asyncio.wait_for(
-                    graph.ainvoke(initial_state, config=config_opts),
-                    timeout=INVESTIGATION_TIMEOUT_S,
+            final_state = await asyncio.wait_for(
+                graph.ainvoke(initial_state, config=config_opts),
+                timeout=INVESTIGATION_TIMEOUT_S,
 ```

@@ -220,7 +220,7 @@ _FRONTIER_API_TYPES = {"anthropic", "openai"}
 
 **1. Invocation** — The board is wired into the graph as a mandatory node on the path to any response.
 
-`analytics/llm_hunter/orchestrator.py:L137-L137`
+`analytics/llm_hunter/orchestrator.py:L140-L140`
 
 ```python
     builder.add_node("review_board", review_board_node)
@@ -629,7 +629,7 @@ def append_verdict(record: dict, ledger_path: str = DEFAULT_LEDGER) -> dict:
 
 **2. Logic** — Deterministic per-run energy (Wh) and carbon (gCO2e): power × time × PUE, with an explicit grid-intensity factor.
 
-`analytics/llm_hunter/agents/controls.py:L506-L517`
+`analytics/llm_hunter/agents/controls.py:L604-L615`
 
 ```python
 def estimate_inference_energy(duration_s, avg_power_w, pue: float = 1.5,
@@ -775,6 +775,98 @@ def is_floating_model(model: str) -> bool:
         if not ok:
             logger.error("Refusing LLM provider: %s", reason)
             continue
+```
+
+\newpage
+
+### NC-7-ENDPOINT-ABUSE — Inference-endpoint abuse / model-extraction monitoring
+
+*Implementation: `analytics/llm_hunter/agents/endpoint_abuse_monitor.py`*
+
+**Execution chain:** Logic → Logic → Logic → Execution
+
+**1. Logic** — Per-caller volume spike over the caller's own baseline (or an absolute floor for a cold-start abuser) -- the model-extraction volume signal.
+
+`analytics/llm_hunter/agents/controls.py:L519-L531`
+
+```python
+def query_volume_anomalies(current, baseline, factor: float = 3.0,
+                           min_floor: int = 100) -> list:
+    """Callers whose current-window volume exceeds max(baseline*factor, floor).
+
+    A caller with no baseline (brand new) is gated by the absolute floor only, so
+    a cold-start abuser is still caught without flagging normal ramp-up."""
+    baseline = baseline or {}
+    out = []
+    for caller, n in (current or {}).items():
+        base = float(baseline.get(caller, 0.0))
+        threshold = base * factor + min_floor if base else float(min_floor)
+        if n > threshold:
+            out.append({"caller": caller, "count": n, "baseline": base,
+```
+
+**2. Logic** — Systematic near-duplicate probing: mean pairwise token-set Jaccard flags a caller sweeping perturbed prompts to map the decision boundary.
+
+`analytics/llm_hunter/agents/controls.py:L547-L565`
+
+```python
+def membership_inference_signal(queries, sim_threshold: float = 0.85,
+                                min_queries: int = 10, sample_cap: int = 200) -> dict:
+    """Flag systematic probing: a caller issuing many mutually-similar queries.
+
+    Model-extraction / membership-inference campaigns sweep near-duplicate prompts
+    (perturbing an id, an IP, a score) to map the decision boundary. Mean pairwise
+    token-set Jaccard over the caller's queries captures that without embeddings.
+    Below min_queries there is not enough signal to judge."""
+    qs = [q for q in (queries or []) if str(q).strip()]
+    n = len(qs)
+    if n < min_queries:
+        return {"flagged": False, "mean_similarity": 0.0, "n": n}
+    sets = [_token_set(q) for q in qs[:sample_cap]]
+    m = len(sets)
+    total, pairs = 0.0, 0
+    for i in range(m):
+        for j in range(i + 1, m):
+            total += _jaccard(sets[i], sets[j])
+            pairs += 1
+```
+
+**3. Logic** — Combines quota, volume, and probing signals into a per-caller verdict with the tripped axes, for operator throttle/revoke.
+
+`analytics/llm_hunter/agents/controls.py:L571-L587`
+
+```python
+def endpoint_abuse_report(records, quota: int = 1000, baseline=None,
+                          volume_factor: float = 3.0, volume_floor: int = 100,
+                          sim_threshold: float = 0.85, min_queries: int = 10) -> dict:
+    """Per-caller abuse verdict over access records [{caller, query}].
+
+    Combines the three signals; a caller is flagged with the axes that tripped so
+    an operator sees why. No single axis is dispositive on its own -- the report
+    surfaces them, the steward/operator decides on throttle vs revoke."""
+    by_caller = {}
+    for r in records or []:
+        by_caller.setdefault(str((r or {}).get("caller", "")), []).append(
+            str((r or {}).get("query", "")))
+    counts = {c: len(q) for c, q in by_caller.items()}
+    over_quota = dict(per_caller_quota_exceeded(counts, quota))
+    vol = {a["caller"]: a for a in query_volume_anomalies(
+        counts, baseline or {}, volume_factor, volume_floor)}
+    flagged = []
+```
+
+**4. Execution** — Scheduler entry point: pulls the sovereign vLLM access log, runs the abuse audit against the prior-window baseline, and writes a dated report.
+
+`analytics/llm_hunter/agents/endpoint_abuse_monitor.py:L120-L126`
+
+```python
+def collect_and_monitor(client=None, source: str = "", limit: int = 500000,
+                        report_dir: str = DEFAULT_REPORT_DIR,
+                        collector: Optional[Callable] = None,
+                        baseline: Optional[dict] = None, **audit_kwargs) -> dict:
+    """Scheduler entry point: collect access records, run the abuse audit, write the
+    report. `collector(client, source, limit) -> records` and `baseline` may be
+    injected (tests); otherwise the baseline is read from the last report. Extra
 ```
 
 \newpage
@@ -1031,10 +1123,10 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **1. Invocation** — At swarm start the orchestrator mints a per-investigation canary token and seeds it into the agents' system context.
 
-`analytics/llm_hunter/orchestrator.py:L199-L199`
+`analytics/llm_hunter/orchestrator.py:L233-L233`
 
 ```python
-            canary = CognitiveSanitizer.generate_canary()
+        canary = CognitiveSanitizer.generate_canary()
 ```
 
 **2. Logic** — The canary is a unique UUID tripwire — its only legitimate place is the system prompt, so any later appearance downstream is proof of a prompt leak.
@@ -1056,13 +1148,13 @@ def merge_entities(left: Dict[str, dict], right: Dict[str, dict]):
 
 **3. Execution** — Before any verdict is released the orchestrator verifies the canary never leaked onto an outbound surface; a leak halts the SOAR pipeline.
 
-`analytics/llm_hunter/orchestrator.py:L260-L263`
+`analytics/llm_hunter/orchestrator.py:L294-L297`
 
 ```python
-            # OWASP LLM01: verify the canary did not leak into any outbound surface.
-            report = final_state.get("incident_report", "") or ""
-            action = final_state.get("action_payload", {}) or {}
-            if canary in report or canary in json.dumps(action):
+        # OWASP LLM01: verify the canary did not leak into any outbound surface.
+        report = final_state.get("incident_report", "") or ""
+        action = final_state.get("action_payload", {}) or {}
+        if canary in report or canary in json.dumps(action):
 ```
 
 \newpage
@@ -1292,29 +1384,29 @@ _investigation_sema = asyncio.Semaphore(MAX_CONCURRENT_INVESTIGATIONS)
 
 **3. Effect** — …acquired before any LLM work, bounding model-DoS blast at the investigation entry point.
 
-`analytics/llm_hunter/orchestrator.py:L187-L188`
+`analytics/llm_hunter/orchestrator.py:L195-L196`
 
 ```python
     async with _investigation_sema:  # bound concurrent investigations (DoS guard)
-        await _broadcast_hud(alert, nc_client)
+        await _investigate(alert, js_client, nc_client, graph)
 ```
 
 **4. Execution** — Per-run the graph carries a LangGraph recursion ceiling that bounds runaway agent loops…
 
-`analytics/llm_hunter/orchestrator.py:L215-L215`
+`analytics/llm_hunter/orchestrator.py:L249-L249`
 
 ```python
-            config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
+        config_opts = {"configurable": {"thread_id": alert.event_id}, "recursion_limit": RECURSION_LIMIT}
 ```
 
 **5. Execution** — …and an absolute wall-clock timeout; a timeout escalates to manual review rather than hanging the swarm.
 
-`analytics/llm_hunter/orchestrator.py:L219-L221`
+`analytics/llm_hunter/orchestrator.py:L253-L255`
 
 ```python
-                final_state = await asyncio.wait_for(
-                    graph.ainvoke(initial_state, config=config_opts),
-                    timeout=INVESTIGATION_TIMEOUT_S,
+            final_state = await asyncio.wait_for(
+                graph.ainvoke(initial_state, config=config_opts),
+                timeout=INVESTIGATION_TIMEOUT_S,
 ```
 
 \newpage
@@ -1370,7 +1462,7 @@ class SoarExecutionSchema(BaseModel):
 
 **2. Invocation** — The dispatch path is the single egress for any containment action.
 
-`analytics/llm_hunter/orchestrator.py:L311-L312`
+`analytics/llm_hunter/orchestrator.py:L345-L346`
 
 ```python
 async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
@@ -1379,7 +1471,7 @@ async def _dispatch_soar(alert: UnifiedAlertSchema, action: dict, js_client):
 
 **3. Execution** — Before publish, the action is re-validated against the schema; an off-contract payload raises ValidationError and is dropped rather than executed.
 
-`analytics/llm_hunter/orchestrator.py:L341-L348`
+`analytics/llm_hunter/orchestrator.py:L375-L382`
 
 ```python
         validated = SoarExecutionSchema(
@@ -1692,7 +1784,7 @@ S3_SECRET_KEY    = _vault_secret("nexus/s3/secret_key",     "S3_SECRET_KEY",    
 
 **1. Logic** — SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
 
-`analytics/llm_hunter/tools/nexus_config.py:L118-L148`
+`analytics/llm_hunter/tools/nexus_config.py:L147-L177`
 
 ```python
 def get_siem_config(config: dict = None) -> dict:

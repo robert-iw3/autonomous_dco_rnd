@@ -80,6 +80,9 @@ resource "aws_iam_policy" "lambda_containment" {
           "ec2:DescribeSubnets",
           "ec2:CreateTags",
           "ec2:DeleteTags",
+          "ec2:CreateSnapshot",
+          "ec2:DescribeIamInstanceProfileAssociations",
+          "ec2:DisassociateIamInstanceProfile",
         ]
         Resource = "*"
       },

@@ -21,7 +21,7 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 
 ### OWASP Top 10 for Large Language Model Applications (2023)
 
-*Covered 9 · Gaps 1 · N-A 0*
+*Covered 10 · Gaps 0 · N-A 0*
 
 | ID | Item | Status | Controls | Remediation (if gap) |
 |---|---|---|---|---|
@@ -34,11 +34,11 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | LLM07 | Insecure Plugin Design | Covered | SEC-OUTPUT-SCHEMA | — |
 | LLM08 | Excessive Agency | Covered | SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SIEM-TOOL-GUARD | — |
 | LLM09 | Overreliance | Covered | AI-REVIEW-BOARD, SEC-REGRESSION-GATE | — |
-| LLM10 | Model Theft | **GAP** | — | Addressable: rate-limit + anomaly-monitor the sovereign inference endpoints and add model-extraction / membership-inference detection; tighten access control and egress monitoring on weight artifacts. SHA-384 verification protects weight INTEGRITY (tampering) but not exfiltration/theft. |
+| LLM10 | Model Theft | Covered | NC-7-ENDPOINT-ABUSE | — |
 
 ### MITRE ATLAS — platform-relevant techniques
 
-*Covered 6 · Gaps 2 · N-A 1*
+*Covered 8 · Gaps 0 · N-A 1*
 
 | ID | Item | Status | Controls | Remediation (if gap) |
 |---|---|---|---|---|
@@ -48,8 +48,8 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | AML.T0044 | Full ML Model Access (weight tampering) | Covered | SEC-SUPPLY-CHAIN | — |
 | AML.T0031 | Erode ML Model Integrity (reward poisoning) | Covered | SEC-RLHF-QUARANTINE | — |
 | AML.T0020 | Poison Training Data | Covered | SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE | — |
-| AML.T0024 | Exfiltration via ML Inference API (model extraction) | **GAP** | — | Addressable: detect model-extraction query patterns + membership inference on the internal vLLM endpoints (rate/volume anomaly + canary outputs). Ties to OWASP LLM10 and NIST MS-2.10-001 (POA&M-4). |
-| AML.T0040 | ML Model Inference API Access | **GAP** | — | Addressable: enforce authn/z + per-caller quotas on the sovereign inference endpoints and log/alert on abnormal query volume (currently network-isolated but not rate-monitored). |
+| AML.T0024 | Exfiltration via ML Inference API (model extraction) | Covered | NC-7-ENDPOINT-ABUSE | — |
+| AML.T0040 | ML Model Inference API Access | Covered | NC-7-ENDPOINT-ABUSE | — |
 | AML.T0048 | Societal Harm | N-A | — | Defensive internal SOC system; not a public content generator (see applicability determinations). |
 
 \newpage
@@ -90,13 +90,13 @@ For each framework taxonomy, every item is classified **Covered** (a Sentinel Ne
 | ID Identify | ID.AM | Asset Management | NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT | Technical |
 | ID Identify | ID.IM | Improvement | NC-2-CALIBRATION, NC-9-ACTIVE-LEARNING, SEC-REGRESSION-GATE | Technical |
 | ID Identify | ID.RA | Risk Assessment | _policy / process — see SSP_ | Process |
-| PR Protect | PR.AA | Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD | Technical |
+| PR Protect | PR.AA | Identity Mgmt, Authn & Access Control | IAC-HARDENING, ING-ZERO-TRUST, NC-7-ENDPOINT-ABUSE, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SIEM-TOOL-GUARD | Technical |
 | PR Protect | PR.AT | Awareness & Training | _policy / process — see SSP_ | Process |
 | PR Protect | PR.DS | Data Security | AI-MEMORY-TTL, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, NC-4-RETENTION, SEC-CANARY, SEC-DLP-EGRESS, SEC-RLHF-QUARANTINE, SEC-TRAINING-HYGIENE, SEC-VECTOR-DIM | Technical |
 | PR Protect | PR.IR | Technology Infrastructure Resilience | SEC-BLAST-RADIUS, SEC-FAILOVER, SEC-MODEL-DOS | Technical |
 | PR Protect | PR.PS | Platform Security | IAC-HARDENING, SEC-DUCKDB-SANDBOX, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-SANITIZER, SEC-SUPPLY-CHAIN | Technical |
 | DE Detect | DE.AE | Adverse Event Analysis | AI-GROUNDING, AI-REVIEW-BOARD, NC-10-VERDICT-LINEAGE, NC-9-ACTIVE-LEARNING, SIEM-COUNTERPART-DISPROOF | Technical |
-| DE Detect | DE.CM | Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-8-OVER-RELIANCE, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD | Technical |
+| DE Detect | DE.CM | Continuous Monitoring | IAC-HARDENING, ING-DLQ-BREAKER, ING-ZERO-TRUST, NC-1-BIAS-AUDIT, NC-7-ENDPOINT-ABUSE, NC-8-OVER-RELIANCE, SEC-CANARY, SEC-MODEL-DOS, SEC-RLHF-QUARANTINE, SIEM-E2E, SIEM-TOOL-GUARD | Technical |
 | RS Respond | RS.AN | Incident Analysis | AI-REVIEW-BOARD | Technical |
 | RS Respond | RS.CO | Incident Response Reporting & Comms | _policy / process — see SSP_ | Process |
 | RS Respond | RS.MA | Incident Management | _policy / process — see SSP_ | Process |
@@ -117,8 +117,6 @@ The 12 GAI risk families and their coverage/gaps are maintained in `../nist_ai_6
 
 These are **applicable** items not yet covered by a control, each with a remediation that can close it. They are candidate backlog items.
 
-- **LLM10 — Model Theft.** Addressable: rate-limit + anomaly-monitor the sovereign inference endpoints and add model-extraction / membership-inference detection; tighten access control and egress monitoring on weight artifacts. SHA-384 verification protects weight INTEGRITY (tampering) but not exfiltration/theft.
-- **AML.T0024 — Exfiltration via ML Inference API (model extraction).** Addressable: detect model-extraction query patterns + membership inference on the internal vLLM endpoints (rate/volume anomaly + canary outputs). Ties to OWASP LLM10 and NIST MS-2.10-001 (POA&M-4).
-- **AML.T0040 — ML Model Inference API Access.** Addressable: enforce authn/z + per-caller quotas on the sovereign inference endpoints and log/alert on abnormal query volume (currently network-isolated but not rate-monitored).
+- _None: every applicable OWASP/ATLAS item maps to a control._
 
 **Theme.** The principal residual exposure is **inference-endpoint abuse / model extraction** (OWASP LLM10, ATLAS AML.T0024 / AML.T0040, NIST MS-2.10-001): the sovereign vLLM endpoints are network-isolated but not rate-/anomaly-monitored for extraction or membership-inference query patterns. Remediation is a bounded, testable control (per-caller quotas + query-volume anomaly alerting + a membership-inference review) — tracked as a backlog item and SSP POA&M-4.
