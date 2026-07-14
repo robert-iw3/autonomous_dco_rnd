@@ -52,7 +52,10 @@ _COMPONENTS = [
     ("infrastructure/nats", "nats_streams", "shell"),
 ]
 _SCAN_EXT = {".py", ".rs", ".sh", ".ts", ".svelte"}
-_SKIP = {"tests", "target", "data", "__pycache__", "node_modules", ".git", "img", "archive"}
+_SKIP = {"tests", "target", "data", "__pycache__", "node_modules", ".git", "img", "archive",
+         # data_ops/ is a conceptual draft (see data_ops/README.md) — not real
+         # wired-in code yet, so keep it out of the generated graph for now.
+         "data_ops"}
 # Vendored third-party distributions: present in the tree but not our source.
 _SKIP_PREFIXES = ("operations/playbooks/tools/",)
 _SKIP_SUBPATHS = ("threat_hunting/egress_monitor/tools/",)

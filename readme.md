@@ -97,7 +97,7 @@ By organizing distinct, specialized neural networks (both generative and unsuper
 #### Model B: The Adversarial Pattern Classifier
 
 * **Purpose:** Classify adversarial network intent across two complementary domains -- C2 beacon/exfiltration flow statistics and full 42-field Layer 7 session forensics -- producing deterministic MITRE ATT&CK attribution with containment recommendations.
-* **Architecture:** Configurable via `mlops/model_config.toml` (`[models.b]`). Default: **Mistral Small 3.1 24B**, QLoRA fine-tuned in 4-bit NF4 quantization. The genuine 128k long-context window (GQA-backed, improved over Nemo's SWA) allows the model to hold large arrays of sequential network sessions in a single forward pass without truncation.
+* **Architecture:** Configurable via `mlops/model_config.toml` (`[models.b]`). Default: **Llama-4 Scout 17B-16E** (17B active / 109B total MoE), QLoRA fine-tuned in 4-bit NF4 quantization. Long context well beyond the 128k session-array requirement; only 17B params active per token keeps inference cost near the prior 24B dense while the MoE holds broader learned coverage. Served 4-bit (`QUANTIZATION=bitsandbytes`) — the 109B weight set does not fit GPUs 0-1 in bf16. *(Promoted 2026-07 from Mistral Small 3.1 24B; VRAM fit + adapter-layer compatibility pending GPU validation on Node Beta — see `[models.b]` notes.)*
 * **Training Corpus (Dual-Track Curriculum):**
   * **Track 2 (C2 Beacons):** Linux/Windows C2 flow statistics (jitter CV, outbound ratio, DGA entropy, beacon interval) with MITRE TTP labels derived from live S3 archives. Eval gate: ≥98% TTP mapping accuracy.
   * **Track 4 (Nettap SPI):** Full 42-field L7 session windows with derived analyst responses: JA3 fingerprint analysis, TLS certificate anomalies, DNS tunneling indicators, ephemeral port usage, lateral movement classification. Eval gate: ≥95% forensic quality.
@@ -125,7 +125,7 @@ By organizing distinct, specialized neural networks (both generative and unsuper
 #### Model D: The SOAR Critic (Blast Radius Evaluator)
 
 * **Purpose:** Serve as the final autonomous decision gate before any containment action is dispatched. Weighs confirmed threat evidence against operational blast radius -- preventing catastrophic self-inflicted outages from over-eager containment of critical infrastructure.
-* **Architecture:** Configurable via `mlops/model_config.toml` (`[models.d]`). Default: **Gemma-3-4B**, fine-tuned with **Direct Preference Optimization (DPO/IPO)**. At 4B parameters (~8GB VRAM) it frees significant headroom on the GPU pair shared with Model C. IPO is selected over standard DPO for its stability in constrained, low-cardinality decision spaces. The model outputs exactly one of three decision tokens: `CONFIRM_QUARANTINE`, `MANUAL_REVIEW`, or `DISMISS_FALSE_POSITIVE`.
+* **Architecture:** Configurable via `mlops/model_config.toml` (`[models.d]`). Default: **Gemma-3-9B**, fine-tuned with **Direct Preference Optimization (DPO/IPO)**. At 9B (~18GB VRAM bf16) it trades some of the 4B's headroom on the GPU pair shared with Model C for stronger edge-case blast-radius reasoning. IPO is selected over standard DPO for its stability in constrained, low-cardinality decision spaces. The model outputs exactly one of three decision tokens: `CONFIRM_QUARANTINE`, `MANUAL_REVIEW`, or `DISMISS_FALSE_POSITIVE`. *(Promoted 2026-07 from Gemma-3-4B; re-check the shared-GPU VRAM budget vs Model C — see `[models.d]` notes.)*
 * **Training Corpus:** DPO preference pairs -- threat-based, governance-based, and baseline-triggered categories. Category 4 hard negatives (TP look-alikes that should be dismissed) are generated from the TTP behavioral corpus FP records.
 * **Execution Logic:** The `response.py` agent computes the `DisruptionIndex = Σ(AssetValue x ContainmentImpact)` for the proposed target set. The critic **fails CLOSED** -- if the server is unreachable, the verdict is automatically demoted to `manual_review_required`.
 * **HitL Circuit Breaker:** `CONFIRM_QUARANTINE` is overridden to `manual_review_required` if: DisruptionIndex > 0.5, any target has AssetValue ≥ 0.9, or the target set covers > 20% of the known fleet.
@@ -147,11 +147,11 @@ Model selection is fully configurable via `mlops/model_config.toml` and `NEXUS_M
 
 | Model | Params | Context | Key strength for this role | Key weakness | Status |
 |-------|--------|---------|---------------------------|--------------|--------|
-| **Mistral Small 3.1 24B** | 24B | 128k | GQA-backed long-context (improved over Nemo SWA), strong structured JSON, 24B reasoning depth | Larger than Nemo -- more VRAM per inference slot | **Active default** |
+| **Llama 4 Scout** | 17B active / 109B MoE | 10M | Effectively unlimited context for session arrays; only 17B active params/token; broad MoE coverage | Served 4-bit to fit 2xA100; adapter targets must be re-verified against MoE attention names | **Active default** |
+| Mistral Small 3.1 24B | 24B | 128k | GQA-backed long-context (improved over Nemo SWA), strong structured JSON, 24B reasoning depth | Larger than Nemo -- more VRAM per inference slot | Previous default |
 | Mistral-Nemo 12B (Jul 2024) | 12B | 128k SWA | Lighter, fast inference | SWA degrades effective recall past ~32k -- Track 4 windows often exceed this | Previous default |
 | Gemma 3 27B (Mar 2025) | 27B | 128k | Google post-training quality, excellent structured output | 3B larger than Small 3.1, slightly tighter VRAM budget at 128k | Alternative |
 | Qwen2.5-14B (Sep 2024) | 14B | 128k | Best-in-class RULER long-context score at weight class, excellent JSON fidelity | Smaller than Nemo at same task complexity | Alternative |
-| Llama 4 Scout (Apr 2025) | 17B active / 109B MoE | 10M | Effectively unlimited context for session arrays | MoE QLoRA training is complex -- expert routing gradients are uneven | Future v2 |
 
 ---
 
@@ -176,9 +176,9 @@ Model selection is fully configurable via `mlops/model_config.toml` and `NEXUS_M
 
 | Model | Params | Context | VRAM @bf16 | Key strength | Key weakness | Status |
 |-------|--------|---------|-----------|--------------|--------------|--------|
-| **Gemma-3-4B** | 4B | 128k | ~8 GB | Smallest viable option -- frees ~8 GB vs 8B models on shared GPU; Google instruction quality is strong at 4B | Edge-case blast-radius reasoning at 4B is weaker than larger models | **Active default** |
+| Gemma-3-4B | 4B | 128k | ~8 GB | Smallest viable option -- frees ~8 GB vs 8B models on shared GPU; Google instruction quality is strong at 4B | Edge-case blast-radius reasoning at 4B is weaker than larger models | Previous default |
 | Phi-4-mini 3.8B (Feb 2025) | 3.8B | 128k | ~7.5 GB | Exceptional reasoning-per-parameter ratio; smallest VRAM footprint | Less proven for DPO alignment in SOC context | Alternative |
-| Gemma-3-9B (Mar 2025) | 9B | 128k | ~18 GB | Better edge-case reasoning; same family as default | Nearly 2.5x VRAM of Gemma-3-4B | Upgrade path |
+| **Gemma-3-9B** | 9B | 128k | ~18 GB | Better edge-case reasoning; same family as prior default | Nearly 2.5x VRAM of Gemma-3-4B — re-check shared-GPU budget vs Model C | **Active default** |
 | Qwen2.5-7B (Sep 2024) | 7B | 128k | ~14 GB | Excellent structured decision-making, strong DPO results | 6 GB more than Gemma-3-4B on shared GPU | Alternative |
 | Llama-3.1-8B | 8B | 128k | ~16 GB | Same family as Model C -- shared base download | Largest of the practical options for shared GPU | Alternative |
 | Llama-3.3-70B | 70B | 128k | ~140 GB | Highest reasoning quality for difficult blast-radius edge cases | Requires dedicated GPU node | Future |

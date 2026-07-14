@@ -111,7 +111,7 @@ Each component: language, how it's **built** (Dockerfile), **deployed** (Ansible
 |---|---|---|---|---|---|---|---|---|
 | **core_ingress** | rust | services/core_ingress/Dockerfile | rust_ingress @ ingress | services | 2->1 | - | 1 | 2 |
 | **det_chamber** | python | det_chamber/agents/Dockerfile | - | detchamber | 2->2 | - | 0 | 14 |
-| **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 223 |
+| **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 410 |
 | **lib_siem_core** | rust | libs/lib_siem_core/Dockerfile | - | services | 0->1 | - | 2 | 2 |
 | **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 4->3 | - | 25 | 39 |
 | **looking_glass** | svelte-ts | services/looking_glass/Dockerfile | - | services | 0->0 | - | 0 | 4 |

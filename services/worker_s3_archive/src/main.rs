@@ -42,10 +42,12 @@ struct S3ArchiveAdapter {
     s3: Arc<dyn ObjectStore>,
     batch_size: usize,
     max_upload_retries: u32,
-    // ZSTD compression level (1=fastest, 22=max). Default 3 gives ~3-5x size
-    // reduction on Parquet with minimal CPU overhead.  Set S3_COMPRESS_LEVEL=0
-    // to disable compression entirely (useful in dev where raw Parquet is easier
-    // to inspect with DuckDB without an extra decompression pass).
+    // Whole-file ZSTD wrap level (0=off, 1=fastest, 22=max). Default 0:
+    // sensor parquet is already ZSTD column-compressed internally, and a
+    // wrapped object cannot be queried in place by DuckDB (llm_hunter),
+    // pyarrow (mlops spool), or Spark (data_ops). Levels > 0 are an opt-in
+    // deep-archive mode; wrapped objects are keyed *.parquet.zst and need
+    // an offline decompression pass before analysis.
     compress_level: i32,
 }
 
@@ -58,7 +60,7 @@ impl SiemAdapter for S3ArchiveAdapter {
         let max_retries: u32 = std::env::var("S3_MAX_UPLOAD_RETRIES")
             .ok().and_then(|v| v.parse().ok()).unwrap_or(5);
         let compress_level: i32 = std::env::var("S3_COMPRESS_LEVEL")
-            .ok().and_then(|v| v.parse().ok()).unwrap_or(3);
+            .ok().and_then(|v| v.parse().ok()).unwrap_or(0);
 
         let s3 = AmazonS3Builder::from_env()
             .with_bucket_name(&s3_bucket)
@@ -114,32 +116,40 @@ impl SiemAdapter for S3ArchiveAdapter {
                 .map(|v| v.as_str().to_string())
                 .unwrap_or_else(|| Utc::now().format("%H").to_string());
 
-            let object_key = format!(
-                "telemetry/{}/dt={}/hour={}/{}.parquet",
-                sensor_type,
-                dt,
-                hr,
-                uuid::Uuid::new_v4()
-            );
-
-            // Apply ZSTD compression before upload when compress_level > 0.
-            // Parquet is already column-encoded, so ZSTD achieves 3-5x reduction
-            // on typical telemetry.  DuckDB decompresses transparently on query.
-            let upload_bytes: Bytes = if self.compress_level > 0 {
+            // Whole-file ZSTD wrap (compress_level > 0) makes the object
+            // opaque to every parquet reader in the pipeline: DuckDB
+            // read_parquet (llm_hunter globs), pyarrow dataset discovery
+            // (mlops spool + lab_s3_worker contract), and Spark s3a all need
+            // the PAR1 magic and footer-seekable bytes. Sensor parquet is
+            // already ZSTD column-compressed internally, so the wrap mostly
+            // re-compresses compressed data. Wrapped objects therefore get a
+            // ".parquet.zst" suffix so `*.parquet` globs skip them instead of
+            // failing mid-scan — an offline decompression pass is required
+            // before anything can query them.
+            let (upload_bytes, extension): (Bytes, &str) = if self.compress_level > 0 {
                 match zstd::bulk::compress(payload.as_ref(), self.compress_level) {
                     Ok(compressed) => {
                         let ratio = payload.len() as f64 / compressed.len().max(1) as f64;
                         histogram!("nexus_s3_compression_ratio").record(ratio);
-                        Bytes::from(compressed)
+                        (Bytes::from(compressed), "parquet.zst")
                     }
                     Err(e) => {
                         warn!(error = %e, "ZSTD compression failed; uploading uncompressed");
-                        payload.clone()
+                        (payload.clone(), "parquet")
                     }
                 }
             } else {
-                payload.clone()
+                (payload.clone(), "parquet")
             };
+
+            let object_key = format!(
+                "telemetry/{}/dt={}/hour={}/{}.{}",
+                sensor_type,
+                dt,
+                hr,
+                uuid::Uuid::new_v4(),
+                extension
+            );
 
             let path = object_store::path::Path::from(object_key.clone());
 
