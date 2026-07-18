@@ -9,7 +9,7 @@ Tests that Model C does not exhibit negative transfer or cross-domain contaminat
 Failures indicate the fine-tuning corpus caused unintended capability bleedover or
 alignment drift between domain specializations.
 
-Q-18: This script is a mandatory blocking gate in `make deploy`.
+Q-18: This script is a mandatory blocking gate in `make publish`.
 Awaiting production evaluation environment — gate wired; stress runs offline against
 test stubs when NEXUS_EVAL_OFFLINE=1 (default).
 

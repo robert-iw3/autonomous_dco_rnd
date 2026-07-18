@@ -2,11 +2,13 @@
 #   docker build -f project_empros/tests/Dockerfile.bench -t nexus-test-bench .
 FROM docker.io/alpine:3.24
 
-RUN apk add --no-cache python3 py3-pip
+# numpy backs the TurboVec near-duplicate index the leakage gate runs on.
+RUN apk add --no-cache python3 py3-pip py3-numpy
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN pip3 install --no-cache-dir "pytest>=7.4.0"
 
-# The benchmark runner + RSI loop (gate-activation test) + the registry it loads.
+# The benchmark runner, eval-QA gates, RSI loop (gate-activation test) and the
+# registry they load.
 COPY project_empros/mlops/scripts/        /repo/project_empros/mlops/scripts/
 COPY project_empros/mlops/benchmarks/     /repo/project_empros/mlops/benchmarks/
 COPY project_empros/tests/lab_benchmarks/ /repo/project_empros/tests/lab_benchmarks/

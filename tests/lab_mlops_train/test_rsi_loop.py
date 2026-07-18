@@ -394,14 +394,14 @@ class TestSourceContracts:
     def test_airgap_env_dict_present(self):
         assert "_AIRGAP_ENV" in RSI_SRC
 
-    def test_alignment_gate_called_before_deploy(self):
+    def test_alignment_gate_called_before_publish(self):
         fn_start = RSI_SRC.find("def rsi_loop(")
         fn_end   = RSI_SRC.find("\ndef ", fn_start + 1)
         fn_body  = RSI_SRC[fn_start:fn_end]
         gate_pos  = fn_body.find("_run_alignment_gate(")
-        deploy_pos = fn_body.find('"deploy"')
-        assert gate_pos < deploy_pos, \
-            "Alignment gate must be checked before deploy make target"
+        publish_pos = fn_body.find('"publish"')
+        assert 0 <= gate_pos < publish_pos, \
+            "Alignment gate must be checked before the publish make target"
 
     def test_safety_violation_halts_before_training(self):
         fn_start = RSI_SRC.find("def rsi_loop(")
@@ -585,20 +585,20 @@ class TestLedgerSourceContracts:
         fn_body = RSI_SRC[fn_start:]
         assert fn_body.find("_batch_failure_count") < fn_body.find("train-ppo")
 
-    def test_regression_gate_between_alignment_gate_and_deploy(self):
+    def test_regression_gate_between_alignment_gate_and_publish(self):
         fn_start = RSI_SRC.find("def rsi_loop(")
         fn_body = RSI_SRC[fn_start:]
         align_pos  = fn_body.find("_run_alignment_gate(")
         reg_pos    = fn_body.find("_regression_gate(")
-        deploy_pos = fn_body.find('"deploy"')
-        assert align_pos < reg_pos < deploy_pos, \
-            "Regression gate must run after the alignment gate and before deploy"
+        publish_pos = fn_body.find('"publish"')
+        assert 0 <= align_pos < reg_pos < publish_pos, \
+            "Regression gate must run after the alignment gate and before publish"
 
     def test_every_terminal_outcome_writes_ledger(self):
         fn_start = RSI_SRC.find("def rsi_loop(")
         fn_body = RSI_SRC[fn_start:]
-        for outcome in ("quarantined", "spool_failed", "deployed", "deploy_failed",
-                        "gate_failed"):
+        for outcome in ("quarantined", "spool_failed", "deployed", "publish_failed",
+                        "judge_frozen", "gate_failed"):
             assert f'"{outcome}"' in fn_body, f"outcome {outcome} not recorded"
 
     def test_makefile_has_rsi_loop_target(self):

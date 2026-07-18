@@ -2,7 +2,10 @@
 
 **Status:** IN PROGRESS — **B0 + B1 landed** (M-26 runner+registry, M-27 investigation metrics +
 outcome join, `bench` CI section; M-28 replay-case freezer + graded scorer, M-29 tier-0 canary
-gate in the RSI loop). Per-section status legend below.
+gate in the RSI loop). **B2 + B2.5 landed at the code level** (Q-19 scorer/leakage tests, Q-20
+eval-QA gates, M-33 registry contract, M-34 `model_steward`, Q-21 contract suite); remaining
+work is live-stack validation (registry bucket provisioning, steward on the serving node,
+first judge-calibration sample). Per-section status legend below.
 
 **Status legend** (per section / phase):
 - 🧪 **Unit testing completed** — logic implemented + proven offline in `tests/` (test-first).
@@ -191,7 +194,11 @@ as an external reference point. (a) and (c) run quarterly, not per-cycle — the
 
 ## 4. Pillar 2 — QA Harness for the Evaluations Themselves
 
-*Status: 📋 planned (B2 / Q-20 — leakage scan, dataset SHA-384 manifests, judge-κ gate).*
+*Status: 🧪 unit testing completed (Q-19/Q-20, `12_eval_qa.py` + scorer implementations in
+`09_benchmark_runner.py`; `tests/lab_benchmarks/test_eval_qa.py` + `test_scorers.py` — leakage
+gate, manifest round-trip/tamper, balance audit, judge-κ freeze wired into `08_rsi_loop.py` and
+`validate_pipeline.py`) · ⏳ validating production implementation (first operator double-scored
+judge sample; leakage scan against the full staging corpus at scale).*
 
 Evaluations are code + data; they get the same QA discipline as the pipeline.
 
@@ -290,7 +297,13 @@ the backstop when shadow traffic missed a regime.
 
 ## 6. Pillar 4 — Training/Serving Plane Separation & Model Registry
 
-*Status: 📋 planned (B2.5 / M-33 registry, M-34 model_steward, Q-21 contract tests).*
+*Status: 🧪 unit testing completed (M-33 `13_publish_model.py` manifest contract, M-34
+`services/model_steward/` pull/verify/swap/probe/rollback, `08_rsi_loop.py` ends at publish,
+NATS per-plane users, MinIO registry bucket + per-plane credentials, `model_steward` Ansible
+role; Q-21 suite in `tests/lab_mlops_serving/test_model_steward.py` +
+`tests/lab_infra_contracts/test_registry_contracts.py`) · ⏳ validating production
+implementation (live bucket + steward on the serving node; deployment_prep baseline weights
+as registry version 0).*
 
 ### 6.1 The coupling problem
 
@@ -461,12 +474,12 @@ stores, 100-case canary corpus assembly, and the leakage gate (B2 / Q-20).
 *Acceptance: a deliberately overfit adapter is caught by tier-0 in <5 min; replay cases
 reproduce frozen verdicts bit-stable on the champion.*
 
-**Phase B2 — Eval QA (1 sprint, parallel with B1)** — 📋 planned
+**Phase B2 — Eval QA (1 sprint, parallel with B1)** — 🧪 unit testing completed · ⏳ validating production implementation
 Dataset manifests + SHA-384, balance audits, consistency-sweep integration, judge
 calibration sampling + κ gate, `validate_pipeline.py` checks. *Acceptance: registering a
 bench with training-set leakage fails CI.*
 
-**Phase B2.5 — Plane split & model registry (1–2 sprints, prerequisite for B3/B4)** — 📋 planned
+**Phase B2.5 — Plane split & model registry (1–2 sprints, prerequisite for B3/B4)** — 🧪 unit testing completed · ⏳ validating production implementation
 Registry bucket + manifest schema (§6.3); `model_steward` on the serving plane (deploy/
 rollback mechanics moved out of the Makefile training context); `08_rsi_loop.py` ends at
 publish; `nexus.models.promote/promoted/rejected` subjects + NATS per-plane authorization;

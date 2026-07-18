@@ -193,16 +193,22 @@ The pipeline now produces training data across **12 source types** covering all 
                               │ All gates passed
                               ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                       STAGE 4: WEIGHT MERGE + DEPLOY                    │
+│                     STAGE 4: WEIGHT MERGE + PUBLISH                     │
 │                                                                         │
 │  04_merge_weights.py                                                    │
 │  └── Fuses LoRA adapters → OUTPUT_DIR (timestamped)                     │
 │                                                                         │
-│  make deploy                                                            │
-│  ├── Atomic symlink swap (nexus_spatial_production → new weights)       │
-│  ├── SHA-384 full-directory integrity manifest (ATLAS AML.T0044)        │
-│  ├── vllm-inference.service restart                                     │
-│  └── Readiness probe polling (12 x 10s); auto-rollback on failure       │
+│  make publish (training plane ends here — no exec power over serving)   │
+│  ├── Q-18 alignment gates (CognitiveBypass + CrossPollination)          │
+│  ├── 13_publish_model.py: manifest.json (SHA-384 map, gate_scores,      │
+│  │   gates_passed) → nexus-model-registry bucket → nexus.models.promote │
+│  └── waits for the steward's promoted/rejected ack                      │
+│                                                                         │
+│  model_steward (serving plane, services/model_steward/)                 │
+│  ├── pulls + re-verifies manifest contract and every artifact SHA-384   │
+│  ├── atomic re-pin of the model's `current` symlink in the local store  │
+│  ├── vllm unit restart + readiness probe (12 x 10s)                     │
+│  └── probe failure → rollback re-pin to previous version + rejected ack │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -259,8 +265,9 @@ make eval-critic-full   # Model D: Phase 1-4 + LLM-as-judge (full suite)
 
 make generate-synthetic # Claude API synthetic hard negative generation (requires ANTHROPIC_API_KEY)
 
-make deploy             # Atomic weight swap + readiness probe + auto-rollback
-make all                # End-to-end: data-all → train-all → eval-critic-full → deploy
+make publish            # Q-18 gates → registry upload + nexus.models.promote → steward ack
+                        # (the serving-plane model_steward performs the verified swap)
+make all                # End-to-end: data-all → train-all → eval-critic-full → publish
 
 # ── Phase 1: Continuous Threat Feed + Sandbox (SKELETON -- requires local ti_feeds mirrors) ──
 make feed-ingest        # 07_feed_ingest.py: Atomic Red Team 4-stage filter → sandbox queue
@@ -281,9 +288,10 @@ make train-ppo          # 02_train_qlora.py --rlhf-mode ppo: online RLHF on sand
 # ── Phase 4: Closed-Loop RSI cycle ─────────────────────────────────────────────────────────
 make rsi-loop           # 08_rsi_loop.py: ledger-resumed cursor → batch quarantine check →
                         # spool → train-ppo + train-dpo → alignment gate (garak+PyRIT) →
-                        # regression gate vs last DEPLOYED baseline → conditional make deploy
+                        # regression gate vs last DEPLOYED baseline → judge-kappa gate →
+                        # conditional make publish (steward-acked registry promotion)
                         # Ledger: mlops/data/rsi_ledger_v1.jsonl (one record per cycle)
-                        # Exit: 0 deployed, 1 gate/deploy/spool fail, 2 safety violation,
+                        # Exit: 0 promoted, 1 gate/publish/spool fail, 2 safety violation,
                         #       3 below batch threshold, 4 batch quarantined
 
 # ── Phase 3: NeMo Guardrails (SKELETON -- requires nemoguardrails>=0.5.0) ──────────────────

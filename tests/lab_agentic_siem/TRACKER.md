@@ -23,16 +23,25 @@ the LLM where no network-tap sensor exists.
 
 ## Current state (honest)
 
-**P0 scaffold only - PASSING (17 tests), NOT production-grade yet.** What exists today:
+**P0 scaffold + the WS-J J0-J5 code promotion - PASSING (60 tests), NOT production-grade yet.**
+What exists today:
 - 3 small mock SIEMs (Splunk/CIM, Elastic/ECS, Sentinel/KQL), a handful of events each (a few
   benign + one short attack chain).
-- A **deterministic** analysis stand-in (not the real LangGraph swarm): pivot -> entity
-  extraction -> attack graph -> verdict -> report, with the real WS-I containment protocol.
-- Grounding, benign-discipline, read-only, coverage-gap, and detection_training/ corpus +
-  mlops-spool tests.
+- The PROMOTED `analytics/llm_hunter/siem_analysis/` package, exercised directly by the lab:
+  request schema, CIM/ECS entity extractor, read-only standalone pivot (SIEM_UNAVAILABLE
+  fail-open), seed synthesis into the strict UnifiedAlertSchema, the standalone runner with the
+  real WS-I containment protocol (heuristic verdicts always operator-gated; the `investigate=`
+  seam is where the real swarm plugs in), coverage/gap + environment profile, verdict-ledger
+  audit, and the `nexus.siem.analyze` consumer.
+- mlops Track 10 corpus builder (`siem_analysis_track.py`): 800+ real rules parsed from
+  detection_training/ into three SFT families + a stable held-out eval split feeding the
+  registered `siem_analysis` benchmark.
+- Grounding, benign-discipline, read-only, coverage-gap, and corpus/spool tests; own `siemlab`
+  CI section (Dockerfile.siemlab).
 
-This proves the *data flow and the shape of the logic*. It does NOT yet prove real-world
-analysis quality. The gaps to close are P1-P5.
+This proves the *data flow and the shape of the logic* end to end through the promoted code.
+It does NOT yet prove real-world analysis quality: the analysis brain in CI is still the
+deterministic ladder, not the Phase-D-trained swarm. The gaps to close are D + P1-P5.
 
 ## Definition of "production-quality" (acceptance criteria - must all hold before promotion)
 
@@ -75,7 +84,7 @@ analysis quality. The gaps to close are P1-P5.
 | **P3** | Ground-truth scenario labels + factual-report scoring (entity P/R, attack-graph edge correctness, verdict accuracy, containment completeness, zero benign contained) | [ ] |
 | **P4** | Cross-SIEM correlation: one campaign stitched across endpoint+cloud+identity into a single incident + unified course of action | [ ] |
 | **P5** | Quality metrics + regression gate (precision/recall/F1, FP rate, completeness, cost) via the WS-A benchmark harness; promotion checklist | [ ] |
-| **P6** | Promote refined logic into the stack (WS-J J0-J5) once P1-P5 are green | [ ] |
+| **P6** | Promote refined logic into the stack (WS-J J0-J5) — code-level promotion landed 2026-07-18 (`analytics/llm_hunter/siem_analysis/`); *production-quality sign-off* still gated on D + P1-P5 being green | [~] |
 
 ## Detection-quality training pipeline (Phase D detail - the prerequisite)
 

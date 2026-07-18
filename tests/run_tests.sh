@@ -50,6 +50,7 @@ SECTIONS=(
     "pipeline|Dockerfile.pipeline|Phase1/2/3 pipeline, guardrails, mlops_serving, mlops_train"
     "detchamber|Dockerfile.detchamber|Det Chamber engine + acquisition + intake/detonation lifecycle"
     "siem|Dockerfile.siemfed|SIEM-federated investigation mock E2E (CIM/ECS fanout + swarm pivot + counterpart disproof)"
+    "siemlab|Dockerfile.siemlab|WS-J standalone agentic SIEM analysis — runner + coverage + Track 10 corpus"
 )
 
 # -- Change → section trigger map ---------------------------------------------
@@ -67,8 +68,10 @@ TRIGGERS=(
     "docs/governance/:governance"
     "services/worker_memory/:memory"
     "tests/lab_memory_forensics:memory"
-    "mlops/benchmarks/|mlops/scripts/09_benchmark_runner|mlops/scripts/10_freeze_replay_case|tests/lab_benchmarks:bench"
+    "mlops/benchmarks/|mlops/scripts/09_benchmark_runner|mlops/scripts/10_freeze_replay_case|mlops/scripts/12_eval_qa|tests/lab_benchmarks:bench"
     "mlops/scripts/08_rsi_loop:bench pipeline"
+    "services/model_steward/|mlops/scripts/13_publish_model:pipeline services"
+    "analytics/llm_hunter/siem_analysis/|tests/lab_agentic_siem|detection_training/|mlops/scripts/siem_analysis_track:siemlab"
     "middleware/config/:siem services"
     "det_chamber/:detchamber"
     "services/worker_ti_ingest/:mlops"

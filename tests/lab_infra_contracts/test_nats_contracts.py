@@ -209,3 +209,34 @@ class TestDetChamberNatsAuth:
     def test_detchamber_node_has_vault_password(self):
         assert "vault_nats_detchamber_pass" in _conf(), \
             "detchamber_node password must come from vault, not a hardcoded secret"
+
+
+# ── WS-J: standalone SIEM analysis subjects ──────────────────────────────────
+
+class TestSiemAnalyzeSubjects:
+    """nexus.siem.analyze flows ingress -> swarm; the report flows back from the
+    swarm alone. The subject vocabulary is pinned in the conf and the consumer."""
+
+    ENTRY = ANALYTICS / "llm_hunter" / "siem_analysis" / "entry.py"
+
+    def test_ingress_may_publish_analyze_requests(self):
+        sect = _user_section(_conf(), "ingress_node")
+        publish = sect[sect.find("publish:"): sect.find("subscribe:")]
+        assert "nexus.siem.analyze" in publish
+
+    def test_swarm_consumes_analyze_and_answers(self):
+        sect = _user_section(_conf(), "swarm_node")
+        publish = sect[sect.find("publish:"): sect.find("subscribe:")]
+        subscribe = sect[sect.find("subscribe:"):]
+        assert '"nexus.siem.analyze"' in subscribe
+        assert "nexus.siem.analysis.report" in publish
+
+    def test_consumer_source_speaks_both_subjects(self):
+        src = self.ENTRY.read_text()
+        assert '"nexus.siem.analyze"' in src
+        assert '"nexus.siem.analysis.report"' in src
+
+    def test_swarm_cannot_forge_analyze_requests(self):
+        sect = _user_section(_conf(), "swarm_node")
+        publish = sect[sect.find("publish:"): sect.find("subscribe:")]
+        assert '"nexus.siem.analyze"' not in publish

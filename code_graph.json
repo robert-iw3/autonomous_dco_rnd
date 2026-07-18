@@ -578,6 +578,8 @@
         "nexus.dlq.cognitive",
         "nexus.hud.telemetry",
         "nexus.metrics.investigation",
+        "nexus.siem.analysis.report",
+        "nexus.siem.analyze",
         "nexus.soar.callback",
         "nexus.soar.execute"
       ],
@@ -609,6 +611,14 @@
         "analytics/llm_hunter/detonation_enrichment.py",
         "analytics/llm_hunter/investigation_metrics.py",
         "analytics/llm_hunter/orchestrator.py",
+        "analytics/llm_hunter/siem_analysis/__init__.py",
+        "analytics/llm_hunter/siem_analysis/coverage.py",
+        "analytics/llm_hunter/siem_analysis/entity_extractor.py",
+        "analytics/llm_hunter/siem_analysis/entry.py",
+        "analytics/llm_hunter/siem_analysis/pivot.py",
+        "analytics/llm_hunter/siem_analysis/request.py",
+        "analytics/llm_hunter/siem_analysis/seed.py",
+        "analytics/llm_hunter/siem_analysis/standalone.py",
         "analytics/llm_hunter/state.py",
         "analytics/llm_hunter/tools/__init__.py",
         "analytics/llm_hunter/tools/acquire_detonate.py",
@@ -626,6 +636,7 @@
         "nexus.dlq.cognitive",
         "nexus.hud.telemetry",
         "nexus.metrics.investigation",
+        "nexus.siem.analysis.report",
         "nexus.soar.execute"
       ],
       "rust_deps": [],
@@ -633,6 +644,7 @@
       "subscribes": [
         "nexus.alerts.>",
         "nexus.alerts.detonation",
+        "nexus.siem.analyze",
         "nexus.soar.callback"
       ],
       "test_section": "analytics"
@@ -697,6 +709,9 @@
         "nexus.c2.telemetry",
         "nexus.deepsensor.telemetry",
         "nexus.macos.telemetry",
+        "nexus.models.promote",
+        "nexus.models.promoted",
+        "nexus.models.rejected",
         "nexus.network_tap.telemetry",
         "nexus.pyrit",
         "nexus.rsi",
@@ -729,6 +744,8 @@
         "mlops/scripts/09_benchmark_runner.py",
         "mlops/scripts/10_freeze_replay_case.py",
         "mlops/scripts/11_join_outcomes.py",
+        "mlops/scripts/12_eval_qa.py",
+        "mlops/scripts/13_publish_model.py",
         "mlops/scripts/build_baseline_windows.py",
         "mlops/scripts/build_model_b_corpus.py",
         "mlops/scripts/corpus_utils.py",
@@ -737,6 +754,7 @@
         "mlops/scripts/model_config.py",
         "mlops/scripts/projector.py",
         "mlops/scripts/serve_baseline.py",
+        "mlops/scripts/siem_analysis_track.py",
         "mlops/scripts/stage_active_directory_behavioral.py",
         "mlops/scripts/stage_bypass_behavioral.py",
         "mlops/scripts/stage_c2_behavioral.py",
@@ -760,14 +778,41 @@
         "mlops/scripts/vault_client.py"
       ],
       "publishes": [
-        "nexus.alerts.baseline"
+        "nexus.alerts.baseline",
+        "nexus.models.promote"
       ],
       "rust_deps": [],
       "serves": [],
       "subscribes": [
+        "nexus.models.promoted",
+        "nexus.models.rejected",
         "nexus.network_tap.telemetry"
       ],
       "test_section": "offline"
+    },
+    "model_steward": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "services/model_steward/Dockerfile",
+      "language": "python",
+      "mentions": [
+        "nexus.models.promote",
+        "nexus.models.promoted",
+        "nexus.models.rejected"
+      ],
+      "paths": [
+        "services/model_steward/main.py",
+        "services/model_steward/manifest.py",
+        "services/model_steward/steward.py"
+      ],
+      "publishes": [],
+      "rust_deps": [],
+      "serves": [],
+      "subscribes": [
+        "nexus.models.promote"
+      ],
+      "test_section": "pipeline"
     },
     "nats_streams": {
       "calls": [
@@ -1948,6 +1993,7 @@
       "looking_glass",
       "memory_worker",
       "minio_node",
+      "model_steward",
       "nats_node",
       "nexus_hunter",
       "observability_node",
@@ -2404,6 +2450,16 @@
         "11",
         "join_outcomes",
         "11_join_outcomes.py \u2014 WS-A M-27 delayed-ground-truth join."
+      ],
+      [
+        "12",
+        "eval_qa",
+        "12_eval_qa.py - QA harness for the evaluations themselves."
+      ],
+      [
+        "13",
+        "publish_model",
+        "13_publish_model.py - training-plane end of the model registry contract."
       ]
     ]
   },
@@ -2520,6 +2576,21 @@
       "state",
       "tools.sanitizer"
     ],
+    "analytics/llm_hunter/siem_analysis/coverage.py": [
+      "agents.lateral_movement"
+    ],
+    "analytics/llm_hunter/siem_analysis/pivot.py": [
+      "tools.nexus_config",
+      "tools.sanitizer",
+      "tools.siem_query"
+    ],
+    "analytics/llm_hunter/siem_analysis/seed.py": [
+      "state"
+    ],
+    "analytics/llm_hunter/siem_analysis/standalone.py": [
+      "agents.containment_protocol",
+      "agents.verdict_ledger"
+    ],
     "analytics/llm_hunter/tools/__init__.py": [
       "tools.acquire_detonate",
       "tools.duckdb_query",
@@ -2597,6 +2668,9 @@
       "model_config"
     ],
     "mlops/scripts/08_rsi_loop.py": [
+      "corpus_utils"
+    ],
+    "mlops/scripts/12_eval_qa.py": [
       "corpus_utils"
     ],
     "mlops/scripts/projector.py": [
@@ -2937,6 +3011,41 @@
         "Nexus_Metrics_Investigation"
       ]
     },
+    "nexus.models.promote": {
+      "consumers": [
+        "model_steward"
+      ],
+      "mentioned_by": [
+        "mlops_pipeline",
+        "model_steward"
+      ],
+      "producers": [
+        "mlops_pipeline"
+      ],
+      "streams": []
+    },
+    "nexus.models.promoted": {
+      "consumers": [
+        "mlops_pipeline"
+      ],
+      "mentioned_by": [
+        "mlops_pipeline",
+        "model_steward"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.models.rejected": {
+      "consumers": [
+        "mlops_pipeline"
+      ],
+      "mentioned_by": [
+        "mlops_pipeline",
+        "model_steward"
+      ],
+      "producers": [],
+      "streams": []
+    },
     "nexus.network_tap.telemetry": {
       "consumers": [
         "mlops_pipeline"
@@ -2975,6 +3084,26 @@
       "consumers": [],
       "mentioned_by": [
         "mlops_pipeline"
+      ],
+      "producers": [],
+      "streams": []
+    },
+    "nexus.siem.analysis.report": {
+      "consumers": [],
+      "mentioned_by": [
+        "llm_hunter_swarm"
+      ],
+      "producers": [
+        "llm_hunter_swarm"
+      ],
+      "streams": []
+    },
+    "nexus.siem.analyze": {
+      "consumers": [
+        "llm_hunter_swarm"
+      ],
+      "mentioned_by": [
+        "llm_hunter_swarm"
       ],
       "producers": [],
       "streams": []

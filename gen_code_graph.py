@@ -38,6 +38,7 @@ _COMPONENTS = [
     ("services/worker_s3_archive", "worker_s3_archive", "rust"),
     ("services/worker_rlhf", "worker_rlhf", "rust"),
     ("services/worker_ti_ingest", "worker_ti_ingest", "python"),
+    ("services/model_steward", "model_steward", "python"),
     ("services/looking_glass", "looking_glass", "svelte-ts"),
     ("libs/lib_siem_core", "lib_siem_core", "rust"),
     ("middleware/src/worker_splunk", "worker_splunk", "rust"),

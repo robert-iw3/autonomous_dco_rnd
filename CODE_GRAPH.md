@@ -36,7 +36,12 @@ flowchart LR
     worker_memory(["worker_memory"]) -->|nexus.memory.enrichment| ?(["?"])
     core_ingress(["core_ingress"]) -->|nexus.memory.intake| worker_memory(["worker_memory"])
     llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.metrics.investigation| ?(["?"])
+    mlops_pipeline(["mlops_pipeline"]) -->|nexus.models.promote| model_steward(["model_steward"])
+    ?(["?"]) -->|nexus.models.promoted| mlops_pipeline(["mlops_pipeline"])
+    ?(["?"]) -->|nexus.models.rejected| mlops_pipeline(["mlops_pipeline"])
     ?(["?"]) -->|nexus.network_tap.telemetry| mlops_pipeline(["mlops_pipeline"])
+    llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.siem.analysis.report| ?(["?"])
+    ?(["?"]) -->|nexus.siem.analyze| llm_hunter_swarm(["llm_hunter_swarm"])
     ?(["?"]) -->|nexus.soar.callback| llm_hunter_swarm(["llm_hunter_swarm"])
     llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.soar.execute| worker_soar(["worker_soar"])
     ?(["?"]) -->|nexus.telemetry| lib_siem_core(["lib_siem_core"])
@@ -70,11 +75,16 @@ flowchart LR
 | `nexus.memory.enrichment` | worker_memory | - | Nexus_Memory_Enrichment | nats_streams |
 | `nexus.memory.intake` | core_ingress | worker_memory | Nexus_Memory_Intake | nats_streams |
 | `nexus.metrics.investigation` | llm_hunter_swarm | - | Nexus_Metrics_Investigation | nats_streams |
+| `nexus.models.promote` | mlops_pipeline | model_steward | - | - |
+| `nexus.models.promoted` | - | mlops_pipeline | - | model_steward |
+| `nexus.models.rejected` | - | mlops_pipeline | - | model_steward |
 | `nexus.network_tap.telemetry` | - | mlops_pipeline | - | - |
 | `nexus.pyrit` | - | - | - | mlops_pipeline |
 | `nexus.rsi` | - | - | - | mlops_pipeline |
 | `nexus.sensor.telemetry` | - | - | - | mlops_pipeline |
 | `nexus.sentinel.telemetry` | - | - | - | mlops_pipeline |
+| `nexus.siem.analysis.report` | llm_hunter_swarm | - | - | - |
+| `nexus.siem.analyze` | - | llm_hunter_swarm | - | - |
 | `nexus.soar.callback` | - | llm_hunter_swarm | Nexus_SOAR_Callback | nats_streams |
 | `nexus.soar.execute` | llm_hunter_swarm | worker_soar | Nexus_SOAR_Execute | nats_streams |
 | `nexus.telemetry` | - | lib_siem_core | - | - |
@@ -113,10 +123,11 @@ Each component: language, how it's **built** (Dockerfile), **deployed** (Ansible
 | **det_chamber** | python | det_chamber/agents/Dockerfile | - | detchamber | 2->2 | - | 0 | 14 |
 | **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 410 |
 | **lib_siem_core** | rust | libs/lib_siem_core/Dockerfile | - | services | 0->1 | - | 2 | 2 |
-| **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 4->3 | - | 25 | 39 |
+| **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 5->4 | - | 25 | 47 |
 | **looking_glass** | svelte-ts | services/looking_glass/Dockerfile | - | services | 0->0 | - | 0 | 4 |
 | **middleware** | rust | middleware/src/Dockerfile | - | services | 0->0 | - | 0 | 6 |
-| **mlops_pipeline** | python | mlops/scripts/Dockerfile | - | offline | 1->1 | - | 2 | 52 |
+| **mlops_pipeline** | python | mlops/scripts/Dockerfile | - | offline | 2->3 | - | 2 | 55 |
+| **model_steward** | python | services/model_steward/Dockerfile | - | pipeline | 0->1 | - | 0 | 3 |
 | **nats_streams** | shell | infrastructure/nats/Dockerfile | - | services | 0->0 | - | 0 | 1 |
 | **on_host_agent** | python | operations/agent/Dockerfile | - | services | 0->0 | - | 0 | 2 |
 | **worker_elastic** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
@@ -176,7 +187,7 @@ Joins the governance dossier into the graph: each control's implementing compone
 
 ## Infrastructure inventory
 
-**Ansible roles** (20): `bare_metal_base`, `common_hardening`, `det_chamber_linux`, `det_chamber_sandbox`, `gpu_inference`, `haproxy_node`, `internal_networking`, `looking_glass`, `memory_worker`, `minio_node`, `nats_node`, `nexus_hunter`, `observability_node`, `opencti_node`, `podman_setup`, `qdrant_node`, `redis_node`, `rust_ingress`, `rust_podman_worker`, `ti_ingest_worker`
+**Ansible roles** (21): `bare_metal_base`, `common_hardening`, `det_chamber_linux`, `det_chamber_sandbox`, `gpu_inference`, `haproxy_node`, `internal_networking`, `looking_glass`, `memory_worker`, `minio_node`, `model_steward`, `nats_node`, `nexus_hunter`, `observability_node`, `opencti_node`, `podman_setup`, `qdrant_node`, `redis_node`, `rust_ingress`, `rust_podman_worker`, `ti_ingest_worker`
 
 **Terraform resources** (66):
 
@@ -356,6 +367,8 @@ End-to-end flows run as numbered scripts: `deploy` (orchestration) and `mlops` (
 | 09 | `benchmark_runner` | 09_benchmark_runner.py — WS-A M-26 benchmark runner + registry. |
 | 10 | `freeze_replay_case` | 10_freeze_replay_case.py - freeze closed investigations into replay bench cases. |
 | 11 | `join_outcomes` | 11_join_outcomes.py — WS-A M-27 delayed-ground-truth join. |
+| 12 | `eval_qa` | 12_eval_qa.py - QA harness for the evaluations themselves. |
+| 13 | `publish_model` | 13_publish_model.py - training-plane end of the model registry contract. |
 
 ## Python intra-repo imports
 
@@ -381,6 +394,10 @@ Module -> local modules it imports (call-chain within the Python planes).
 - `analytics/llm_hunter/agents/target_class.py` -> `agents.lateral_movement`
 - `analytics/llm_hunter/agents/verdict_ledger.py` -> `agents.controls`
 - `analytics/llm_hunter/orchestrator.py` -> `agents.cloud_expert`, `agents.host_expert`, `agents.net_expert`, `agents.nettap_expert`, `agents.response`, `agents.review_board`, `agents.supervisor`, `detonation_enrichment`, `investigation_metrics`, `state`, `tools.sanitizer`
+- `analytics/llm_hunter/siem_analysis/coverage.py` -> `agents.lateral_movement`
+- `analytics/llm_hunter/siem_analysis/pivot.py` -> `tools.nexus_config`, `tools.sanitizer`, `tools.siem_query`
+- `analytics/llm_hunter/siem_analysis/seed.py` -> `state`
+- `analytics/llm_hunter/siem_analysis/standalone.py` -> `agents.containment_protocol`, `agents.verdict_ledger`
 - `analytics/llm_hunter/tools/__init__.py` -> `tools.acquire_detonate`, `tools.duckdb_query`, `tools.entity_manager`, `tools.nexus_config`, `tools.qdrant_search`, `tools.sanitizer`, `tools.siem_query`, `tools.ti_lookup`
 - `analytics/llm_hunter/tools/acquire_detonate.py` -> `state`
 - `analytics/llm_hunter/tools/duckdb_query.py` -> `tools.nexus_config`, `tools.sanitizer`
@@ -403,6 +420,7 @@ Module -> local modules it imports (call-chain within the Python planes).
 - `mlops/scripts/05_serve_network.py` -> `model_config`
 - `mlops/scripts/05_serve_sovereign.py` -> `model_config`
 - `mlops/scripts/08_rsi_loop.py` -> `corpus_utils`
+- `mlops/scripts/12_eval_qa.py` -> `corpus_utils`
 - `mlops/scripts/projector.py` -> `model_config`
 - `mlops/scripts/stage_active_directory_behavioral.py` -> `corpus_utils`
 - `mlops/scripts/stage_bypass_behavioral.py` -> `corpus_utils`

@@ -392,17 +392,17 @@ class TestAlignmentGatePresence:
         src = (self.TESTS_DIR / "Invoke-CrossPollinationStress.py").read_text()
         ast.parse(src)  # raises SyntaxError if invalid
 
-    def test_deploy_target_calls_cognitive_bypass(self):
+    def test_publish_target_calls_cognitive_bypass(self):
         makefile = (MLOPS_DIR / "Makefile").read_text()
-        deploy_section = makefile.split("deploy:")[1].split("\nexport-onnx:")[0]
-        assert "Execute-CognitiveBypass.sh" in deploy_section, \
-            "Makefile deploy target must call Execute-CognitiveBypass.sh (Q-18 gate)"
+        publish_section = makefile.split("\npublish:")[1].split("\ndeploy:")[0]
+        assert "Execute-CognitiveBypass.sh" in publish_section, \
+            "Makefile publish target must call Execute-CognitiveBypass.sh (Q-18 gate)"
 
-    def test_deploy_target_calls_cross_pollination(self):
+    def test_publish_target_calls_cross_pollination(self):
         makefile = (MLOPS_DIR / "Makefile").read_text()
-        deploy_section = makefile.split("deploy:")[1].split("\nexport-onnx:")[0]
-        assert "Invoke-CrossPollinationStress.py" in deploy_section, \
-            "Makefile deploy target must call Invoke-CrossPollinationStress.py (Q-18 gate)"
+        publish_section = makefile.split("\npublish:")[1].split("\ndeploy:")[0]
+        assert "Invoke-CrossPollinationStress.py" in publish_section, \
+            "Makefile publish target must call Invoke-CrossPollinationStress.py (Q-18 gate)"
 
     def test_cognitive_bypass_script_has_offline_mode(self):
         src = (self.TESTS_DIR / "Execute-CognitiveBypass.sh").read_text()

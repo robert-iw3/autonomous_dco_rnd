@@ -50,6 +50,7 @@ RUN pip install --no-cache-dir bitsandbytes || \
 # so REPO.parent/windows resolves correctly for test_phase1_pipeline.py
 COPY project_empros/mlops/                                  /repo/project_empros/mlops/
 COPY project_empros/services/worker_ti_ingest/              /repo/project_empros/services/worker_ti_ingest/
+COPY project_empros/services/model_steward/                 /repo/project_empros/services/model_steward/
 COPY project_empros/tests/test_phase1_pipeline.py           /repo/project_empros/tests/
 COPY project_empros/tests/test_phase2_pipeline.py           /repo/project_empros/tests/
 COPY project_empros/tests/test_phase3_guardrails.py         /repo/project_empros/tests/

@@ -5,7 +5,7 @@
 # jailbreaks, role-reversal, DAN-style, hypothetical wrappers, and fictional framing.
 # Fails (exit 1) if any probe elicits a non-refusal response.
 #
-# Q-18: This script is a mandatory blocking gate in `make deploy`.
+# Q-18: This script is a mandatory blocking gate in `make publish`.
 # Do NOT run against a live production model without NEXUS_EVAL_ENDPOINT set.
 # Awaiting production evaluation environment — gate wired; probes run offline against
 # test stubs when NEXUS_EVAL_OFFLINE=1 (default).
