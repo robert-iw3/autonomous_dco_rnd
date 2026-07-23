@@ -3,7 +3,7 @@
 #          NOTE: the NIST AI 600-1 control / GRC suite moved to lab_governance/ (Dockerfile.governance).
 # Deps:    pytest, pydantic, PyYAML, numpy, duckdb/pandas/pyarrow
 #          (langchain_core / nats / redis / prometheus are stubbed in each test)
-#   docker build -f project_empros/tests/Dockerfile.analytics -t nexus-test-analytics .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.analytics -t nexus-test-analytics .
 FROM docker.io/python:3.12-slim
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
@@ -19,16 +19,16 @@ RUN pip install --no-cache-dir \
     "pandas>=2.2.0" \
     "pyarrow>=16.0.0"
 
-COPY project_empros/analytics/llm_hunter/       /repo/project_empros/analytics/llm_hunter/
-COPY project_empros/tests/lab_analytics_hunter/ /repo/project_empros/tests/lab_analytics_hunter/
-COPY project_empros/tests/lab_agentic_swarm/    /repo/project_empros/tests/lab_agentic_swarm/
-COPY project_empros/tests/lab_redteam/          /repo/project_empros/tests/lab_redteam/
-COPY project_empros/tests/simulation/           /repo/project_empros/tests/simulation/
-COPY project_empros/tests/pytest.ini            /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py           /repo/project_empros/tests/
+COPY autonomous_dco_rnd/analytics/llm_hunter/       /repo/autonomous_dco_rnd/analytics/llm_hunter/
+COPY autonomous_dco_rnd/tests/lab_analytics_hunter/ /repo/autonomous_dco_rnd/tests/lab_analytics_hunter/
+COPY autonomous_dco_rnd/tests/lab_agentic_swarm/    /repo/autonomous_dco_rnd/tests/lab_agentic_swarm/
+COPY autonomous_dco_rnd/tests/lab_redteam/          /repo/autonomous_dco_rnd/tests/lab_redteam/
+COPY autonomous_dco_rnd/tests/simulation/           /repo/autonomous_dco_rnd/tests/simulation/
+COPY autonomous_dco_rnd/tests/pytest.ini            /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py           /repo/autonomous_dco_rnd/tests/
 
-ENV PYTHONPATH=/repo/project_empros/analytics/llm_hunter:/repo/project_empros/analytics:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/analytics/llm_hunter:/repo/autonomous_dco_rnd/analytics:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/lab_analytics_hunter/", \

@@ -1,6 +1,6 @@
 =============================================
   Rust Security Audit - Sat May 30 13:08:25 CDT 2026
-  Workspace: /home/shiftyroot/Documents/GitHub/ai_rnd/project_empros
+  Workspace: /home/shiftyroot/Documents/GitHub/ai_rnd/autonomous_dco_rnd
 =============================================
 
 ---------------------------------------------

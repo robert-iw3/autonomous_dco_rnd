@@ -63,7 +63,7 @@ import requests
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).parents[3]
-PROJECT   = REPO_ROOT / "project_empros"
+PROJECT   = REPO_ROOT / "autonomous_dco_rnd"
 WINDOWS   = REPO_ROOT / "windows"
 LINUX     = REPO_ROOT / "linux"
 INFRA     = REPO_ROOT / "infra"

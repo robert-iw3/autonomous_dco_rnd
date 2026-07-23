@@ -1,7 +1,7 @@
 # SECTION: sensors
 # Tests:   tests/sensors/* (all sensor pipeline schema + vector validation)
 # Deps:    pytest, numpy, pyarrow, pandas, pydantic
-#   docker build -f project_empros/tests/Dockerfile.sensors -t nexus-test-sensors .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.sensors -t nexus-test-sensors .
 FROM docker.io/alpine:3.24
 
 RUN apk add --no-cache \
@@ -20,18 +20,18 @@ RUN pip3 install --no-cache-dir \
     "pydantic>=2.7.1" \
     "requests>=2.31.0"
 
-# project_empros source
-COPY project_empros/mlops/scripts/                      /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/config/                       /repo/project_empros/mlops/config/
-COPY project_empros/services/config/                    /repo/project_empros/services/config/
-COPY project_empros/services/worker_qdrant/             /repo/project_empros/services/worker_qdrant/
-COPY project_empros/tests/config/                       /repo/project_empros/tests/config/
-COPY project_empros/tests/deploy/                       /repo/project_empros/tests/deploy/
-COPY project_empros/tests/sensors/                      /repo/project_empros/tests/sensors/
-COPY project_empros/tests/lab_sensor_transmission/      /repo/project_empros/tests/lab_sensor_transmission/
-COPY project_empros/tests/test_e2e_sensor_pipeline.py   /repo/project_empros/tests/
-COPY project_empros/tests/pytest.ini                    /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py                   /repo/project_empros/tests/
+# autonomous_dco_rnd source
+COPY autonomous_dco_rnd/mlops/scripts/                      /repo/autonomous_dco_rnd/mlops/scripts/
+COPY autonomous_dco_rnd/mlops/config/                       /repo/autonomous_dco_rnd/mlops/config/
+COPY autonomous_dco_rnd/services/config/                    /repo/autonomous_dco_rnd/services/config/
+COPY autonomous_dco_rnd/services/worker_qdrant/             /repo/autonomous_dco_rnd/services/worker_qdrant/
+COPY autonomous_dco_rnd/tests/config/                       /repo/autonomous_dco_rnd/tests/config/
+COPY autonomous_dco_rnd/tests/deploy/                       /repo/autonomous_dco_rnd/tests/deploy/
+COPY autonomous_dco_rnd/tests/sensors/                      /repo/autonomous_dco_rnd/tests/sensors/
+COPY autonomous_dco_rnd/tests/lab_sensor_transmission/      /repo/autonomous_dco_rnd/tests/lab_sensor_transmission/
+COPY autonomous_dco_rnd/tests/test_e2e_sensor_pipeline.py   /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/pytest.ini                    /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py                   /repo/autonomous_dco_rnd/tests/
 
 # Repo-root sensor sources (linux/c2_sensor, linux/sentinel, linux/suricata,
 # infra/aws, infra/azure, infra/gcp, infra/network_tap, windows/).
@@ -41,8 +41,8 @@ COPY infra/     /repo/infra/
 COPY linux/     /repo/linux/
 COPY windows/   /repo/windows/
 
-ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/mlops/scripts:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/sensors/", \

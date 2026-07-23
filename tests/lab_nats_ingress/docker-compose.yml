@@ -1,6 +1,6 @@
 ---
 # Lab 3: Sensor → Ingress → NATS Integrity Pipeline
-# Run from project_empros/tests/lab_nats_ingress/:
+# Run from autonomous_dco_rnd/tests/lab_nats_ingress/:
 #   docker compose up -d
 #   pytest test_ingress_pipeline.py -v
 

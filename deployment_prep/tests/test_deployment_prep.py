@@ -7,7 +7,7 @@ no container runtime, no network, and no live services required.
 
 Run:
     pytest deployment_prep/tests/test_deployment_prep.py -v
-    # or from project_empros root:
+    # or from autonomous_dco_rnd root:
     pytest deployment_prep/tests/ -v
 """
 
@@ -29,7 +29,7 @@ yaml = pytest.importorskip("yaml", reason="pyyaml required: pip install pyyaml")
 # ---------------------------------------------------------------------------
 THIS = Path(__file__).parent                  # deployment_prep/tests/
 PREP = THIS.parent                            # deployment_prep/
-REPO = PREP.parent                            # project_empros/
+REPO = PREP.parent                            # autonomous_dco_rnd/
 
 SCRIPTS = PREP / "scripts"
 SUPPLY_CHAIN = PREP / "supply_chain"

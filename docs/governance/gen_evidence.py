@@ -23,7 +23,7 @@ from pathlib import Path
 import yaml
 
 HERE = Path(__file__).parent
-PE = HERE.parent.parent                      # project_empros/
+PE = HERE.parent.parent                      # autonomous_dco_rnd/
 EVIDENCE_MAP = HERE / "evidence_map.yaml"
 MANIFEST = HERE / "controls_manifest.yaml"
 ARTIFACTS = HERE / "artifacts"

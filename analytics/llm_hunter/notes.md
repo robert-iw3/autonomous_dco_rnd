@@ -88,7 +88,7 @@ Every `source_type` in `state.py` is covered. Counterpart mapping:
 - **nettap**: network_tap
 - **cloud**: aws_{vpc,cloudtrail,guardduty}, azure_{nsg,activity,entraid}, gcp_{audit,scc,vpc_flow}
 
-## Tests (`project_empros/tests/lab_analytics_hunter/`)
+## Tests (`autonomous_dco_rnd/tests/lab_analytics_hunter/`)
 
 - `test_review_board.py` — pure `aggregate_board` decision rule + mock-simulation
   workflows (disprove→override, can't-disprove→confirm, fail-closed, FP symmetry).

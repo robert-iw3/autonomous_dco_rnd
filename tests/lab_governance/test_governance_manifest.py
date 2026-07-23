@@ -21,7 +21,7 @@ import pytest
 
 yaml = pytest.importorskip("yaml")
 
-PE = Path(__file__).parent.parent.parent          # project_empros/
+PE = Path(__file__).parent.parent.parent          # autonomous_dco_rnd/
 GOV = PE / "docs/governance"
 if not (GOV / "controls_manifest.yaml").exists():
     pytest.skip("governance manifest not present in this image", allow_module_level=True)

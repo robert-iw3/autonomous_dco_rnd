@@ -10,7 +10,7 @@ import importlib.util as ilu
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent.parent          # project_empros/
+ROOT = Path(__file__).parent.parent.parent          # autonomous_dco_rnd/
 spec = ilu.spec_from_file_location("gen_code_graph", str(ROOT / "gen_code_graph.py"))
 cg = ilu.module_from_spec(spec)
 sys.modules["gen_code_graph"] = cg

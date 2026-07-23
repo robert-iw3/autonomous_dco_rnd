@@ -2,18 +2,18 @@
 # Tests:   lab_governance/  (NIST AI 600-1 control suite + GRC manifest/evidence/wiring)
 # The manifest/evidence drift-guards validate the WHOLE control register (impl + test
 # + evidence paths span analytics/mlops/services/libs/hardening/operations/tests), so
-# this section needs the full project_empros tree, not a subset (.dockerignore prunes
+# this section needs the full autonomous_dco_rnd tree, not a subset (.dockerignore prunes
 # data/img/target). Heavy deps are stubbed in each test; only pydantic + PyYAML needed.
-#   docker build -f project_empros/tests/Dockerfile.governance -t nexus-test-governance .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.governance -t nexus-test-governance .
 FROM docker.io/alpine:3.24
 
 RUN apk add --no-cache python3 py3-pip
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN pip3 install --no-cache-dir "pytest>=7.4.0" "pydantic>=2.7.1" "PyYAML>=6.0"
 
-COPY project_empros/ /repo/project_empros/
+COPY autonomous_dco_rnd/ /repo/autonomous_dco_rnd/
 
-ENV PYTHONPATH=/repo/project_empros/analytics/llm_hunter:/repo/project_empros/analytics:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/analytics/llm_hunter:/repo/autonomous_dco_rnd/analytics:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 CMD ["python3", "-m", "pytest", "tests/lab_governance/", \
      "-v", "--tb=short", "--junit-xml=/reports/governance.xml"]

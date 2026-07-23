@@ -2,7 +2,7 @@
 # ==============================================================================
 # Lab Det Chamber -- dockerized environment that mocks the real deployment.
 #
-# Run from project_empros/tests/lab_det_chamber/:
+# Run from autonomous_dco_rnd/tests/lab_det_chamber/:
 #   docker compose up --build --abort-on-container-exit lab-runner
 #
 # `lab-runner` runs the cumulative pytest suite -- including the Phase 7 capstone
@@ -21,7 +21,7 @@ services:
   lab-runner:
     build:
       context: ../../../
-      dockerfile: project_empros/tests/Dockerfile.detchamber
+      dockerfile: autonomous_dco_rnd/tests/Dockerfile.detchamber
     volumes:
       - ../reports:/reports
     # Phase 1 suite needs no live substrate. Later phases add depends_on: [nats, minio, ...].

@@ -17,7 +17,7 @@ else:
     load_dotenv(Path(__file__).parent / ".env.example")
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-REPO_ROOT     = Path(__file__).parents[2]   # project_empros/
+REPO_ROOT     = Path(__file__).parents[2]   # autonomous_dco_rnd/
 STAGING_DIR   = REPO_ROOT / "mlops" / "data" / "staging"
 LOG_DIR       = Path(os.getenv("EVAL_LOG_DIR", str(REPO_ROOT / "logs")))
 

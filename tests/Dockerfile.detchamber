@@ -5,7 +5,7 @@
 #          requests). The Windows-only bits (pywin32/Procmon/Magnet/Volatility) are
 #          imported lazily by the engine and stubbed in tests, so the image is a
 #          faithful Linux stand-in for the deployed engine runtime.
-#   docker build -f project_empros/tests/Dockerfile.detchamber -t nexus-test-detchamber .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.detchamber -t nexus-test-detchamber .
 FROM docker.io/python:3.12-slim
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir \
 # Swarm-side modules used by the Phase 7 capstone E2E (state schemas, acquire tool,
 # enrichment). langchain_core is stubbed in the test; importing the heavy tools
 # package is avoided -- the capstone imports the specific modules directly.
-COPY project_empros/analytics/llm_hunter/   /repo/project_empros/analytics/llm_hunter/
+COPY autonomous_dco_rnd/analytics/llm_hunter/   /repo/autonomous_dco_rnd/analytics/llm_hunter/
 
 # Offline IaC validators so the lab proves the infrastructure will actually deploy
 # (terraform fmt needs no provider downloads -- works in the isolated lab).
@@ -36,21 +36,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-c
     && apt-get purge -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # IaC lives in infrastructure/; the lab validates it too (isolation + deployability).
-COPY project_empros/det_chamber/            /repo/project_empros/det_chamber/
-COPY project_empros/infrastructure/terraform/det_chamber/        /repo/project_empros/infrastructure/terraform/det_chamber/
-COPY project_empros/infrastructure/det_chamber/                  /repo/project_empros/infrastructure/det_chamber/
-COPY project_empros/infrastructure/ansible/roles/det_chamber_sandbox/ /repo/project_empros/infrastructure/ansible/roles/det_chamber_sandbox/
-COPY project_empros/infrastructure/ansible/roles/det_chamber_linux/   /repo/project_empros/infrastructure/ansible/roles/det_chamber_linux/
+COPY autonomous_dco_rnd/det_chamber/            /repo/autonomous_dco_rnd/det_chamber/
+COPY autonomous_dco_rnd/infrastructure/terraform/det_chamber/        /repo/autonomous_dco_rnd/infrastructure/terraform/det_chamber/
+COPY autonomous_dco_rnd/infrastructure/det_chamber/                  /repo/autonomous_dco_rnd/infrastructure/det_chamber/
+COPY autonomous_dco_rnd/infrastructure/ansible/roles/det_chamber_sandbox/ /repo/autonomous_dco_rnd/infrastructure/ansible/roles/det_chamber_sandbox/
+COPY autonomous_dco_rnd/infrastructure/ansible/roles/det_chamber_linux/   /repo/autonomous_dco_rnd/infrastructure/ansible/roles/det_chamber_linux/
 # Operations playbooks (acquisition 05 + restore 06 + eradication 02 journal) and
 # the ssh_playbook_v1 provider config -- the lab validates these contracts too.
-COPY project_empros/operations/playbooks/   /repo/project_empros/operations/playbooks/
-COPY project_empros/operations/infra/containment.toml /repo/project_empros/operations/infra/containment.toml
-COPY project_empros/tests/lab_det_chamber/  /repo/project_empros/tests/lab_det_chamber/
-COPY project_empros/tests/pytest.ini        /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py        /repo/project_empros/tests/
+COPY autonomous_dco_rnd/operations/playbooks/   /repo/autonomous_dco_rnd/operations/playbooks/
+COPY autonomous_dco_rnd/operations/infra/containment.toml /repo/autonomous_dco_rnd/operations/infra/containment.toml
+COPY autonomous_dco_rnd/tests/lab_det_chamber/  /repo/autonomous_dco_rnd/tests/lab_det_chamber/
+COPY autonomous_dco_rnd/tests/pytest.ini        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py        /repo/autonomous_dco_rnd/tests/
 
-ENV PYTHONPATH=/repo/project_empros/det_chamber/engine:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/det_chamber/engine:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/lab_det_chamber/", \

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[2]      # project_empros
+REPO = Path(__file__).resolve().parents[2]      # autonomous_dco_rnd
 ROOT = REPO.parent                              # git root (linux/, windows/)
 
 WIN_DEFENSE = ROOT / "windows" / "windows_xdr_dev" / "agent" / "ActiveDefenseModule.cs"

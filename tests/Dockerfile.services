@@ -3,7 +3,7 @@
 #          lab_operations_contracts/, lab_orchestration/
 # Deps:    pytest only -- all tests do pure source-code reads (no imports of
 #          compiled deps); subprocess used to validate cargo check syntax
-#   docker build -f project_empros/tests/Dockerfile.services -t nexus-test-services .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.services -t nexus-test-services .
 FROM docker.io/alpine:3.23
 
 RUN apk add --no-cache python3 py3-pip
@@ -15,29 +15,29 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
 RUN pip3 install --no-cache-dir "pytest>=7.4.0" "PyYAML>=6.0"
 
 # All source trees the contract tests read (no Python imports -- file reads only)
-COPY project_empros/services/           /repo/project_empros/services/
-COPY project_empros/infrastructure/     /repo/project_empros/infrastructure/
-COPY project_empros/orchestration/      /repo/project_empros/orchestration/
-COPY project_empros/operations/         /repo/project_empros/operations/
-COPY project_empros/middleware/         /repo/project_empros/middleware/
-COPY project_empros/libs/               /repo/project_empros/libs/
-COPY project_empros/analytics/llm_hunter/ /repo/project_empros/analytics/llm_hunter/
-COPY project_empros/mlops/scripts/      /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/data/staging/             /repo/project_empros/mlops/data/staging/
-COPY project_empros/tests/test_worker_contracts.py      /repo/project_empros/tests/
-COPY project_empros/tests/test_s3_query_alignment.py    /repo/project_empros/tests/
-COPY project_empros/tests/docker-compose.yml            /repo/project_empros/tests/
-COPY project_empros/tests/lab_worker_rules/             /repo/project_empros/tests/lab_worker_rules/
-COPY project_empros/tests/lab_infra_contracts/          /repo/project_empros/tests/lab_infra_contracts/
-COPY project_empros/tests/lab_operations_contracts/     /repo/project_empros/tests/lab_operations_contracts/
-COPY project_empros/tests/lab_orchestration/            /repo/project_empros/tests/lab_orchestration/
-COPY project_empros/tests/lab_nats_ingress/nats-test.conf /repo/project_empros/tests/lab_nats_ingress/
-COPY project_empros/tests/deploy/                       /repo/project_empros/tests/deploy/
-COPY project_empros/tests/pytest.ini                    /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py                    /repo/project_empros/tests/
+COPY autonomous_dco_rnd/services/           /repo/autonomous_dco_rnd/services/
+COPY autonomous_dco_rnd/infrastructure/     /repo/autonomous_dco_rnd/infrastructure/
+COPY autonomous_dco_rnd/orchestration/      /repo/autonomous_dco_rnd/orchestration/
+COPY autonomous_dco_rnd/operations/         /repo/autonomous_dco_rnd/operations/
+COPY autonomous_dco_rnd/middleware/         /repo/autonomous_dco_rnd/middleware/
+COPY autonomous_dco_rnd/libs/               /repo/autonomous_dco_rnd/libs/
+COPY autonomous_dco_rnd/analytics/llm_hunter/ /repo/autonomous_dco_rnd/analytics/llm_hunter/
+COPY autonomous_dco_rnd/mlops/scripts/      /repo/autonomous_dco_rnd/mlops/scripts/
+COPY autonomous_dco_rnd/mlops/data/staging/             /repo/autonomous_dco_rnd/mlops/data/staging/
+COPY autonomous_dco_rnd/tests/test_worker_contracts.py      /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_s3_query_alignment.py    /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/docker-compose.yml            /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/lab_worker_rules/             /repo/autonomous_dco_rnd/tests/lab_worker_rules/
+COPY autonomous_dco_rnd/tests/lab_infra_contracts/          /repo/autonomous_dco_rnd/tests/lab_infra_contracts/
+COPY autonomous_dco_rnd/tests/lab_operations_contracts/     /repo/autonomous_dco_rnd/tests/lab_operations_contracts/
+COPY autonomous_dco_rnd/tests/lab_orchestration/            /repo/autonomous_dco_rnd/tests/lab_orchestration/
+COPY autonomous_dco_rnd/tests/lab_nats_ingress/nats-test.conf /repo/autonomous_dco_rnd/tests/lab_nats_ingress/
+COPY autonomous_dco_rnd/tests/deploy/                       /repo/autonomous_dco_rnd/tests/deploy/
+COPY autonomous_dco_rnd/tests/pytest.ini                    /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py                    /repo/autonomous_dco_rnd/tests/
 
-ENV PYTHONPATH=/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/test_worker_contracts.py", \

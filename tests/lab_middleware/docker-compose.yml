@@ -1,6 +1,6 @@
 ---
 # Lab 5: Middleware ETL Fanout Pipeline
-# Run from project_empros/tests/lab_middleware/:
+# Run from autonomous_dco_rnd/tests/lab_middleware/:
 #   docker compose up -d --build
 #   pytest test_middleware_etl.py -v
 

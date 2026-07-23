@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 # -- Paths ----------------------------------------------------------------------
-REPO = Path(__file__).parent.parent.parent   # project_empros/
+REPO = Path(__file__).parent.parent.parent   # autonomous_dco_rnd/
 PREP = REPO / "deployment_prep"
 
 COMPOSE_FILES = [
