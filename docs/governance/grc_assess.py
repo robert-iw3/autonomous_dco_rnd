@@ -704,10 +704,12 @@ def render_report(assessment, post, timestamp):
                          + (f"·{b['state']}" if b["state"] != "resolved" else "")
                          for b in a["bindings"]) or "_(none)_"
         ptr = _evidence_pointer(a["id"], evidence_map)
+        # basename:line keeps the pointer narrow (full path is in the dossier)
+        ptr_short = f"{Path(ptr.split(':')[0]).name}:{ptr.split(':', 1)[1]}" if ptr else None
         chain = "INCOMPLETE — " + "; ".join(a["completeness_issues"]) if a["incomplete"] else "complete"
         L_.append(f"| {a['id']} | {a['title']} | {a['intent']} | "
                   f"{_STATUS_BADGE[a['assessed']]} | {chain} | {refs} | "
-                  f"{('`' + ptr + '`') if ptr else '—'} |")
+                  f"{('`' + ptr_short + '`') if ptr_short else '—'} |")
 
     # open findings (POA&M seed)
     findings = [a for a in assessment if a["finding"]]
@@ -718,7 +720,8 @@ def render_report(assessment, post, timestamp):
            "Not-Run finding is a coverage gap (blocking only in `--gate --strict` / `--full`).", ""]
     if findings:
         for a in findings:
-            detail = "; ".join(f"{b['ref']} [{b['state']}"
+            # backtick the refs so the PDF renderer can break the long paths
+            detail = "; ".join(f"`{b['ref']}` [{b['state']}"
                                + (f"={b['result']}" if b['result'] else "") + "]"
                                for b in a["bindings"])
             chain = (" · **evidence:** " + "; ".join(a["completeness_issues"])

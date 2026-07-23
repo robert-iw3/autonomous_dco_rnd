@@ -1,0 +1,10 @@
+% Continuous-assessment report: the per-control proven-status matrix packs
+% monospace test refs and file:line pointers into narrow landscape cells. Long
+% CamelCase identifiers (e.g. TestFrontierPinEnforcement) carry no hyphenation
+% point, so hyphenat alone cannot wrap them. Redefine inline code to break at any
+% character (seqsplit) so every token wraps in-cell instead of overrunning the
+% right margin. Scoped to this document via build_pdfs.sh.
+\usepackage{seqsplit}
+\let\nexusoldtexttt\texttt
+\renewcommand{\texttt}[1]{\nexusoldtexttt{\seqsplit{#1}}}
+\emergencystretch=3em
