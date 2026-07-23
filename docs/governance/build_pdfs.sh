@@ -18,10 +18,15 @@ for md in *.md; do
   # wide cross-reference docs render in landscape at a smaller font so tables fit;
   # the evidence dossier renders portrait at a smaller font with line-wrapped code.
   case "$md" in
-    controls_catalog.md|applicability_matrix.md|assessment_report.md)
-      # wide cross-reference tables (assessment_report's per-control proven-status
-      # matrix included) render in landscape at a smaller font so nothing overruns
+    controls_catalog.md|applicability_matrix.md)
       geo='-V geometry:landscape -V geometry:margin=0.7in -V fontsize=9pt' ;;
+    assessment_report.md)
+      # wide per-control proven-status matrix: landscape + smaller font, and
+      # _assessment.tex so the monospace test refs / file:line pointers (incl.
+      # long CamelCase class names) break at any character and wrap in-cell
+      # instead of overrunning the right margin.
+      geo='-V geometry:landscape -V geometry:margin=0.7in -V fontsize=9pt'
+      hdr+=(-H _assessment.tex) ;;
     control_evidence.md)
       geo='-V geometry:margin=0.75in -V fontsize=9pt'
       hdr+=(-H _code.tex -H _prose.tex) ;;

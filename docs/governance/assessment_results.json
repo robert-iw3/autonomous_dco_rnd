@@ -3,7 +3,7 @@
     "uuid": "19323796-7825-5196-9f05-15b65866ad66",
     "metadata": {
       "title": "Sentinel Nexus \u2014 Continuous Control Assessment Results",
-      "last-modified": "2026-07-23T15:22:52+00:00",
+      "last-modified": "2026-07-23T15:32:01+00:00",
       "version": "1.0",
       "oscal-version": "1.1.2"
     },
@@ -12,10 +12,10 @@
     },
     "results": [
       {
-        "uuid": "0fa884d6-5118-57f4-ba5b-7af7182a6934",
+        "uuid": "feef1489-985a-5b3c-a3dc-edd2f2e3d0d5",
         "title": "Sentinel Nexus continuous control assessment",
         "description": "Per-control proven status derived from the pipeline's JUnit results, with framework posture.",
-        "start": "2026-07-23T15:22:52+00:00",
+        "start": "2026-07-23T15:32:01+00:00",
         "reviewed-controls": {
           "control-selections": [
             {
