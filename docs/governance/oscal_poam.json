@@ -1,0 +1,136 @@
+{
+  "plan-of-action-and-milestones": {
+    "uuid": "7b7e2c47-f61f-56c5-9a31-2439eb792a10",
+    "metadata": {
+      "title": "Sentinel Nexus \u2014 POA&M (generated from open findings)",
+      "last-modified": "2026-07-23T15:22:52+00:00",
+      "version": "1.0",
+      "oscal-version": "1.1.2"
+    },
+    "import-ssp": {
+      "href": "./oscal_ssp.json"
+    },
+    "poam-items": [
+      {
+        "uuid": "326e139b-fd38-5ba3-a2a6-051063561c91",
+        "title": "IAC-HARDENING \u2014 OS / kernel / network hardening baseline",
+        "description": "Control claimed 'implemented' but assessed 'Not-Run'.",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Not-Run"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "AC-17, AU-2, AU-12, CM-7, IA-5, SC-5, SC-7, SI-3, SI-7, SI-16"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "1da87c36-8567-5e13-9399-c76d40226bd7"
+          }
+        ]
+      },
+      {
+        "uuid": "978d181d-b222-54e0-8814-1ed2a9aa945c",
+        "title": "SEC-DLP-EGRESS \u2014 Outbound DLP / sovereign data isolation",
+        "description": "Control claimed 'implemented' but assessed 'Not-Run'.",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Not-Run"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "AC-4, SC-7"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "6abd8fa5-b51d-5f31-a987-8b2c77edec7a"
+          }
+        ]
+      },
+      {
+        "uuid": "93fb0dca-6ced-51a3-9c1d-3448fba0ce58",
+        "title": "SEC-ENDPOINT-ID \u2014 Endpoint identity injection defense",
+        "description": "Control claimed 'implemented' but assessed 'Satisfied'. Evidence: logic-only (no wired invocation\u2192execution).",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Satisfied"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "SI-10"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "b41d4884-7263-5c7a-b3c6-9a11477c58ad"
+          }
+        ]
+      },
+      {
+        "uuid": "b933a335-7fa5-5028-9dae-f7a578adb143",
+        "title": "SEC-SANITIZER \u2014 Cognitive boundary isolation & untrusted-payload wrapping",
+        "description": "Control claimed 'implemented' but assessed 'Not-Run'.",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Not-Run"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "SI-10"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "e6dccb43-928d-58f2-85b9-d3235734501c"
+          }
+        ]
+      },
+      {
+        "uuid": "e138daa1-715e-5f40-b602-cd9e7d02419c",
+        "title": "SEC-TRAINING-HYGIENE \u2014 Training-data hygiene & credential scrubbing",
+        "description": "Control claimed 'implemented' but assessed 'Satisfied'. Evidence: logic-only (no wired invocation\u2192execution).",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Satisfied"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "SI-12, AC-4"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "75eebdf3-5e35-5187-b18c-44766b3c312a"
+          }
+        ]
+      },
+      {
+        "uuid": "3aaba2b2-6350-5ae9-9254-d73fc85a0b6e",
+        "title": "SIEM-E2E \u2014 SIEM federation end-to-end conservation",
+        "description": "Control claimed 'implemented' but assessed 'Not-Run'.",
+        "props": [
+          {
+            "name": "assessed-status",
+            "value": "Not-Run"
+          },
+          {
+            "name": "sp800-53-controls",
+            "value": "CA-2, SI-4"
+          }
+        ],
+        "related-observations": [
+          {
+            "observation-uuid": "4316eaf0-dcd7-57e2-b051-5a6343aeb0b3"
+          }
+        ]
+      }
+    ]
+  }
+}

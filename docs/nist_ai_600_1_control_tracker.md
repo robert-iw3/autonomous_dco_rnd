@@ -99,6 +99,51 @@ network/LLM seams stubbed) by
 [tests/lab_governance/test_nist_controls_wiring.py](../tests/lab_governance/test_nist_controls_wiring.py)
 (**8 passed**), which fails on a tree where the ledgers are defined but never called.
 
+### Wave 6 — GRC-as-Code continuous assessment (WS-H, H0–H3) (23 Jul 2026)
+
+Waves 3–5 made the register **generated, drift-guarded, and wired** — but a control's `status:
+implemented` was still **hand-asserted**: nothing checked that its proving tests *actually passed*
+in the last run, only that the test files existed. Wave 6 closes that loop by making the GRC
+assessment **ride the test pipeline** — the literal realization of *"just as code is tested before
+production, the GRC assessment is produced and validated in parallel, from the same run."*
+
+| Capability | Landed as | Behaviour |
+|---|---|---|
+| **Control ↔ real testcase binding (H0)** | [`docs/governance/grc_lib.py`](governance/grc_lib.py) | parses `tests/reports/*.xml`, normalises each `<testcase>` back to the manifest's `path::Class::method` node-id, resolves every control's `tests:` refs to a concrete pass/fail/skip result; separates a **broken** (stale) ref from a **not-run** one |
+| **Assessment engine (H1)** | [`docs/governance/grc_assess.py`](governance/grc_assess.py) | classifies each control **Satisfied / Failed / Not-Run / Documentation** from the JUnit; emits **`assessment_results.json`** (OSCAL Assessment Results) + **`assessment_report.md`** (per-control proven status + posture + POA&M seed) |
+| **Posture + regression gate (H2)** | `grc_assess.py --gate` vs committed [`posture_baseline.json`](governance/posture_baseline.json) | per-framework coverage = applicable items addressed by ≥1 **Satisfied** control; exit 1 on posture regression or any `implemented`-but-**Failed** control (`--strict` also blocks Not-Run) |
+| **Pipeline integration (H3)** | [`tests/Dockerfile.grc`](../tests/Dockerfile.grc) + the `grc` section in [`run_tests.sh`](../tests/run_tests.sh) | runs **after** the functional sections, consumes their JUnit, writes **`grc.xml`** (the gate as JUnit so the dashboard shows it), and **fails the build** exactly like a failing unit test |
+| **Completeness (H4)** | `grc_assess.py` completeness rule + `--suggest-anchors` | an `implemented` code control must present an execution **chain** (reach-in + act-out), not a lone logic snippet; a logic-only chain is flagged `Incomplete` (decision #8). `--suggest-anchors` proposes evidence_map anchors + step roles by intersecting impl symbols with the proving test + live-graph call sites |
+| **Trend + findings export (H5)** | `posture_ledger.jsonl` + `grc_assess.py --trend` / `--sarif`; POA&M-1 cadence | each scheduled re-assessment appends a posture snapshot (continuous monitoring, mirroring the NC-2 Brier trend); `--trend` reports deltas + regression; `--sarif` exports findings for code-scanning UIs. Wired onto the daily POA&M-1 timer via `scheduled_audits.py` |
+| **OSCAL SSP + POA&M (H6)** | `grc_assess.py --oscal-export` → `oscal_ssp.json` + `oscal_poam.json` | an OSCAL SSP `implemented-requirements` block (one per SP 800-53 control the register claims, proof-backed) + an OSCAL POA&M from the open findings, cross-referenced to the cached rev5 catalog — portable to any OSCAL-aware GRC tool |
+
+**Completeness caught a real security-relevant gap.** The H4 rule flagged `SEC-ENDPOINT-ID` as
+logic-only: its `endpoint_id` regex lives on `DynamicUebaVector` in `lib_siem_core/src/models.rs`, but
+that struct is **never constructed and `.validate()` is never called** anywhere in the Rust tree — the
+injection-defense validation is *declared but not wired*. The source-contract test proves the
+declaration exists (control assessed **Satisfied**); the completeness rule proves the chain is unwired
+(also **Incomplete**). Left surfaced for the ingestion owner rather than papered over — exactly what a
+continuous-assessment layer is for.
+
+**Real-half findings surfaced and remediated (the assessment earning its keep).** Running the engine
+against the real manifest immediately exposed imprecise bindings: five controls were bound at
+**file level** to the whole `tests/test_worker_contracts.py`, which swept in an unrelated failing
+meta-test (`TestTrack6Regression`) and mis-scored them. They were tightened to their **proving
+class** (`ING-ZERO-TRUST`→`TestEvidenceIngress`, `ING-DLQ-BREAKER`→`TestWorkerS3ArchiveDLQ`/
+`TestCognitiveFaultDLQ`, `SEC-FAILOVER`→`TestLLMCircuitBreaker`, `SEC-RLHF-QUARANTINE`→
+`TestNATSSubjectAuth`). `SEC-ENDPOINT-ID` was bound to a file with **no** `endpoint_id` proof at all;
+a hermetic source-contract (`TestEndpointIdInjectionDefense`, pinning the `RE_ENDPOINT` regex in
+`libs/lib_siem_core/src/models.rs`) was added and the binding corrected.
+
+Complementary to the **static** guard: `test_governance_manifest.py` proves the register is
+well-formed and honest about its sources; the **dynamic** engine proves the controls are currently
+satisfied by green tests. Validated by
+[tests/lab_governance/test_grc_binding.py](../tests/lab_governance/test_grc_binding.py) (H0),
+[test_grc_assess.py](../tests/lab_governance/test_grc_assess.py) (H1/H2),
+[test_grc_pipeline.py](../tests/lab_governance/test_grc_pipeline.py) (H3), and the mock end-to-end
+lab [tests/lab_grc_assessment/test_grc_e2e.py](../tests/lab_grc_assessment/test_grc_e2e.py)
+(synthetic + real halves).
+
 ---
 
 ## 1. Coverage summary

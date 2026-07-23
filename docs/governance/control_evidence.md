@@ -1780,9 +1780,18 @@ S3_SECRET_KEY    = _vault_secret("nexus/s3/secret_key",     "S3_SECRET_KEY",    
 
 *Implementation: `analytics/llm_hunter/tools/nexus_config.py`*
 
-**Execution chain:** Logic
+**Execution chain:** Invocation → Logic
 
-**1. Logic** — SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
+**1. Invocation** — The live review-board counterpart resolves the sovereign [siem] config contract at disproof time — the runtime entry into the config gate.
+
+`analytics/llm_hunter/agents/review_board.py:L139-L140`
+
+```python
+            from tools.nexus_config import get_siem_config
+            siem_config = get_siem_config()
+```
+
+**2. Logic** — SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist.
 
 `analytics/llm_hunter/tools/nexus_config.py:L147-L177`
 

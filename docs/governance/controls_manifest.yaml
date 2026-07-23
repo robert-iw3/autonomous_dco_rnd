@@ -363,7 +363,7 @@ controls:
     status: implemented
     description: TLS+JWT; HMAC-SHA256 canonical lineage stamp; temporal-drift, monotonic-sequence, cross-OS/collision validation; adaptive sensor banning.
     implementation: services/core_ingress/src/integrity.rs
-    tests: ["tests/test_worker_contracts.py"]
+    tests: ["tests/test_worker_contracts.py::TestEvidenceIngress"]
     frameworks:
       sp_800_53: [SC-7, SC-8, SC-16, SI-7, SI-10, AC-7]
       csf_2_0: [PR, DE]
@@ -375,7 +375,7 @@ controls:
     status: implemented
     description: Exponential-backoff retry, circuit breaker, poison-message DLQ with metrics; graceful SIGTERM drain.
     implementation: libs/lib_siem_core/src/lib.rs
-    tests: ["tests/test_worker_contracts.py"]
+    tests: ["tests/test_worker_contracts.py::TestWorkerS3ArchiveDLQ", "tests/test_worker_contracts.py::TestCognitiveFaultDLQ"]
     frameworks:
       sp_800_53: [SI-4, CP-10]
       csf_2_0: [DE, RC]
@@ -414,7 +414,7 @@ controls:
     status: implemented
     description: worker_rlhf monitors operator-override velocity; coordinated malicious dismissals trip an atomic circuit breaker quarantining the tainted reward data.
     implementation: services/worker_rlhf/src/main.rs
-    tests: ["tests/test_worker_contracts.py"]
+    tests: ["tests/test_worker_contracts.py::TestNATSSubjectAuth"]
     frameworks:
       owasp_llm: [LLM03]
       atlas: [AML.T0031, AML.T0020]
@@ -468,7 +468,7 @@ controls:
     status: implemented
     description: Per-node provider failover chain; total failure emits a safe default verdict (monitor) rather than crashing — degrade-to-monitoring.
     implementation: analytics/llm_hunter/agents/llm_providers.py
-    tests: ["tests/test_worker_contracts.py"]
+    tests: ["tests/test_worker_contracts.py::TestLLMCircuitBreaker"]
     frameworks:
       owasp_llm: [LLM05]
       sp_800_53: [CP-10, SI-4]
@@ -506,7 +506,7 @@ controls:
     status: implemented
     description: Sensor endpoint_id regex-validated in the Rust ingestion layer before reaching Qdrant/Parquet (blocks injection/path traversal).
     implementation: libs/lib_siem_core/src/models.rs
-    tests: ["tests/test_worker_contracts.py"]
+    tests: ["tests/test_worker_contracts.py::TestEndpointIdInjectionDefense"]
     frameworks:
       sp_800_53: [SI-10]
       csf_2_0: [PR]

@@ -11,7 +11,7 @@
 # breadcrumb followed by the numbered steps.
 #
 # entry fields:
-#   file    – path relative to project_empros/
+#   file    – path relative to autonomous_dco_rnd/
 #   anchor  – a unique substring on the first line of the snippet
 #   step    – the chain role of this snippet (Invocation / Routing / Node /
 #             Logic / Effect / Execution / Persistence / Boot / Proof)
@@ -130,6 +130,8 @@ evidence:
        caption: "Wired into the tool's _run: a query is rejected unless it passes read-only + index-allowlist checks, then is force-bounded before any adapter runs it."}
 
   SIEM-CONFIG-CONTRACT:
+    - {file: analytics/llm_hunter/agents/review_board.py, step: Invocation, anchor: "siem_config = get_siem_config()", before: 1, after: 0,
+       caption: "The live review-board counterpart resolves the sovereign [siem] config contract at disproof time — the runtime entry into the config gate."}
     - {file: analytics/llm_hunter/tools/nexus_config.py, step: Logic, anchor: "def get_siem_config", after: 30,
        caption: "SIEM access is sovereign-by-default and double-gated; the allowed index set is the fan-out's own indexes plus an explicit operator allowlist."}
 

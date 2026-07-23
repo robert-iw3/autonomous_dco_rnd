@@ -1165,3 +1165,39 @@ class TestServiceImagesNonRoot:
         # guard against the glob silently matching nothing
         names = {df.parent.name for df in self._service_dockerfiles()}
         assert {"worker_ti_ingest", "worker_soar", "core_ingress"} <= names
+
+
+# ── SEC-ENDPOINT-ID: endpoint identity injection defense ─────────────────────
+
+class TestEndpointIdInjectionDefense:
+    """SEC-ENDPOINT-ID: sensor endpoint_id / source_type are regex-validated in the
+    ingestion data model (lib_siem_core) *before* a record reaches Qdrant/Parquet,
+    so an attacker cannot inject or path-traverse via those fields. Rust is
+    compiled/unit-tested in CI; this pins the source contract so a revert of the
+    validation surfaces immediately in the offline suite."""
+
+    MODELS_RS = Path(__file__).parent.parent / "libs/lib_siem_core/src/models.rs"
+
+    def _src(self) -> str:
+        return self.MODELS_RS.read_text()
+
+    def test_models_source_present(self):
+        assert self.MODELS_RS.exists(), "lib_siem_core models.rs is the ingestion data model"
+
+    def test_endpoint_id_bounded_charset_regex(self):
+        src = self._src()
+        assert "RE_ENDPOINT" in src, "endpoint_id validation regex must be defined"
+        # bounded length + injection-safe charset (alphanumerics and dash only)
+        assert r"^[a-zA-Z0-9\-]{3,64}$" in src, \
+            "endpoint_id regex must bound length and forbid path/injection metacharacters"
+
+    def test_endpoint_id_field_is_validated(self):
+        src = self._src()
+        m = re.search(r'#\[validate\(regex\(path = "\*RE_ENDPOINT".*?\)\)\]\s*'
+                      r'pub endpoint_id', src, re.DOTALL)
+        assert m, "endpoint_id field must carry the #[validate(regex=RE_ENDPOINT)] guard"
+
+    def test_source_type_also_validated(self):
+        # the sibling free-text identifier is guarded the same way (defense in depth)
+        src = self._src()
+        assert "RE_SOURCE_TYPE" in src and r"^[a-zA-Z0-9_]{3,64}$" in src

@@ -353,7 +353,7 @@ regenerated, so the SSP can never cite code that no longer exists. The multiple
 - **SEC-SUPPLY-CHAIN** — Cryptographic model supply-chain integrity (SHA-384). *Evidence:* artifacts/SEC-SUPPLY-CHAIN.md — serve_vllm.sh L48-L66,L68-L69
 - **SEC-TRAINING-HYGIENE** — Training-data hygiene & credential scrubbing. *Evidence:* artifacts/SEC-TRAINING-HYGIENE.md — 01_spool_datasets.py L49-L60
 - **SEC-VECTOR-DIM** — Vector dimensionality validation. *Evidence:* artifacts/SEC-VECTOR-DIM.md — qdrant_search.py L50-L50,L58-L72
-- **SIEM-CONFIG-CONTRACT** — SIEM config ↔ fanout index contract. *Evidence:* artifacts/SIEM-CONFIG-CONTRACT.md — nexus_config.py L147-L177
+- **SIEM-CONFIG-CONTRACT** — SIEM config ↔ fanout index contract. *Evidence:* artifacts/SIEM-CONFIG-CONTRACT.md — review_board.py L139-L140; nexus_config.py L147-L177
 - **SIEM-COUNTERPART-DISPROOF** — Review-board counterpart SIEM disproof. *Evidence:* artifacts/SIEM-COUNTERPART-DISPROOF.md — review_board.py L117-L127,L128-L156
 - **SIEM-E2E** — SIEM federation end-to-end conservation. *Evidence:* artifacts/SIEM-E2E.md — test_siem_federation_e2e.py L189-L195,L222-L227
 - **SIEM-TOOL-GUARD** — SIEM query tool — read-only / bounded / allowlist. *Evidence:* artifacts/SIEM-TOOL-GUARD.md — siem_query.py L110-L128,L142-L154,L155-L173,L348-L356

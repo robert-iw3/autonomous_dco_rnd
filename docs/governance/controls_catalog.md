@@ -40,7 +40,7 @@ Generated from the master controls manifest: **36 controls**, each mapped to its
 | AI-PROVENANCE | AI-origin provenance disclosure | implemented | — | — | MP-5.1-003 | AU-3 | GV | 1 |
 | AI-REVIEW-BOARD | Adversarial review board (per-expert counterparts) | implemented | LLM09 | — | MG-1.3-002 | SI-7, RA-3 | DE, RS | 2 |
 | IAC-HARDENING | OS / kernel / network hardening baseline | implemented | — | — | — | AC-17, AU-2, AU-12, CM-7, IA-5, SC-5, SC-7, SI-3, SI-7, SI-16 | PR, DE | 1 |
-| ING-DLQ-BREAKER | Durable worker circuit breaker + dead-letter routing | implemented | — | — | — | SI-4, CP-10 | DE, RC | 1 |
+| ING-DLQ-BREAKER | Durable worker circuit breaker + dead-letter routing | implemented | — | — | — | SI-4, CP-10 | DE, RC | 2 |
 | ING-ZERO-TRUST | Zero-Trust ingestion gateway (HMAC + 3-tier replay defense) | implemented | — | — | — | SC-7, SC-8, SC-16, SI-7, SI-10, AC-7 | PR, DE | 1 |
 | NC-1-BIAS-AUDIT | Bias/disparity + homogenization scheduled audit | implemented | — | — | MS-2.11-002, GV-1.3-005, MS-2.11-005 | AU-6, RA-3 | GV, DE | 1 |
 | NC-10-VERDICT-LINEAGE | Tamper-evident verdict lineage | implemented | — | — | MS-2.8-003 | AU-9, AU-10, SI-7 | PR, DE | 2 |
@@ -244,7 +244,7 @@ Ephemeral in-memory DuckDB, destructive-keyword + local-FS block, auto LIMIT, pe
 Per-node provider failover chain; total failure emits a safe default verdict (monitor) rather than crashing — degrade-to-monitoring.
 
 - Implementation: `analytics/llm_hunter/agents/llm_providers.py`
-- Tests: `tests/test_worker_contracts.py`
+- Tests: `tests/test_worker_contracts.py::TestLLMCircuitBreaker`
 - Code evidence: `artifacts/SEC-FAILOVER.md` (extracted snippets)
 
 **SEC-IDEMPOTENT-SOAR — Idempotent SOAR execution & deduplication** *(status: implemented; owner: Platform Engineering)*
@@ -284,7 +284,7 @@ All execution plans validated against SoarExecutionSchema (blast-radius cap, enu
 worker_rlhf monitors operator-override velocity; coordinated malicious dismissals trip an atomic circuit breaker quarantining the tainted reward data.
 
 - Implementation: `services/worker_rlhf/src/main.rs`
-- Tests: `tests/test_worker_contracts.py`
+- Tests: `tests/test_worker_contracts.py::TestNATSSubjectAuth`
 - Code evidence: `artifacts/SEC-RLHF-QUARANTINE.md` (extracted snippets)
 
 **SEC-SANITIZER — Cognitive boundary isolation & untrusted-payload wrapping** *(status: implemented; owner: Platform Engineering)*
@@ -338,7 +338,7 @@ sysctl (ASLR, rp_filter, syncookies, no source-routing), mount hardening (noexec
 Exponential-backoff retry, circuit breaker, poison-message DLQ with metrics; graceful SIGTERM drain.
 
 - Implementation: `libs/lib_siem_core/src/lib.rs`
-- Tests: `tests/test_worker_contracts.py`
+- Tests: `tests/test_worker_contracts.py::TestWorkerS3ArchiveDLQ`, `tests/test_worker_contracts.py::TestCognitiveFaultDLQ`
 - Code evidence: `artifacts/ING-DLQ-BREAKER.md` (extracted snippets)
 
 **ING-ZERO-TRUST — Zero-Trust ingestion gateway (HMAC + 3-tier replay defense)** *(status: implemented; owner: Platform Engineering)*
@@ -346,7 +346,7 @@ Exponential-backoff retry, circuit breaker, poison-message DLQ with metrics; gra
 TLS+JWT; HMAC-SHA256 canonical lineage stamp; temporal-drift, monotonic-sequence, cross-OS/collision validation; adaptive sensor banning.
 
 - Implementation: `services/core_ingress/src/integrity.rs`
-- Tests: `tests/test_worker_contracts.py`
+- Tests: `tests/test_worker_contracts.py::TestEvidenceIngress`
 - Code evidence: `artifacts/ING-ZERO-TRUST.md` (extracted snippets)
 
 **SEC-ENDPOINT-ID — Endpoint identity injection defense** *(status: implemented; owner: Platform Engineering)*
@@ -354,7 +354,7 @@ TLS+JWT; HMAC-SHA256 canonical lineage stamp; temporal-drift, monotonic-sequence
 Sensor endpoint_id regex-validated in the Rust ingestion layer before reaching Qdrant/Parquet (blocks injection/path traversal).
 
 - Implementation: `libs/lib_siem_core/src/models.rs`
-- Tests: `tests/test_worker_contracts.py`
+- Tests: `tests/test_worker_contracts.py::TestEndpointIdInjectionDefense`
 - Code evidence: `artifacts/SEC-ENDPOINT-ID.md` (extracted snippets)
 
 

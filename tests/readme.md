@@ -1,6 +1,6 @@
 # Tests
 
-All validation for `project_empros`. Every feature, sensor, and service contract must have a test here before it goes anywhere near production. No exceptions.
+All validation for `autonomous_dco_rnd`. Every feature, sensor, and service contract must have a test here before it goes anywhere near production. No exceptions.
 
 ---
 
@@ -10,27 +10,27 @@ After any codebase change, run tests through the containerized pipeline from the
 
 ```bash
 # Auto-detect what changed vs HEAD~1 and run only affected sections
-./project_empros/tests/run_tests.sh
+./autonomous_dco_rnd/tests/run_tests.sh
 
 # Run all 6 sections (full regression)
-./project_empros/tests/run_tests.sh --full
+./autonomous_dco_rnd/tests/run_tests.sh --full
 
 # Run a single section
-./project_empros/tests/run_tests.sh --section offline
-./project_empros/tests/run_tests.sh --section sensors
-./project_empros/tests/run_tests.sh --section "mlops services"
+./autonomous_dco_rnd/tests/run_tests.sh --section offline
+./autonomous_dco_rnd/tests/run_tests.sh --section sensors
+./autonomous_dco_rnd/tests/run_tests.sh --section "mlops services"
 
 # Run all sections in parallel
-./project_empros/tests/run_tests.sh --full --parallel
+./autonomous_dco_rnd/tests/run_tests.sh --full --parallel
 
 # Force-rebuild images (bypass layer cache)
-./project_empros/tests/run_tests.sh --full --rebuild
+./autonomous_dco_rnd/tests/run_tests.sh --full --rebuild
 
 # Diff against a specific branch instead of HEAD~1
-./project_empros/tests/run_tests.sh --base main
+./autonomous_dco_rnd/tests/run_tests.sh --base main
 
 # List all sections and their change-detection triggers
-./project_empros/tests/run_tests.sh --list
+./autonomous_dco_rnd/tests/run_tests.sh --list
 ```
 
 Each section runs in an **ephemeral container**: built → tested → report written → image deleted. JUnit XML reports land in `tests/reports/` on the host and are preserved between runs.
@@ -50,8 +50,11 @@ Each section runs in an **ephemeral container**: built → tested → report wri
 | `pipeline` | `Dockerfile.pipeline` | Phase 1/2/3 pipeline, guardrails, mlops serving/train | Debian slim |
 | `detchamber` | `Dockerfile.detchamber` | Det Chamber engine + acquisition + intake/detonation lifecycle | Alpine 3.23 |
 | `siem` | `Dockerfile.siemfed` | SIEM-federated investigation mock E2E (CIM/ECS fanout → mock Splunk/Elastic → swarm pivot + counterpart disproof + conservation) | Alpine 3.23 |
+| `grc` | `Dockerfile.grc` | **GRC-as-Code continuous assessment** — binds each control to its real JUnit results, classifies proven status (Satisfied/Failed/Not-Run/Documentation), scores framework posture, and **gates** on `posture_baseline.json`. **Runs LAST** (consumes every other section's `reports/*.xml`); emits `assessment_results.json` (OSCAL AR) + `assessment_report.md` + `grc.xml` (`lab_grc_assessment/`) | Alpine 3.24 |
 
 > `mlops` and `pipeline` use `python:3.12-slim` (Debian glibc) because PyTorch CPU wheels link against glibc symbols absent from musl libc.
+>
+> The `grc` section is the literal realization of *"the GRC assessment is validated in parallel with the tests"*: it rides the same run, consumes the functional sections' JUnit, and fails the build exactly like a failing unit test when a control claimed **implemented** has a bound test that failed, or when framework posture regresses below the committed baseline.
 
 ### Change → section mapping
 
@@ -62,7 +65,10 @@ The script maps changed file paths to sections automatically:
 | `mlops/scripts/` | offline, mlops, pipeline |
 | `analytics/llm_hunter/` | analytics, services, governance |
 | `analytics/llm_hunter/agents/controls` + ledger modules | governance |
-| `docs/governance/` | governance |
+| `docs/governance/` | governance, grc |
+| `docs/governance/controls_manifest.yaml`, `grc_lib.py`, `grc_assess.py`, `posture_baseline.json` | grc |
+| `tests/lab_grc_assessment/` | grc |
+| _(any section triggered in change-detect mode)_ | grc also runs, last |
 | `services/` | services |
 | `services/worker_ti_ingest/` | mlops |
 | `windows/` | pipeline, sensors |
@@ -295,8 +301,25 @@ Offline; **section `governance`** (`Dockerfile.governance` → `reports/governan
 | `test_ai_controls.py` | pure control logic in `agents/controls.py` (grounding, memory-TTL, provenance, fairness, calibration, over-reliance, failure capture, lineage, energy) |
 | `test_nist_controls_wave2.py` / `_wave4.py` | the durable-ledger control jobs (bias audit, calibration, frontier-pin, reliance, active-learning, verdict-lineage, energy accounting) |
 | `test_nist_controls_wiring.py` | NC-9/10/11 are actually **wired into the live `response_agent` / `review_board_node`** (the chain runs end to end), not just defined |
+| `test_grc_binding.py` | **(H0)** each control's `tests:` ref normalises to, and resolves against, a *real* collected JUnit testcase id — no stale (`broken`) bindings |
+| `test_grc_assess.py` | **(H1/H2)** the classifier maps synthetic pass/fail/missing/doc fixtures to Satisfied/Failed/Not-Run/Documentation; posture math is exact; `--gate` fails on regression / contradicted claim |
+| `test_grc_pipeline.py` | **(H3)** the section entrypoint writes a valid `grc.xml` with the documented exit code; `run_tests.sh` registers `grc`, runs it last, and its change-detect triggers fire |
+| `test_grc_completeness.py` | **(H4)** the completeness rule flags a logic-only evidence chain as `Incomplete`; `--suggest-anchors` proposes real anchors; the live manifest's incomplete set is the tracked ledger |
+| `test_grc_trend.py` | **(H5)** the posture ledger appends idempotently; `--trend` computes deltas + a regression flag; the `--sarif` findings export validates structurally |
+| `test_grc_oscal_export.py` | **(H6)** the OSCAL SSP `implemented-requirements` + POA&M validate structurally and round-trip their control ids against the cached rev5 catalog |
 
 `langchain_core` / `qdrant` / `redis` are stubbed; depends only on `pydantic` + `PyYAML`.
+
+### Lab 10h: GRC-as-Code Continuous Assessment (`lab_grc_assessment/`)
+
+Offline; **section `grc`** (`Dockerfile.grc` → `reports/grc.xml`), runs **after** the functional sections and consumes their JUnit. The *dynamic* half of the governance layer — where `lab_governance` proves the register is well-formed and honest about its sources, this proves the controls are **currently satisfied by green tests**:
+
+| File | Proves |
+|---|---|
+| `test_grc_e2e.py` (synthetic) | a hermetic fixture manifest + JUnit drives classification, exact posture math, the regression gate, the OSCAL Assessment Results shape, and the report render |
+| `test_grc_e2e.py` (real) | the engine against the **real** manifest + latest `reports/*.xml`: no broken bindings, no `implemented` control contradicted by a failing test, and the committed posture baseline still holds (the build-blocking gate) |
+
+Engine modules live in `docs/governance/`: `grc_lib.py` (JUnit binding), `grc_assess.py` (classification · OSCAL AR · posture · gate · completeness · `--suggest-anchors` · posture ledger/`--trend` · `--sarif` · OSCAL SSP/POA&M export). Depends only on `PyYAML`. The section emits, into `tests/reports/`: `grc.xml` (gate), `assessment_results.json` (OSCAL AR), `assessment_report.md`, `grc.sarif.json` (findings), `oscal_ssp.json` + `oscal_poam.json`, and `posture_ledger.jsonl`. GRC re-assessment also runs on the daily **POA&M-1** timer (`agents/scheduled_audits.py`) so posture is monitored continuously, not only on commit.
 
 ### Lab 11: Operations Contracts (`lab_operations_contracts/`)
 

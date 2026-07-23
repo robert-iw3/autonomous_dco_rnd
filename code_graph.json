@@ -1532,7 +1532,8 @@
       ],
       "status": "implemented",
       "tests": [
-        "tests/test_worker_contracts.py"
+        "tests/test_worker_contracts.py::TestWorkerS3ArchiveDLQ",
+        "tests/test_worker_contracts.py::TestCognitiveFaultDLQ"
       ]
     },
     "ING-ZERO-TRUST": {
@@ -1545,7 +1546,7 @@
       ],
       "status": "implemented",
       "tests": [
-        "tests/test_worker_contracts.py"
+        "tests/test_worker_contracts.py::TestEvidenceIngress"
       ]
     },
     "NC-1-BIAS-AUDIT": {
@@ -1752,7 +1753,7 @@
       ],
       "status": "implemented",
       "tests": [
-        "tests/test_worker_contracts.py"
+        "tests/test_worker_contracts.py::TestEndpointIdInjectionDefense"
       ]
     },
     "SEC-FAILOVER": {
@@ -1767,7 +1768,7 @@
       ],
       "status": "implemented",
       "tests": [
-        "tests/test_worker_contracts.py"
+        "tests/test_worker_contracts.py::TestLLMCircuitBreaker"
       ]
     },
     "SEC-IDEMPOTENT-SOAR": {
@@ -1835,7 +1836,7 @@
       ],
       "status": "implemented",
       "tests": [
-        "tests/test_worker_contracts.py"
+        "tests/test_worker_contracts.py::TestNATSSubjectAuth"
       ]
     },
     "SEC-SANITIZER": {
@@ -1895,6 +1896,7 @@
         "llm_hunter_swarm"
       ],
       "evidence_files": [
+        "analytics/llm_hunter/agents/review_board.py",
         "analytics/llm_hunter/tools/nexus_config.py"
       ],
       "status": "implemented",

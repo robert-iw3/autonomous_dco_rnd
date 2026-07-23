@@ -1,0 +1,34 @@
+# SECTION: grc  — GRC-as-Code continuous assessment (the "validated in parallel" gate)
+#
+# Runs AFTER the functional sections: they emit JUnit into tests/reports/ (mounted
+# at /reports); this section consumes those reports, binds each control to its real
+# testcases, classifies proven status, scores framework posture, and gates the build
+# against the committed posture_baseline.json.
+#
+# It emits, into the mounted /reports (preserved on host):
+#   * assessment_results.json  — OSCAL Assessment Results (canonical, machine)
+#   * assessment_report.md      — human report (per-control proven status + posture)
+#   * grc.xml                    — this lab's JUnit (the build-blocking gate)
+#
+# Needs the full autonomous_dco_rnd tree (bindings/evidence span the whole repo); heavy
+# deps are stubbed — only PyYAML + pytest are required.
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.grc -t nexus-test-grc .
+FROM docker.io/alpine:3.24
+
+RUN apk add --no-cache python3 py3-pip
+ENV PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+RUN pip3 install --no-cache-dir "pytest>=7.4.0" "PyYAML>=6.0"
+
+COPY autonomous_dco_rnd/ /repo/autonomous_dco_rnd/
+
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/docs/governance:/repo/autonomous_dco_rnd \
+    GRC_REPORTS=/reports
+WORKDIR /repo/autonomous_dco_rnd
+
+# 1) emit the OSCAL AR + human report from the mounted reports (copied to /reports
+#    so they survive on the host), then 2) run the mock E2E lab whose real-half is
+#    the build-blocking gate and whose JUnit is grc.xml. Artifacts are emitted first
+#    so they persist even when the gate then fails the build.
+CMD ["sh", "-c", "python3 docs/governance/grc_assess.py --reports /reports --oscal-export \
+--sarif /reports/grc.sarif.json --out-dir /reports; \
+python3 -m pytest tests/lab_grc_assessment/ -v --tb=short --junit-xml=/reports/grc.xml"]

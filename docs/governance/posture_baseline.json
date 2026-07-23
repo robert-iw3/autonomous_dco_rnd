@@ -1,0 +1,31 @@
+{
+  "note": "Committed posture floor for the GRC gate. Raising it is a deliberate, reviewed commit; the build fails if posture drops below.",
+  "generated_from_controls": 36,
+  "posture": {
+    "owasp_llm": {
+      "pct": 90.0,
+      "covered": 9,
+      "applicable": 10
+    },
+    "atlas": {
+      "pct": 100.0,
+      "covered": 8,
+      "applicable": 8
+    },
+    "nist_ai_600_1": {
+      "pct": 92.9,
+      "covered": 13,
+      "applicable": 14
+    },
+    "sp_800_53": {
+      "pct": 82.4,
+      "covered": 28,
+      "applicable": 34
+    },
+    "csf_2_0": {
+      "pct": 100.0,
+      "covered": 6,
+      "applicable": 6
+    }
+  }
+}
