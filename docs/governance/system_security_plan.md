@@ -351,7 +351,7 @@ regenerated, so the SSP can never cite code that no longer exists. The multiple
 - **SEC-RLHF-QUARANTINE** — Sybil RLHF poisoning quarantine. *Evidence:* artifacts/SEC-RLHF-QUARANTINE.md — main.rs L90-L91,L135-L141,L132-L158
 - **SEC-SANITIZER** — Cognitive boundary isolation & untrusted-payload wrapping. *Evidence:* artifacts/SEC-SANITIZER.md — sanitizer.py L24-L48,L88-L96; expert_base.py L83-L84
 - **SEC-SUPPLY-CHAIN** — Cryptographic model supply-chain integrity (SHA-384). *Evidence:* artifacts/SEC-SUPPLY-CHAIN.md — serve_vllm.sh L48-L66,L68-L69
-- **SEC-TRAINING-HYGIENE** — Training-data hygiene & credential scrubbing. *Evidence:* artifacts/SEC-TRAINING-HYGIENE.md — 01_spool_datasets.py L47-L58
+- **SEC-TRAINING-HYGIENE** — Training-data hygiene & credential scrubbing. *Evidence:* artifacts/SEC-TRAINING-HYGIENE.md — 01_spool_datasets.py L49-L60
 - **SEC-VECTOR-DIM** — Vector dimensionality validation. *Evidence:* artifacts/SEC-VECTOR-DIM.md — qdrant_search.py L50-L50,L58-L72
 - **SIEM-CONFIG-CONTRACT** — SIEM config ↔ fanout index contract. *Evidence:* artifacts/SIEM-CONFIG-CONTRACT.md — nexus_config.py L147-L177
 - **SIEM-COUNTERPART-DISPROOF** — Review-board counterpart SIEM disproof. *Evidence:* artifacts/SIEM-COUNTERPART-DISPROOF.md — review_board.py L117-L127,L128-L156
