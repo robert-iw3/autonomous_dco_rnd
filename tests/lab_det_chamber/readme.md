@@ -6,22 +6,22 @@ test-first (TDD) and cumulatively: every phase adds tests + the deployment servi
 it needs, and the whole suite must stay green before the next phase lands.
 
 See the build plan and per-phase contracts in
-`project_empros/planning_docs/archive/DET_CHAMBER_INTEGRATION_PLAN.md`.
+`autonomous_dco_rnd/planning_docs/archive/DET_CHAMBER_INTEGRATION_PLAN.md`.
 
 ## Run
 
 Fast (host pytest, Phase 1 contract tests only — no containers):
 ```bash
-cd project_empros
+cd autonomous_dco_rnd
 pytest tests/lab_det_chamber/ -v
 ```
 
 Dockerized (mocks the deployment; the way CI runs it):
 ```bash
-cd project_empros/tests/lab_det_chamber
+cd autonomous_dco_rnd/tests/lab_det_chamber
 docker compose up --build --abort-on-container-exit lab-runner
 # or via the section runner:
-cd project_empros/tests && ./run_tests.sh --section detchamber
+cd autonomous_dco_rnd/tests && ./run_tests.sh --section detchamber
 ```
 
 ## Mocked deployment topology (grows per phase)

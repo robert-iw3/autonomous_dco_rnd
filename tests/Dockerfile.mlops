@@ -4,7 +4,7 @@
 #          test_worker_ti_ingest, mlops_eval_minilab/
 # Deps:    pytest, numpy, pandas, pyarrow, duckdb, fakeredis, safetensors,
 #          torch (CPU), requests, qdrant-client[grpc], rich, python-dotenv
-#   docker build -f project_empros/tests/Dockerfile.mlops -t nexus-test-mlops .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.mlops -t nexus-test-mlops .
 #
 # NOTE: Uses python:3.12-slim (Debian/glibc) instead of Alpine because PyTorch
 #       CPU wheels link against glibc symbols (pthread_attr_setaffinity_np) that
@@ -44,24 +44,24 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cpu \
     "torch>=2.3.0"
 
-COPY project_empros/mlops/                                  /repo/project_empros/mlops/
-COPY project_empros/services/worker_ti_ingest/              /repo/project_empros/services/worker_ti_ingest/
-COPY project_empros/adversarial_corpus_templates/           /repo/project_empros/adversarial_corpus_templates/
-COPY project_empros/tests/test_turbovec_mlops.py            /repo/project_empros/tests/
-COPY project_empros/tests/test_data_flow.py                 /repo/project_empros/tests/
-COPY project_empros/tests/test_track6_dryrun.py             /repo/project_empros/tests/
-COPY project_empros/tests/test_s3_query_alignment.py        /repo/project_empros/tests/
-COPY project_empros/tests/test_cross_source_temporal.py     /repo/project_empros/tests/
-COPY project_empros/tests/test_worker_ti_ingest.py          /repo/project_empros/tests/
-COPY project_empros/tests/test_siem_pivot_corpus.py         /repo/project_empros/tests/
-COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py  /repo/project_empros/tests/lab_mlops_train/
-COPY project_empros/tests/mlops_eval_minilab/               /repo/project_empros/tests/mlops_eval_minilab/
-COPY project_empros/tests/lab_s3_worker/                    /repo/project_empros/tests/lab_s3_worker/
-COPY project_empros/tests/pytest.ini                        /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py                       /repo/project_empros/tests/
+COPY autonomous_dco_rnd/mlops/                                  /repo/autonomous_dco_rnd/mlops/
+COPY autonomous_dco_rnd/services/worker_ti_ingest/              /repo/autonomous_dco_rnd/services/worker_ti_ingest/
+COPY autonomous_dco_rnd/adversarial_corpus_templates/           /repo/autonomous_dco_rnd/adversarial_corpus_templates/
+COPY autonomous_dco_rnd/tests/test_turbovec_mlops.py            /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_data_flow.py                 /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_track6_dryrun.py             /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_s3_query_alignment.py        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_cross_source_temporal.py     /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_worker_ti_ingest.py          /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_siem_pivot_corpus.py         /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/lab_mlops_train/test_rsi_loop.py  /repo/autonomous_dco_rnd/tests/lab_mlops_train/
+COPY autonomous_dco_rnd/tests/mlops_eval_minilab/               /repo/autonomous_dco_rnd/tests/mlops_eval_minilab/
+COPY autonomous_dco_rnd/tests/lab_s3_worker/                    /repo/autonomous_dco_rnd/tests/lab_s3_worker/
+COPY autonomous_dco_rnd/tests/pytest.ini                        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py                       /repo/autonomous_dco_rnd/tests/
 
-ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/mlops/scripts:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/test_turbovec_mlops.py", \

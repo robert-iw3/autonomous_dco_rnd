@@ -219,8 +219,8 @@ class TestMemoryEvidenceAutomation:
     def test_worker_memory_dockerfile_is_service_local(self):
         df = (PROJECT_ROOT / "services/worker_memory/Dockerfile").read_text()
         # built with context = the service dir (like worker_ti_ingest): COPY *.py, no
-        # outer project_empros/ prefix, and not a cargo build.
-        assert "COPY *.py" in df and "project_empros/" not in df
+        # outer autonomous_dco_rnd/ prefix, and not a cargo build.
+        assert "COPY *.py" in df and "autonomous_dco_rnd/" not in df
         assert "cargo" not in df and "alpine:3.24" in df
 
     def test_production_config_keys(self):

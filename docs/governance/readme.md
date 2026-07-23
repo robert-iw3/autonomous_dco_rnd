@@ -63,6 +63,7 @@ resolves.
 | **Control Catalog** (generated) | `controls_catalog.pdf` | Consolidated cross-correlation: OWASP · ATLAS · AI 600-1 · 800-53 · CSF (incl. CSF 2.0 category cross-ref) |
 | **Applicability & Gap Matrix** (generated) | `applicability_matrix.pdf` | Covered / GAP / N-A per framework; CSF 2.0 function & category coverage; outstanding addressable gaps + remediation |
 | **Control Evidence Dossier** (generated) | `control_evidence.pdf` | The *actual source code* answering each control as its **execution chain** (invocation → logic → execution), extracted + cited `file:line` (per-control under `artifacts/`) |
+| **Continuous Assessment Results** (generated, WS-H) | `assessment_report.pdf` | Each control's **proven** status (Satisfied / Failed / Not-Run / Documentation) derived from the pipeline's JUnit, framework posture, evidence-chain completeness, and open findings. Rendered from `assessment_results.json` (OSCAL AR); companion `oscal_ssp.json` + `oscal_poam.json` export. Produced by the `grc` test section (`grc_assess.py`) |
 | System Security Plan | `system_security_plan.pdf` | SP 800-53 families · CSF 2.0 functions · AI RMF; IaC hardening; secure ingestion/transmission path; **Annex B** code-evidence index |
 | AI System Inventory | `ai_system_inventory.pdf` | GV-1.6 (Models A–D + swarm + frontier) |
 | GAI Risk-Tier Statement | `gai_risk_tier_statement.pdf` | GV-1.3 (Tier 1 — autonomous/consequential) |

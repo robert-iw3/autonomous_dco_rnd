@@ -99,7 +99,7 @@ deployment_prep/
 ## Quick Start -- Online Phase
 
 ```bash
-cd project_empros/deployment_prep
+cd autonomous_dco_rnd/deployment_prep
 
 # Full end-to-end preparation (30–90 min depending on image sizes)
 make prep

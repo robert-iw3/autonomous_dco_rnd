@@ -36,7 +36,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-REPO     = Path(__file__).parent.parent.parent       # project_empros/
+REPO     = Path(__file__).parent.parent.parent       # autonomous_dco_rnd/
 ROOT     = REPO.parent
 TRANSMIT = ROOT / "windows" / "trellix_sql" / "transmit"
 

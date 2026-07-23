@@ -153,8 +153,8 @@ Joins the governance dossier into the graph: each control's implementing compone
 | `AI-PROVENANCE` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestProvenanceDisclosure |
 | `AI-REVIEW-BOARD` | implemented | llm_hunter_swarm | tests/lab_analytics_hunter/test_review_board.py, tests/lab_analytics_hunter/test_review_board_simulation.py |
 | `IAC-HARDENING` | implemented | - | infrastructure/tests/test_infrastructure.py |
-| `ING-DLQ-BREAKER` | implemented | lib_siem_core | tests/test_worker_contracts.py |
-| `ING-ZERO-TRUST` | implemented | core_ingress | tests/test_worker_contracts.py |
+| `ING-DLQ-BREAKER` | implemented | lib_siem_core | tests/test_worker_contracts.py::TestWorkerS3ArchiveDLQ, tests/test_worker_contracts.py::TestCognitiveFaultDLQ |
+| `ING-ZERO-TRUST` | implemented | core_ingress | tests/test_worker_contracts.py::TestEvidenceIngress |
 | `NC-1-BIAS-AUDIT` | implemented | llm_hunter_swarm | tests/lab_governance/test_nist_controls_wave2.py::TestBiasAudit |
 | `NC-10-VERDICT-LINEAGE` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestVerdictLineage, tests/lab_governance/test_nist_controls_wave4.py::TestVerdictLedger |
 | `NC-11-ENERGY-ACCOUNTING` | implemented | llm_hunter_swarm | tests/lab_governance/test_ai_controls.py::TestInferenceEnergy, tests/lab_governance/test_nist_controls_wave4.py::TestEnergyAccounting |
@@ -169,13 +169,13 @@ Joins the governance dossier into the graph: each control's implementing compone
 | `SEC-CANARY` | implemented | llm_hunter_swarm | tests/lab_agentic_swarm/test_agentic_swarm_contracts.py |
 | `SEC-DLP-EGRESS` | implemented | llm_hunter_swarm | tests/lab_redteam/test_cognitive_bypass.py |
 | `SEC-DUCKDB-SANDBOX` | implemented | llm_hunter_swarm | tests/lab_analytics_hunter/test_query_cookbook.py |
-| `SEC-ENDPOINT-ID` | implemented | lib_siem_core | tests/test_worker_contracts.py |
-| `SEC-FAILOVER` | implemented | llm_hunter_swarm | tests/test_worker_contracts.py |
+| `SEC-ENDPOINT-ID` | implemented | lib_siem_core | tests/test_worker_contracts.py::TestEndpointIdInjectionDefense |
+| `SEC-FAILOVER` | implemented | llm_hunter_swarm | tests/test_worker_contracts.py::TestLLMCircuitBreaker |
 | `SEC-IDEMPOTENT-SOAR` | implemented | llm_hunter_swarm, worker_soar | tests/lab_agentic_swarm/test_agentic_swarm_contracts.py |
 | `SEC-MODEL-DOS` | implemented | llm_hunter_swarm | tests/lab_agentic_swarm/test_agentic_swarm_contracts.py |
 | `SEC-OUTPUT-SCHEMA` | implemented | llm_hunter_swarm | tests/lab_agentic_swarm/test_agentic_swarm_contracts.py |
 | `SEC-REGRESSION-GATE` | implemented | mlops_pipeline | tests/lab_mlops_serving/test_mlops_serving.py |
-| `SEC-RLHF-QUARANTINE` | implemented | worker_rlhf | tests/test_worker_contracts.py |
+| `SEC-RLHF-QUARANTINE` | implemented | worker_rlhf | tests/test_worker_contracts.py::TestNATSSubjectAuth |
 | `SEC-SANITIZER` | implemented | llm_hunter_swarm | tests/lab_redteam/test_cognitive_bypass.py |
 | `SEC-SUPPLY-CHAIN` | implemented | - | tests/lab_mlops_serving/test_mlops_serving.py |
 | `SEC-TRAINING-HYGIENE` | implemented | mlops_pipeline | tests/lab_mlops_serving/test_mlops_serving.py |

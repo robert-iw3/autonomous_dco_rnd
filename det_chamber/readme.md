@@ -123,8 +123,8 @@ Test-first (TDD). The dockerized lab mocks the real deployment and runs real IaC
 modules; the endpoint outbound path + ingress endpoints have their own contracts.
 
 ```bash
-cd project_empros && pytest tests/lab_det_chamber/ -v          # fast host run
-cd project_empros/tests && ./run_tests.sh --section detchamber # dockerized (CI)
+cd autonomous_dco_rnd && pytest tests/lab_det_chamber/ -v          # fast host run
+cd autonomous_dco_rnd/tests && ./run_tests.sh --section detchamber # dockerized (CI)
 ```
 Lab details + per-file coverage: [`tests/lab_det_chamber/readme.md`](../tests/lab_det_chamber/readme.md).
 

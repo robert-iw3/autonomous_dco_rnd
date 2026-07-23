@@ -5,7 +5,7 @@
 #          Dockerfile is the only one that copies windows/ from repo root.
 # Deps:    pytest, numpy, PyYAML, pandas, pyarrow, pydantic, safetensors,
 #          torch (CPU), transformers, peft, trl, accelerate
-#   docker build -f project_empros/tests/Dockerfile.pipeline -t nexus-test-pipeline .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.pipeline -t nexus-test-pipeline .
 #
 # NOTE: Uses python:3.12-slim (Debian/glibc) instead of Alpine because PyTorch
 #       CPU wheels link against glibc symbols not present in musl libc.
@@ -46,24 +46,24 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir bitsandbytes || \
     echo "[warn] bitsandbytes skipped -- quantization tests will be skipped"
 
-# Mirror repo layout: project_empros at /repo/project_empros, windows at /repo/windows
+# Mirror repo layout: autonomous_dco_rnd at /repo/autonomous_dco_rnd, windows at /repo/windows
 # so REPO.parent/windows resolves correctly for test_phase1_pipeline.py
-COPY project_empros/mlops/                                  /repo/project_empros/mlops/
-COPY project_empros/services/worker_ti_ingest/              /repo/project_empros/services/worker_ti_ingest/
-COPY project_empros/services/model_steward/                 /repo/project_empros/services/model_steward/
-COPY project_empros/tests/test_phase1_pipeline.py           /repo/project_empros/tests/
-COPY project_empros/tests/test_phase2_pipeline.py           /repo/project_empros/tests/
-COPY project_empros/tests/test_phase3_guardrails.py         /repo/project_empros/tests/
-COPY project_empros/tests/lab_mlops_serving/                /repo/project_empros/tests/lab_mlops_serving/
-COPY project_empros/tests/lab_mlops_train/                  /repo/project_empros/tests/lab_mlops_train/
-COPY project_empros/tests/pytest.ini                        /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py                        /repo/project_empros/tests/
-COPY project_empros/tests/Execute-CognitiveBypass.sh        /repo/project_empros/tests/
-COPY project_empros/tests/Invoke-CrossPollinationStress.py  /repo/project_empros/tests/
+COPY autonomous_dco_rnd/mlops/                                  /repo/autonomous_dco_rnd/mlops/
+COPY autonomous_dco_rnd/services/worker_ti_ingest/              /repo/autonomous_dco_rnd/services/worker_ti_ingest/
+COPY autonomous_dco_rnd/services/model_steward/                 /repo/autonomous_dco_rnd/services/model_steward/
+COPY autonomous_dco_rnd/tests/test_phase1_pipeline.py           /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_phase2_pipeline.py           /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/test_phase3_guardrails.py         /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/lab_mlops_serving/                /repo/autonomous_dco_rnd/tests/lab_mlops_serving/
+COPY autonomous_dco_rnd/tests/lab_mlops_train/                  /repo/autonomous_dco_rnd/tests/lab_mlops_train/
+COPY autonomous_dco_rnd/tests/pytest.ini                        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py                        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/Execute-CognitiveBypass.sh        /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/Invoke-CrossPollinationStress.py  /repo/autonomous_dco_rnd/tests/
 COPY windows/                                               /repo/windows/
 
-ENV PYTHONPATH=/repo/project_empros/mlops/scripts:/repo/project_empros
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/mlops/scripts:/repo/autonomous_dco_rnd
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/test_phase1_pipeline.py", \

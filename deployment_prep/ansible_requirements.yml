@@ -1,5 +1,5 @@
 ---
-# Ansible Galaxy collections required by project_empros Ansible roles.
+# Ansible Galaxy collections required by autonomous_dco_rnd Ansible roles.
 # Download with: ansible-galaxy collection download -r ansible_requirements.yml -p ../deployment_prep/collections/
 # Install offline: ansible-galaxy collection install --offline -r ansible_requirements.yml -p /path/to/collections/
 

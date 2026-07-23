@@ -5,7 +5,7 @@
 #          containment, coverage/profile, nexus.siem.analyze consumer), and
 #          the Track 10 detection_training/ corpus builder.
 # Deps:    pytest, pydantic; langchain_core is stubbed in the tests.
-#   docker build -f project_empros/tests/Dockerfile.siemlab -t nexus-test-siemlab .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.siemlab -t nexus-test-siemlab .
 FROM docker.io/python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -15,16 +15,16 @@ RUN pip install --no-cache-dir \
     "pytest>=7.4.0" \
     "pydantic>=2.7.1"
 
-COPY project_empros/analytics/llm_hunter/        /repo/project_empros/analytics/llm_hunter/
-COPY project_empros/operations/infra/            /repo/project_empros/operations/infra/
-COPY project_empros/mlops/scripts/siem_analysis_track.py /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/benchmarks/            /repo/project_empros/mlops/benchmarks/
-COPY project_empros/detection_training/          /repo/project_empros/detection_training/
-COPY project_empros/tests/lab_agentic_siem/      /repo/project_empros/tests/lab_agentic_siem/
-COPY project_empros/tests/pytest.ini             /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py            /repo/project_empros/tests/
+COPY autonomous_dco_rnd/analytics/llm_hunter/        /repo/autonomous_dco_rnd/analytics/llm_hunter/
+COPY autonomous_dco_rnd/operations/infra/            /repo/autonomous_dco_rnd/operations/infra/
+COPY autonomous_dco_rnd/mlops/scripts/siem_analysis_track.py /repo/autonomous_dco_rnd/mlops/scripts/
+COPY autonomous_dco_rnd/mlops/benchmarks/            /repo/autonomous_dco_rnd/mlops/benchmarks/
+COPY autonomous_dco_rnd/detection_training/          /repo/autonomous_dco_rnd/detection_training/
+COPY autonomous_dco_rnd/tests/lab_agentic_siem/      /repo/autonomous_dco_rnd/tests/lab_agentic_siem/
+COPY autonomous_dco_rnd/tests/pytest.ini             /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py            /repo/autonomous_dco_rnd/tests/
 
-WORKDIR /repo/project_empros
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", "tests/lab_agentic_siem/", \
      "-v", "--tb=short", "--junit-xml=/reports/siemlab.xml"]

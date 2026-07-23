@@ -93,7 +93,7 @@
 
   <!-- BAND 4: DET CHAMBER (isolated, no egress) -->
   <rect x="30" y="550" width="1140" height="230" rx="6" fill="url(#chamber-bg)" stroke="#b91c1c" stroke-width="1.2" opacity="0.92"/>
-  <text x="50" y="570" fill="#fca5a5" font-size="10" font-weight="600" letter-spacing="2">4 -- DET CHAMBER (project_empros/det_chamber · ISOLATED · NO NETWORK EGRESS)</text>
+  <text x="50" y="570" fill="#fca5a5" font-size="10" font-weight="600" letter-spacing="2">4 -- DET CHAMBER (autonomous_dco_rnd/det_chamber · ISOLATED · NO NETWORK EGRESS)</text>
   <text x="1150" y="570" text-anchor="end" fill="#7f1d1d" font-size="9">detonated malware cannot propagate</text>
 
   <rect x="50" y="585" width="300" height="175" rx="4" fill="#1a0a0a" stroke="#ef4444" stroke-width="1.5"/>

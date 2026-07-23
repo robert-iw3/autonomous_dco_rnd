@@ -20,7 +20,7 @@ What this does NOT prove (requires full training):
   - Fine-tuned CoT quality (vs zero-shot Ollama quality tested here)
 
 Usage:
-    # From project_empros/tests/eval_minilab/
+    # From autonomous_dco_rnd/tests/eval_minilab/
     pip install -r requirements.txt
     cp .env.example .env   # edit as needed
     python eval_pipeline.py

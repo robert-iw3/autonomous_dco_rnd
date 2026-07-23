@@ -25,7 +25,7 @@ set -euo pipefail
 
 # Path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # project_empros/
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # autonomous_dco_rnd/
 REPO_ROOT="$(cd "$PROJECT_ROOT/.." && pwd)"
 
 # (disabled when not a tty)
@@ -51,7 +51,12 @@ SECTIONS=(
     "detchamber|Dockerfile.detchamber|Det Chamber engine + acquisition + intake/detonation lifecycle"
     "siem|Dockerfile.siemfed|SIEM-federated investigation mock E2E (CIM/ECS fanout + swarm pivot + counterpart disproof)"
     "siemlab|Dockerfile.siemlab|WS-J standalone agentic SIEM analysis — runner + coverage + Track 10 corpus"
+    "grc|Dockerfile.grc|GRC-as-Code continuous assessment — binds controls to real JUnit, scores posture, gates on posture_baseline.json (runs LAST, consumes all sections)"
 )
+
+# The grc section consumes every other section's JUnit, so it must run AFTER them
+# (last in sequential order; deferred past the parallel batch in --parallel mode).
+GRC_SECTION="grc"
 
 # -- Change → section trigger map ---------------------------------------------
 # Each entry: "regex_pattern:section1 section2 ..."
@@ -65,7 +70,8 @@ TRIGGERS=(
     "analytics/llm_hunter/tools/siem|analytics/llm_hunter/agents/review_board:analytics siem governance"
     "analytics/llm_hunter/:analytics services governance"
     "analytics/:analytics"
-    "docs/governance/:governance"
+    "docs/governance/grc_lib|docs/governance/grc_assess|docs/governance/controls_manifest|docs/governance/posture_baseline|tests/lab_grc_assessment:grc"
+    "docs/governance/:governance grc"
     "services/worker_memory/:memory"
     "tests/lab_memory_forensics:memory"
     "mlops/benchmarks/|mlops/scripts/09_benchmark_runner|mlops/scripts/10_freeze_replay_case|mlops/scripts/12_eval_qa|tests/lab_benchmarks:bench"
@@ -232,7 +238,7 @@ run_section() {
     # Remove stale report from a previous run
     rm -f "$report_xml"
 
-    local build_args=("-f" "project_empros/tests/${dockerfile}" "-t" "${image}")
+    local build_args=("-f" "autonomous_dco_rnd/tests/${dockerfile}" "-t" "${image}")
     [[ $REBUILD -eq 1 ]] && build_args+=("--no-cache")
 
     echo -e "${CYAN}[${name}]${RESET} building ${dockerfile}..."
@@ -345,6 +351,23 @@ case "$MODE" in
         ;;
 esac
 
+# Continuous assessment: whenever any section is queued in change-detect mode, the
+# GRC gate re-runs too (a change to a control-backing file can flip proven posture).
+if [[ "$MODE" == "auto" && ${#SECTIONS_TO_RUN[@]} -gt 0 ]]; then
+    SECTIONS_TO_RUN+=("$GRC_SECTION")
+fi
+
+# The grc section consumes every other section's JUnit → force it to run LAST
+# (and de-duplicate if it was queued more than once).
+if [[ ${#SECTIONS_TO_RUN[@]} -gt 0 ]]; then
+    _reordered=(); _has_grc=0
+    for s in "${SECTIONS_TO_RUN[@]}"; do
+        if [[ "$s" == "$GRC_SECTION" ]]; then _has_grc=1; else _reordered+=("$s"); fi
+    done
+    [[ $_has_grc -eq 1 ]] && _reordered+=("$GRC_SECTION")
+    SECTIONS_TO_RUN=("${_reordered[@]}")
+fi
+
 # Print header
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════════════════════════${RESET}"
@@ -357,10 +380,15 @@ FAIL_COUNT=0
 FAILED_SECTIONS=()
 
 if [[ $PARALLEL -eq 1 ]]; then
-    # Parallel: launch all sections concurrently, collect exit codes
+    # Parallel: launch all sections concurrently EXCEPT grc, which must consume
+    # their finished JUnit — it runs sequentially after the batch drains.
     declare -A PIDS
     declare -A PIPE_FILES
+    PARALLEL_BATCH=(); RUN_GRC_AFTER=0
     for sec in "${SECTIONS_TO_RUN[@]}"; do
+        if [[ "$sec" == "$GRC_SECTION" ]]; then RUN_GRC_AFTER=1; else PARALLEL_BATCH+=("$sec"); fi
+    done
+    for sec in "${PARALLEL_BATCH[@]}"; do
         dockerfile=""
         for entry in "${SECTIONS[@]}"; do
             [[ "$(section_name "$entry")" == "$sec" ]] && dockerfile="$(section_file "$entry")" && break
@@ -386,6 +414,21 @@ if [[ $PARALLEL -eq 1 ]]; then
             FAILED_SECTIONS+=("$sec")
         fi
     done
+
+    # grc runs after the parallel batch drains (it reads their JUnit)
+    if [[ $RUN_GRC_AFTER -eq 1 ]]; then
+        grc_dockerfile=""
+        for entry in "${SECTIONS[@]}"; do
+            [[ "$(section_name "$entry")" == "$GRC_SECTION" ]] && grc_dockerfile="$(section_file "$entry")" && break
+        done
+        echo ""
+        if run_section "$GRC_SECTION" "$grc_dockerfile"; then
+            (( PASS_COUNT++ )) || true
+        else
+            (( FAIL_COUNT++ )) || true
+            FAILED_SECTIONS+=("$GRC_SECTION")
+        fi
+    fi
 else
     # Sequential
     for sec in "${SECTIONS_TO_RUN[@]}"; do

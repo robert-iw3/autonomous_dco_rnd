@@ -7,6 +7,10 @@ periodic AI-governance control as a *running* job, not just implemented logic:
   * NC-1  bias / homogenization audit         (agents/bias_audit.collect_and_audit)
   * NC-2  calibration + over-reliance report  (agents/calibration_ledger.over_reliance)
   * NC-7  inference-endpoint abuse monitor    (agents/endpoint_abuse_monitor.collect_and_monitor)
+  * WS-H  GRC continuous re-assessment        (docs/governance/grc_assess) — re-derives
+          proven control posture from the latest JUnit, appends the posture ledger, and
+          flags on regression / any open finding, so posture is monitored continuously
+          (not only on commit).
 
 Each job is fail-soft and isolated: one job raising never blocks the others, and
 the runner returns a per-job status so the timer's journal shows what ran. The
@@ -57,10 +61,26 @@ def default_jobs() -> Dict[str, Callable[[], Any]]:
         recs = calibration_ledger.load_ledger()
         return calibration_ledger.over_reliance(recs)
 
+    def _grc_reassessment():
+        # WS-H: re-derive proven posture from the latest reports, append the ledger,
+        # and flag on regression or any open finding. Imported locally (governance
+        # engine lives under docs/governance) so this module loads without it.
+        import sys
+        gov = Path(__file__).resolve().parents[3] / "docs/governance"
+        sys.path.insert(0, str(gov))
+        import grc_lib, grc_assess
+        junit = grc_lib.load_junit()
+        a = grc_assess.assess(junit)
+        p = grc_assess.posture(a)
+        grc_assess.append_ledger(a, p, grc_assess._timestamp(grc_lib.DEFAULT_REPORTS))
+        ok, _reasons = grc_assess.gate(a, p, grc_assess.load_baseline())
+        return {"flagged": (not ok) or any(x["finding"] for x in a)}
+
     return {
         "bias_audit": bias_audit.collect_and_audit,
         "over_reliance": _reliance,
         "endpoint_abuse": endpoint_abuse_monitor.collect_and_monitor,
+        "grc_assessment": _grc_reassessment,
     }
 
 

@@ -4,7 +4,7 @@
 #           write<->read conservation + counterpart prevalence disproof)
 # Deps:    pytest, requests, pyyaml. langchain is stubbed at module level; the
 #          mock SIEM is an in-process http.server (no real Splunk/Elastic).
-#   docker build -f project_empros/tests/Dockerfile.siemfed -t nexus-test-siemfed .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.siemfed -t nexus-test-siemfed .
 FROM docker.io/alpine:3.23
 
 RUN apk add --no-cache python3 py3-pip
@@ -18,13 +18,13 @@ RUN pip3 install --no-cache-dir \
     "requests>=2.31.0" \
     "pyyaml>=6.0"
 
-COPY project_empros/analytics/llm_hunter/tools/  /repo/project_empros/analytics/llm_hunter/tools/
-COPY project_empros/middleware/config/           /repo/project_empros/middleware/config/
-COPY project_empros/tests/lab_siem_federation/   /repo/project_empros/tests/lab_siem_federation/
-COPY project_empros/tests/pytest.ini             /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py            /repo/project_empros/tests/
+COPY autonomous_dco_rnd/analytics/llm_hunter/tools/  /repo/autonomous_dco_rnd/analytics/llm_hunter/tools/
+COPY autonomous_dco_rnd/middleware/config/           /repo/autonomous_dco_rnd/middleware/config/
+COPY autonomous_dco_rnd/tests/lab_siem_federation/   /repo/autonomous_dco_rnd/tests/lab_siem_federation/
+COPY autonomous_dco_rnd/tests/pytest.ini             /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py            /repo/autonomous_dco_rnd/tests/
 
-WORKDIR /repo/project_empros
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/lab_siem_federation/", \

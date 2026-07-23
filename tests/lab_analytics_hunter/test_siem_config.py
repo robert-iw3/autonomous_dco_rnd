@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-PE = Path(__file__).parent.parent.parent                    # project_empros/
+PE = Path(__file__).parent.parent.parent                    # autonomous_dco_rnd/
 HUNTER = PE / "analytics/llm_hunter"
 sys.path.insert(0, str(HUNTER / "tools"))
 

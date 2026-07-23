@@ -2,7 +2,7 @@
 # Tests:   tests/test_turbovec_mlops.py  (58)
 #          tests/lab_mlops_train/test_rsi_loop.py  (49)
 # Deps:    pytest + numpy only -- duckdb/torch are stubbed at module level
-#   docker build -f project_empros/tests/Dockerfile.offline -t nexus-test-offline .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.offline -t nexus-test-offline .
 FROM docker.io/alpine:3.23
 
 RUN apk add --no-cache python3 py3-pip py3-numpy
@@ -13,15 +13,15 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
 
 RUN pip3 install --no-cache-dir "pytest>=7.4.0"
 
-COPY project_empros/mlops/scripts/                           /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/data/                              /repo/project_empros/mlops/data/
-COPY project_empros/tests/test_turbovec_mlops.py             /repo/project_empros/tests/
-COPY project_empros/tests/lab_mlops_train/test_rsi_loop.py   /repo/project_empros/tests/lab_mlops_train/
-COPY project_empros/tests/pytest.ini                         /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py                         /repo/project_empros/tests/
+COPY autonomous_dco_rnd/mlops/scripts/                           /repo/autonomous_dco_rnd/mlops/scripts/
+COPY autonomous_dco_rnd/mlops/data/                              /repo/autonomous_dco_rnd/mlops/data/
+COPY autonomous_dco_rnd/tests/test_turbovec_mlops.py             /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/lab_mlops_train/test_rsi_loop.py   /repo/autonomous_dco_rnd/tests/lab_mlops_train/
+COPY autonomous_dco_rnd/tests/pytest.ini                         /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py                         /repo/autonomous_dco_rnd/tests/
 
-ENV PYTHONPATH=/repo/project_empros/mlops/scripts
-WORKDIR /repo/project_empros
+ENV PYTHONPATH=/repo/autonomous_dco_rnd/mlops/scripts
+WORKDIR /repo/autonomous_dco_rnd
 
 CMD ["python3", "-m", "pytest", \
      "tests/test_turbovec_mlops.py", \

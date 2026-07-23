@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """gen_code_graph.py - generate the codebase dependency/link graph.
 
-Scans project_empros and emits, from source (so it never drifts):
-  * code_graph.json - machine-readable nodes + edges (fast lookup / jq)
+Scans autonomous_dco_rnd and emits, from source (so it never drifts):
+  * code_graph.json  - machine-readable nodes + edges (fast lookup / jq)
   * CODE_GRAPH.md    - human guide: the NATS subject bus (the system's nervous
                        system, cross-language), a component index, and Python imports.
 

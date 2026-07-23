@@ -1,5 +1,5 @@
 # SECTION: bench — WS-A benchmark harness (registry + runner + score-file contract)
-#   docker build -f project_empros/tests/Dockerfile.bench -t nexus-test-bench .
+#   docker build -f autonomous_dco_rnd/tests/Dockerfile.bench -t nexus-test-bench .
 FROM docker.io/alpine:3.24
 
 # numpy backs the TurboVec near-duplicate index the leakage gate runs on.
@@ -9,12 +9,12 @@ RUN pip3 install --no-cache-dir "pytest>=7.4.0"
 
 # The benchmark runner, eval-QA gates, RSI loop (gate-activation test) and the
 # registry they load.
-COPY project_empros/mlops/scripts/        /repo/project_empros/mlops/scripts/
-COPY project_empros/mlops/benchmarks/     /repo/project_empros/mlops/benchmarks/
-COPY project_empros/tests/lab_benchmarks/ /repo/project_empros/tests/lab_benchmarks/
-COPY project_empros/tests/pytest.ini      /repo/project_empros/tests/
-COPY project_empros/tests/conftest.py     /repo/project_empros/tests/
+COPY autonomous_dco_rnd/mlops/scripts/        /repo/autonomous_dco_rnd/mlops/scripts/
+COPY autonomous_dco_rnd/mlops/benchmarks/     /repo/autonomous_dco_rnd/mlops/benchmarks/
+COPY autonomous_dco_rnd/tests/lab_benchmarks/ /repo/autonomous_dco_rnd/tests/lab_benchmarks/
+COPY autonomous_dco_rnd/tests/pytest.ini      /repo/autonomous_dco_rnd/tests/
+COPY autonomous_dco_rnd/tests/conftest.py     /repo/autonomous_dco_rnd/tests/
 
-WORKDIR /repo/project_empros
+WORKDIR /repo/autonomous_dco_rnd
 CMD ["python3", "-m", "pytest", "tests/lab_benchmarks/", \
      "-v", "--tb=short", "--junit-xml=/reports/bench.xml"]

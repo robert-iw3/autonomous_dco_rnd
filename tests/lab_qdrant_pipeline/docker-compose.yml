@@ -1,6 +1,6 @@
 ---
 # Lab 4: Qdrant Vector Worker Pipeline
-# Run from project_empros/tests/lab_qdrant_pipeline/:
+# Run from autonomous_dco_rnd/tests/lab_qdrant_pipeline/:
 #   docker compose up -d
 #   pytest test_qdrant_pipeline.py -v
 

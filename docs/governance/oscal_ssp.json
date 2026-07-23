@@ -1,0 +1,1046 @@
+{
+  "system-security-plan": {
+    "uuid": "e40e5ac6-ef67-5dfe-8370-519fd95254f4",
+    "metadata": {
+      "title": "Sentinel Nexus \u2014 System Security Plan (generated)",
+      "last-modified": "2026-07-23T15:22:52+00:00",
+      "version": "1.0",
+      "oscal-version": "1.1.2"
+    },
+    "import-profile": {
+      "href": "./_oscal_sp800-53_rev5.json"
+    },
+    "system-characteristics": {
+      "system-name": "Sentinel Nexus",
+      "description": "Sovereign autonomous SOC platform (generated SSP excerpt).",
+      "status": {
+        "state": "operational"
+      }
+    },
+    "control-implementation": {
+      "description": "Implemented requirements derived from the controls manifest and proven by the continuous assessment.",
+      "implemented-requirements": [
+        {
+          "uuid": "6e3953de-973a-5f48-95b4-3ed3e46de99b",
+          "control-id": "ac-17",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Remote Access"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ac-17_stmt",
+              "uuid": "1426faee-a010-585c-abc0-03f49ea69a15",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "b6d50a95-07d1-5fbb-872c-30c88022dd78",
+          "control-id": "ac-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Access Enforcement"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-DUCKDB-SANDBOX, SIEM-TOOL-GUARD"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-DUCKDB-SANDBOX, SIEM-TOOL-GUARD"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ac-3_stmt",
+              "uuid": "2f18ff2c-9474-5e73-ac46-5754f627a7a9",
+              "description": "Addressed by SEC-DUCKDB-SANDBOX, SIEM-TOOL-GUARD; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "bb3f94e8-28a3-58ed-9750-b382ba3f9710",
+          "control-id": "ac-4",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Information Flow Enforcement"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-7-ENDPOINT-ABUSE, SEC-DLP-EGRESS, SEC-TRAINING-HYGIENE, SIEM-CONFIG-CONTRACT, SIEM-TOOL-GUARD"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-7-ENDPOINT-ABUSE, SEC-TRAINING-HYGIENE, SIEM-CONFIG-CONTRACT, SIEM-TOOL-GUARD"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ac-4_stmt",
+              "uuid": "ecfac60a-9d31-56f4-a919-8c60f714a289",
+              "description": "Addressed by NC-7-ENDPOINT-ABUSE, SEC-DLP-EGRESS, SEC-TRAINING-HYGIENE, SIEM-CONFIG-CONTRACT, SIEM-TOOL-GUARD; proven by 4 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "87db274c-2a64-59d0-ada4-ce0839349698",
+          "control-id": "ac-6",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Least Privilege"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ac-6_stmt",
+              "uuid": "efb314fa-35c9-5f45-b483-f1c2ae3c5318",
+              "description": "Addressed by SEC-BLAST-RADIUS, SEC-DUCKDB-SANDBOX; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "b3bfd6bd-ebca-5f87-b286-6027afd186f7",
+          "control-id": "ac-7",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Unsuccessful Logon Attempts"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-ZERO-TRUST"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-ZERO-TRUST"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ac-7_stmt",
+              "uuid": "dfa8ea59-9397-5416-bc9c-7d8288279335",
+              "description": "Addressed by ING-ZERO-TRUST; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "c21d5519-3124-50f0-a149-adfe4e7b26ae",
+          "control-id": "au-10",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Non-repudiation"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-10-VERDICT-LINEAGE"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-10-VERDICT-LINEAGE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-10_stmt",
+              "uuid": "22f4ac4a-4b12-5e9b-a2f6-a89222bcfc12",
+              "description": "Addressed by NC-10-VERDICT-LINEAGE; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "98bf3e8c-0f73-54a9-97ee-0f2bbce745f3",
+          "control-id": "au-12",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Audit Record Generation"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-12_stmt",
+              "uuid": "75a40aab-be1b-5c8f-a62a-4d69a34bec6d",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "a249a2bc-0fab-5fab-84d5-2c10987574bf",
+          "control-id": "au-2",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Event Logging"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-2_stmt",
+              "uuid": "3b6c52c8-f155-5edf-a648-2ea12aa35aff",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "53bc1132-c778-52ea-b434-21028a19dadb",
+          "control-id": "au-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Content of Audit Records"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "AI-PROVENANCE"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "AI-PROVENANCE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-3_stmt",
+              "uuid": "209dc7fd-dd76-51d3-9dfe-20011ba06f92",
+              "description": "Addressed by AI-PROVENANCE; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "d8d3d992-1e84-54c1-b0aa-97ac8a806444",
+          "control-id": "au-6",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Audit Record Review, Analysis, and Reporting"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-8-OVER-RELIANCE"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-8-OVER-RELIANCE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-6_stmt",
+              "uuid": "789b120c-3a32-57be-8f54-c4d75df7cf56",
+              "description": "Addressed by NC-1-BIAS-AUDIT, NC-2-CALIBRATION, NC-8-OVER-RELIANCE; proven by 3 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "ad80b4e2-1978-5a43-bb77-b93b7106e882",
+          "control-id": "au-9",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Protection of Audit Information"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "AI-MEMORY-TTL, NC-10-VERDICT-LINEAGE, NC-4-RETENTION"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "AI-MEMORY-TTL, NC-10-VERDICT-LINEAGE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "au-9_stmt",
+              "uuid": "aca1aa3a-75b5-5486-8bce-6141ec7adb8b",
+              "description": "Addressed by AI-MEMORY-TTL, NC-10-VERDICT-LINEAGE, NC-4-RETENTION; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "bc7f978b-3c29-520c-b1fa-c9bc385a2c59",
+          "control-id": "ca-2",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Control Assessments"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-REGRESSION-GATE, SIEM-E2E"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-REGRESSION-GATE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ca-2_stmt",
+              "uuid": "5b29b8ce-280c-59df-9f95-334cbe4b870a",
+              "description": "Addressed by SEC-REGRESSION-GATE, SIEM-E2E; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "51885d47-251f-5f31-b9fe-35bbd6b96986",
+          "control-id": "ca-7",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Continuous Monitoring"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-2-CALIBRATION, NC-8-OVER-RELIANCE, NC-9-ACTIVE-LEARNING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-2-CALIBRATION, NC-8-OVER-RELIANCE, NC-9-ACTIVE-LEARNING"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ca-7_stmt",
+              "uuid": "2ced4657-0c35-5b88-b10e-32d65a9a1ceb",
+              "description": "Addressed by NC-2-CALIBRATION, NC-8-OVER-RELIANCE, NC-9-ACTIVE-LEARNING; proven by 3 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "bac0b9b2-2333-58bf-8c17-146f5de28b10",
+          "control-id": "cm-2",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Baseline Configuration"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "cm-2_stmt",
+              "uuid": "7b8d215b-f7b4-500e-80e6-201fc207ebce",
+              "description": "Addressed by NC-3-FRONTIER-PIN, SIEM-CONFIG-CONTRACT; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "0ae31bd6-d251-5172-8212-b296d0c0616f",
+          "control-id": "cm-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Configuration Change Control"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-REGRESSION-GATE"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-REGRESSION-GATE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "cm-3_stmt",
+              "uuid": "f5eb9cc7-fbf1-5f16-b30d-e86858d08e16",
+              "description": "Addressed by SEC-REGRESSION-GATE; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "b3c7535f-b511-5514-a147-13946aa4bc77",
+          "control-id": "cm-7",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Least Functionality"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING, SEC-DUCKDB-SANDBOX"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-DUCKDB-SANDBOX"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "cm-7_stmt",
+              "uuid": "a3b269f6-c0f4-5bd3-9926-7c1e2d548885",
+              "description": "Addressed by IAC-HARDENING, SEC-DUCKDB-SANDBOX; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "3357e1cf-3d6e-553e-a654-6d3218bb22fc",
+          "control-id": "cp-10",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "System Recovery and Reconstitution"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-DLQ-BREAKER, SEC-FAILOVER"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-DLQ-BREAKER, SEC-FAILOVER"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "cp-10_stmt",
+              "uuid": "4d83b47b-358a-51bc-aa15-3677e43411fe",
+              "description": "Addressed by ING-DLQ-BREAKER, SEC-FAILOVER; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "54d0ae8d-f4a3-5062-bbe7-fe93c85acc64",
+          "control-id": "ia-5",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Authenticator Management"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ia-5_stmt",
+              "uuid": "50a76298-f833-5950-bfdf-5851e3aeb249",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "4c8e0d0e-b91e-5417-9823-0dafb8a120f4",
+          "control-id": "ra-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Risk Assessment"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "AI-REVIEW-BOARD, NC-1-BIAS-AUDIT"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "AI-REVIEW-BOARD, NC-1-BIAS-AUDIT"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "ra-3_stmt",
+              "uuid": "4a4ff304-5627-5f01-8268-118aa7106b43",
+              "description": "Addressed by AI-REVIEW-BOARD, NC-1-BIAS-AUDIT; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "9006be0a-2051-5f3e-a4a7-42ae6d859157",
+          "control-id": "sc-16",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Transmission of Security and Privacy Attributes"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-ZERO-TRUST"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-ZERO-TRUST"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-16_stmt",
+              "uuid": "b40d31b9-3689-5631-8b6a-d14dd02b5064",
+              "description": "Addressed by ING-ZERO-TRUST; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "b028046b-79b0-5a28-91bc-d611d84e78a5",
+          "control-id": "sc-28",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Protection of Information at Rest"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "AI-MEMORY-TTL, NC-4-RETENTION"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "AI-MEMORY-TTL"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-28_stmt",
+              "uuid": "0ac186f8-3571-5066-923a-ee34ed15e82c",
+              "description": "Addressed by AI-MEMORY-TTL, NC-4-RETENTION; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "a5754c25-129e-5dea-8547-d81812174936",
+          "control-id": "sc-5",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Denial-of-service Protection"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING, NC-7-ENDPOINT-ABUSE, SEC-IDEMPOTENT-SOAR, SEC-MODEL-DOS"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-7-ENDPOINT-ABUSE, SEC-IDEMPOTENT-SOAR, SEC-MODEL-DOS"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-5_stmt",
+              "uuid": "7c0d5028-22e4-5da8-9f32-2a4f79aa9dd8",
+              "description": "Addressed by IAC-HARDENING, NC-7-ENDPOINT-ABUSE, SEC-IDEMPOTENT-SOAR, SEC-MODEL-DOS; proven by 3 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "e962f4c1-82b8-529d-979f-99b25bf53eeb",
+          "control-id": "sc-6",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Resource Availability"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-MODEL-DOS"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-MODEL-DOS"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-6_stmt",
+              "uuid": "8feb5bdd-02ac-5c72-a053-15720553a0ac",
+              "description": "Addressed by SEC-MODEL-DOS; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "81adaf70-73a8-58ef-9cbd-b078e9c15be4",
+          "control-id": "sc-7",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Boundary Protection"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING, ING-ZERO-TRUST, SEC-DLP-EGRESS"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-ZERO-TRUST"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-7_stmt",
+              "uuid": "f02cc862-c0da-5006-bda9-70e19bb53488",
+              "description": "Addressed by IAC-HARDENING, ING-ZERO-TRUST, SEC-DLP-EGRESS; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "7ddc7739-ff98-524b-b3e4-47750a30c7a2",
+          "control-id": "sc-8",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Transmission Confidentiality and Integrity"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-ZERO-TRUST"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-ZERO-TRUST"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sc-8_stmt",
+              "uuid": "c70dfa02-6345-539c-ba25-c3fa29682a11",
+              "description": "Addressed by ING-ZERO-TRUST; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "048832b3-472f-5355-92f2-e8419d8e682f",
+          "control-id": "si-10",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Information Input Validation"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA, SEC-RLHF-QUARANTINE, SEC-SANITIZER, SEC-VECTOR-DIM, SIEM-TOOL-GUARD"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA, SEC-RLHF-QUARANTINE, SEC-VECTOR-DIM, SIEM-TOOL-GUARD"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-10_stmt",
+              "uuid": "5da0aaaa-4d9b-5ab2-ba1a-ddba51a41383",
+              "description": "Addressed by ING-ZERO-TRUST, SEC-DUCKDB-SANDBOX, SEC-ENDPOINT-ID, SEC-IDEMPOTENT-SOAR, SEC-OUTPUT-SCHEMA, SEC-RLHF-QUARANTINE, SEC-SANITIZER, SEC-VECTOR-DIM, SIEM-TOOL-GUARD; proven by 8 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "48328fc4-63c3-5f91-9046-2b0b0f812847",
+          "control-id": "si-12",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Information Management and Retention"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-4-RETENTION, SEC-TRAINING-HYGIENE"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-TRAINING-HYGIENE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-12_stmt",
+              "uuid": "3ce2c77d-cc14-5563-a176-e67912431dab",
+              "description": "Addressed by NC-4-RETENTION, SEC-TRAINING-HYGIENE; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "c16a5f94-b64f-56ac-b08e-90f9b383e6ab",
+          "control-id": "si-16",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Memory Protection"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-16_stmt",
+              "uuid": "a4a7b3ee-23bb-54b1-90c2-9c0930438c4b",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "f635752c-d798-5e46-9d66-ab7e94bd2bdc",
+          "control-id": "si-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Malicious Code Protection"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "IAC-HARDENING"
+            },
+            {
+              "name": "implementation-status",
+              "value": "planned",
+              "class": "unproven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "\u2014"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-3_stmt",
+              "uuid": "99b6a341-286a-596f-bebd-944df2b3cf26",
+              "description": "Addressed by IAC-HARDENING; proven by 0 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "4e58e43a-312e-5460-a10f-4e585b9b7e23",
+          "control-id": "si-4",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "System Monitoring"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "ING-DLQ-BREAKER, NC-7-ENDPOINT-ABUSE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-RLHF-QUARANTINE, SIEM-E2E"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "ING-DLQ-BREAKER, NC-7-ENDPOINT-ABUSE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-RLHF-QUARANTINE"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-4_stmt",
+              "uuid": "9794d83f-e7b0-50e0-9c88-6d0f47178e06",
+              "description": "Addressed by ING-DLQ-BREAKER, NC-7-ENDPOINT-ABUSE, NC-9-ACTIVE-LEARNING, SEC-CANARY, SEC-FAILOVER, SEC-RLHF-QUARANTINE, SIEM-E2E; proven by 6 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "0264add6-7abc-5653-b3f4-8e6bc1f3d834",
+          "control-id": "si-7",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Software, Firmware, and Information Integrity"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "AI-GROUNDING, AI-REVIEW-BOARD, IAC-HARDENING, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, SEC-BLAST-RADIUS, SEC-CANARY, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SUPPLY-CHAIN"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "AI-GROUNDING, AI-REVIEW-BOARD, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, SEC-BLAST-RADIUS, SEC-CANARY, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SUPPLY-CHAIN"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "si-7_stmt",
+              "uuid": "e5de6da8-cc18-52bd-a9c1-c15585841401",
+              "description": "Addressed by AI-GROUNDING, AI-REVIEW-BOARD, IAC-HARDENING, ING-ZERO-TRUST, NC-10-VERDICT-LINEAGE, SEC-BLAST-RADIUS, SEC-CANARY, SEC-OUTPUT-SCHEMA, SEC-REGRESSION-GATE, SEC-RLHF-QUARANTINE, SEC-SUPPLY-CHAIN; proven by 10 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "b49b4dd7-a7c1-5109-9a57-2fbcd5383c77",
+          "control-id": "sr-11",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Component Authenticity"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-SUPPLY-CHAIN"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-SUPPLY-CHAIN"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sr-11_stmt",
+              "uuid": "e95f0a72-5d88-5509-a0ca-13fc159e776b",
+              "description": "Addressed by SEC-SUPPLY-CHAIN; proven by 1 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "9ad4fb7c-8a57-5a7d-a6a3-c7d546145467",
+          "control-id": "sr-3",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Supply Chain Controls and Processes"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sr-3_stmt",
+              "uuid": "93126146-032d-510b-a6bf-e7fc345df552",
+              "description": "Addressed by NC-3-FRONTIER-PIN, SEC-SUPPLY-CHAIN; proven by 2 Satisfied control(s)."
+            }
+          ]
+        },
+        {
+          "uuid": "3cdcd744-236e-5ad3-bc7f-6c894ba9bcde",
+          "control-id": "sr-4",
+          "props": [
+            {
+              "name": "control-title",
+              "value": "Provenance"
+            },
+            {
+              "name": "implementing-controls",
+              "value": "SEC-SUPPLY-CHAIN"
+            },
+            {
+              "name": "implementation-status",
+              "value": "implemented",
+              "class": "proven"
+            },
+            {
+              "name": "satisfied-by",
+              "value": "SEC-SUPPLY-CHAIN"
+            }
+          ],
+          "statements": [
+            {
+              "statement-id": "sr-4_stmt",
+              "uuid": "bef6903e-5a23-50e0-9889-5dd54905c89b",
+              "description": "Addressed by SEC-SUPPLY-CHAIN; proven by 1 Satisfied control(s)."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
