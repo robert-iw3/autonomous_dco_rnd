@@ -31,10 +31,8 @@ flowchart LR
     det_chamber(["det_chamber"]) -->|nexus.detonation.intake| det_chamber(["det_chamber"])
     llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.dlq.cognitive| ?(["?"])
     llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.hud.telemetry| ?(["?"])
-    ?(["?"]) -->|nexus.memory.cleanup| worker_memory(["worker_memory"])
-    worker_memory(["worker_memory"]) -->|nexus.memory.cleanup.audit| ?(["?"])
     worker_memory(["worker_memory"]) -->|nexus.memory.enrichment| ?(["?"])
-    core_ingress(["core_ingress"]) -->|nexus.memory.intake| worker_memory(["worker_memory"])
+    core_ingress(["core_ingress"]) -->|nexus.memory.intake| ?(["?"])
     llm_hunter_swarm(["llm_hunter_swarm"]) -->|nexus.metrics.investigation| ?(["?"])
     mlops_pipeline(["mlops_pipeline"]) -->|nexus.models.promote| model_steward(["model_steward"])
     ?(["?"]) -->|nexus.models.promoted| mlops_pipeline(["mlops_pipeline"])
@@ -68,12 +66,11 @@ flowchart LR
 | `nexus.dlq` | - | - | - | lib_siem_core, worker_rlhf, worker_s3_archive |
 | `nexus.dlq.>` | - | - | Nexus_DLQ | nats_streams |
 | `nexus.dlq.cognitive` | llm_hunter_swarm | - | - | - |
+| `nexus.dlq.memory_projection` | - | - | - | worker_memory |
 | `nexus.hud.telemetry` | llm_hunter_swarm | - | - | - |
 | `nexus.macos.telemetry` | - | - | - | mlops_pipeline |
-| `nexus.memory.cleanup` | - | worker_memory | - | - |
-| `nexus.memory.cleanup.audit` | worker_memory | - | - | - |
 | `nexus.memory.enrichment` | worker_memory | - | Nexus_Memory_Enrichment | nats_streams |
-| `nexus.memory.intake` | core_ingress | worker_memory | Nexus_Memory_Intake | nats_streams |
+| `nexus.memory.intake` | core_ingress | - | Nexus_Memory_Intake | nats_streams, worker_memory |
 | `nexus.metrics.investigation` | llm_hunter_swarm | - | Nexus_Metrics_Investigation | nats_streams |
 | `nexus.models.promote` | mlops_pipeline | model_steward | - | - |
 | `nexus.models.promoted` | - | mlops_pipeline | - | model_steward |
@@ -120,26 +117,27 @@ Each component: language, how it's **built** (Dockerfile), **deployed** (Ansible
 | Component | Lang | Build | Deploy (role @ host) | Test section | Pub -> Sub | Crate deps | Controls | Files |
 |---|---|---|---|---|---|---|---|---|
 | **core_ingress** | rust | services/core_ingress/Dockerfile | rust_ingress @ ingress | services | 2->1 | - | 1 | 2 |
-| **det_chamber** | python | det_chamber/agents/Dockerfile | - | detchamber | 2->2 | - | 0 | 14 |
-| **ir_playbooks** | mixed | operations/playbooks/Dockerfile | - | services | 0->0 | - | 0 | 410 |
-| **lib_siem_core** | rust | libs/lib_siem_core/Dockerfile | - | services | 0->1 | - | 2 | 2 |
+| **det_chamber** | python | - | - | detchamber | 2->2 | - | 0 | 14 |
+| **dfir_platform** | python | - | - | memory | 0->0 | - | 0 | 4 |
+| **ir_playbooks** | mixed | - | - | services | 0->0 | - | 0 | 410 |
+| **lib_siem_core** | rust | - | - | services | 0->1 | - | 2 | 2 |
 | **llm_hunter_swarm** | python | analytics/llm_hunter/Dockerfile | nexus_hunter @ analytics | analytics | 5->4 | - | 25 | 47 |
 | **looking_glass** | svelte-ts | services/looking_glass/Dockerfile | - | services | 0->0 | - | 0 | 4 |
-| **middleware** | rust | middleware/src/Dockerfile | - | services | 0->0 | - | 0 | 6 |
-| **mlops_pipeline** | python | mlops/scripts/Dockerfile | - | offline | 2->3 | - | 2 | 55 |
-| **model_steward** | python | services/model_steward/Dockerfile | - | pipeline | 0->1 | - | 0 | 3 |
+| **middleware** | rust | - | - | services | 0->0 | - | 0 | 6 |
+| **mlops_pipeline** | python | - | - | offline | 2->3 | - | 2 | 55 |
+| **model_steward** | python | - | - | pipeline | 0->1 | - | 0 | 3 |
 | **nats_streams** | shell | infrastructure/nats/Dockerfile | - | services | 0->0 | - | 0 | 1 |
-| **on_host_agent** | python | operations/agent/Dockerfile | - | services | 0->0 | - | 0 | 2 |
-| **worker_elastic** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
-| **worker_memory** | python | services/worker_memory/Dockerfile | memory_worker @ analytics | memory | 2->2 | - | 0 | 3 |
-| **worker_nexus** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_middleware | 0 | 1 |
+| **on_host_agent** | python | - | - | services | 0->0 | - | 0 | 2 |
+| **worker_elastic** | rust | - | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
+| **worker_memory** | python | services/worker_memory/Dockerfile | memory_worker @ analytics | memory | 1->0 | - | 0 | 3 |
+| **worker_nexus** | rust | - | - | services | 0->0 | lib_middleware | 0 | 1 |
 | **worker_qdrant** | rust | services/worker_qdrant/Dockerfile | rust_podman_worker @ workers | services | 1->0 | lib_siem_core | 0 | 1 |
 | **worker_rlhf** | rust | services/worker_rlhf/Dockerfile | rust_podman_worker @ workers | services | 0->1 | lib_siem_core | 1 | 1 |
 | **worker_rules** | rust | services/worker_rules/Dockerfile | rust_podman_worker @ workers | services | 0->0 | lib_siem_core | 0 | 1 |
 | **worker_s3_archive** | rust | services/worker_s3_archive/Dockerfile | rust_podman_worker @ workers | services | 0->0 | - | 0 | 1 |
 | **worker_soar** | rust | services/worker_soar/Dockerfile | rust_podman_worker @ workers | services | 1->1 | lib_siem_core | 1 | 2 |
-| **worker_splunk** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
-| **worker_sql** | rust | middleware/src/Dockerfile | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
+| **worker_splunk** | rust | - | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
+| **worker_sql** | rust | - | - | services | 0->0 | lib_etl, lib_middleware | 0 | 1 |
 | **worker_ti_ingest** | python | services/worker_ti_ingest/Dockerfile | ti_ingest_worker @ ti | mlops | 0->0 | - | 0 | 4 |
 
 ## GRC controls -> components + tests
@@ -433,4 +431,4 @@ Module -> local modules it imports (call-chain within the Python planes).
 - `mlops/scripts/stage_persistence_behavioral.py` -> `corpus_utils`
 - `mlops/scripts/stage_recon_behavioral.py` -> `corpus_utils`
 - `mlops/scripts/stage_windows_exploitation_behavioral.py` -> `corpus_utils`
-- `services/worker_memory/main.py` -> `evidence_intake`, `memory_analysis`
+- `services/worker_memory/main.py` -> `memory_analysis`

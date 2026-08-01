@@ -1,5 +1,9 @@
-# SECTION: memory — worker_memory (memory-forensics bridge to the agentic stack)
+# SECTION: memory — worker_memory + the DFIR platform integration boundary
 #   docker build -f autonomous_dco_rnd/tests/Dockerfile.memory -t nexus-test-memory .
+#
+# No platform checkout is mounted: the contract tests assert against the pinned baseline
+# that ships in integrations/dfir_platform/, and the one test that reads a real checkout
+# skips without it.
 FROM docker.io/alpine:3.24
 
 RUN apk add --no-cache python3 py3-pip
@@ -7,10 +11,12 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN pip3 install --no-cache-dir "pytest>=7.4.0"
 
 COPY autonomous_dco_rnd/services/worker_memory/        /repo/autonomous_dco_rnd/services/worker_memory/
+COPY autonomous_dco_rnd/integrations/dfir_platform/    /repo/autonomous_dco_rnd/integrations/dfir_platform/
 COPY autonomous_dco_rnd/tests/lab_memory_forensics/    /repo/autonomous_dco_rnd/tests/lab_memory_forensics/
+COPY autonomous_dco_rnd/tests/lab_dfir_platform/       /repo/autonomous_dco_rnd/tests/lab_dfir_platform/
 COPY autonomous_dco_rnd/tests/pytest.ini               /repo/autonomous_dco_rnd/tests/
 COPY autonomous_dco_rnd/tests/conftest.py              /repo/autonomous_dco_rnd/tests/
 
 WORKDIR /repo/autonomous_dco_rnd
-CMD ["python3", "-m", "pytest", "tests/lab_memory_forensics/", \
+CMD ["python3", "-m", "pytest", "tests/lab_memory_forensics/", "tests/lab_dfir_platform/", \
      "-v", "--tb=short", "--junit-xml=/reports/memory.xml"]

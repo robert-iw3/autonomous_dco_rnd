@@ -1,24 +1,23 @@
 """
-worker_memory — the operations-stack bridge for the IR memory-forensics
-workflow. It **extends** the existing toolkit (operations/playbooks) to the agentic stack:
+worker_memory — the pure core that turns adjudicated memory findings into swarm
+enrichment.
 
-  1. a `collect_forensics` playbook captures a RAM image on the affected host and
-     uploads it to staging (formats: .aff4 winpmem · .raw/.lime AVML · .dmp/.vmem);
-  2. this worker spins an EPHEMERAL analysis container (the offline-staged toolkit)
-     and runs the *existing* analyzer — `Analyze-Memory-Linux.sh` /
-     `Analyze-Memory.ps1` — routing by image format (.aff4→MemProcFS,
-     .raw/.dmp→Volatility 3), with `--adjudicate` so findings pass the canonical
-     verdict ladder;
-  3. it consumes the analyzer's `Memory_Findings_<stamp>.json` (the shared
-     finding_schema) + `_status.json` (tp_count), seals the image + findings into a
-     locked-down WORM/KMS S3 historical archive, and publishes the result to the
-     swarm as **enrichment** so the agentic swarm makes the verdict;
-  4. the swarm, on that enriched ground truth, decides whether containment is
-     warranted and initiates the established eradication playbooks.
+`to_enrichment` and the verdict-ladder helpers around it are the contract between the IR
+memory-forensics workflow and the agentic stack, and they are indifferent to who ran the
+analyzer. The DFIR platform runs it now: it collects the RAM image, seals it, holds it in
+its enclave and adjudicates it with the toolkit both projects share, then publishes a
+projection of the findings. `main.py` consumes that projection and passes it through here,
+so the enrichment the swarm reads has the same shape it always did — the analyzer's
+`Memory_Findings_<stamp>.json` (the shared finding_schema) and `_status.json` (tp_count),
+mapped to TP-class findings + MITRE techniques. The swarm, on that enriched ground truth,
+decides whether containment is warranted and initiates the established eradication
+playbooks.
 
-Pure / stdlib core here (image-format routing, the analyzer invocation, parsing
-the shared schema → enrichment, S3 WORM params); `main.py` is the IO shell.
-Air-gapped: the toolkit + Volatility wheels + ISF symbols are staged offline.
+The image-format routing, analyzer invocation and S3 WORM helpers below belong to the
+collect-and-store path this stack no longer runs. They are retired together with the
+`nexus.memory.intake` producer in core_ingress, not before it.
+
+Pure / stdlib; `main.py` is the IO shell.
 """
 from __future__ import annotations
 

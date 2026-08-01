@@ -1,196 +1,190 @@
-"""worker_memory — orchestration shell (thin IO around the pure cores).
+"""
+worker_memory — the DFIR platform's adjudicated findings, on the swarm's bus.
 
-Flow (all evidence is gateway-verified; no side channel):
-  • core_ingress /api/v1/evidence verifies (JWT + HMAC + SHA-256 custody), streams
-    the RAM image into the WORM archive, and publishes a verified handle on
-    `nexus.memory.intake`;
-  • this worker pulls the verified object, re-checks the custody hash, runs the
-    EXISTING analyzer (Analyze-Memory{.ps1,-Linux.sh} --adjudicate) in an ephemeral
-    container, writes findings/status to the WORM record, and publishes
-    `nexus.memory.enrichment` so the swarm makes the verdict;
-  • on conclusion an OPERATOR purges the (GOVERNANCE-locked) image via
-    `handle_operator_cleanup` — the COMPLIANCE record persists.
+This stack does not collect or store memory evidence. The platform does: it receives the
+capture through its own one-way ingest, seals it, holds it in its enclave, and adjudicates
+it with the toolkit both projects share. What reaches this worker is a **projection** — a
+sealed, flat, allow-listed extract of the findings and their run context, and nothing else.
+The RAM image never leaves the platform's enclave, so nothing here has to be trusted with it.
 
-Pure logic is in memory_analysis / evidence_intake; this file is IO only.
-Air-gapped: toolkit + symbols staged offline.
+Flow:
+  • the platform publishes a sealed projection to its DMZ edge (or an operator drops one
+    on removable media — the seal is what makes both legitimate);
+  • this worker pulls it, verifies the seal, and validates it against the contract in
+    `dfir_platform` — seal first, so an unsealed bundle is never parsed for meaning;
+  • it maps the bundle into the toolkit's own finding schema and runs it through the SAME
+    enrichment core (`memory_analysis`) that produced enrichment when this stack ran the
+    analyzer itself, so `nexus.memory.enrichment` keeps the shape the swarm already reads;
+  • the swarm reasons over that flagged evidence and decides whether containment is
+    warranted, initiating the established eradication playbooks.
+
+A bundle that fails validation goes to the DLQ with its reason. It is never partially
+accepted, and it is never silently dropped.
+
+Retention, legal hold and purge of the underlying image are the platform's, along with the
+audit record of each. Removing that duty from this stack is the point of the arrangement,
+not an omission from it.
+
+Configuration:
+  NEXUS_PROJECTION_DIR / NEXUS_PROJECTION_URL   where projections come from (transport.py)
+  NEXUS_PROJECTION_HMAC_KEY                     the shared seal key; required
+  NEXUS_PROJECTION_ALLOW_UNSEALED               lab-only opt-out, default off
+  NEXUS_PROJECTION_INTERVAL                     seconds between polls (default 30)
+  NEXUS_PROJECTION_STATE                        ledger of bundle ids already published
 """
 from __future__ import annotations
 
-import glob
 import json
 import logging
 import os
-import subprocess
-import tempfile
 
 import memory_analysis as ma
-import evidence_intake as ei
+
+import dfir_platform.contract as contract
+import dfir_platform.transport as transport
 
 logger = logging.getLogger("nexus-worker-memory")
 
-ARCHIVE_BUCKET = os.getenv("NEXUS_MEMORY_ARCHIVE_BUCKET", "nexus-ir-memory-archive")
-KMS_KEY_ID = os.getenv("NEXUS_MEMORY_KMS_KEY_ID", "")
-RETAIN_DAYS = int(os.getenv("NEXUS_MEMORY_RETAIN_DAYS", "365"))
-CONTAINER_RUNTIME = os.getenv("NEXUS_CONTAINER_RUNTIME", "podman")
-FETCH_SYMBOLS = os.getenv("NEXUS_MEM_FETCH_SYMBOLS", "").lower() in ("1", "true", "yes")
+ENRICHMENT_SUBJECT = "nexus.memory.enrichment"
+# A refused projection is a fault worth seeing, not a log line to lose. The subject sits
+# under the same DLQ tree the cognitive and archive faults use.
+DLQ_SUBJECT = "nexus.dlq.memory_projection"
+
+HMAC_KEY = os.getenv("NEXUS_PROJECTION_HMAC_KEY", "")
+ALLOW_UNSEALED = os.getenv("NEXUS_PROJECTION_ALLOW_UNSEALED", "").lower() in ("1", "true", "yes")
+POLL_INTERVAL = int(os.getenv("NEXUS_PROJECTION_INTERVAL", "30"))
+STATE_PATH = os.getenv("NEXUS_PROJECTION_STATE", "/var/lib/nexus/projection_seen")
 
 
-def run_memory_analyzer(os_family: str, image_local_path: str, host_folder: str):
-    """Run the EXISTING analyzer in an ephemeral, network-less container; return
-    (findings, status) read back from its shared-schema output."""
-    analysis_image = ma.select_analysis_image(os_family)
-    analyzer = ma.build_analyzer_command(
-        os_family, "/image/" + os.path.basename(image_local_path), "/reports",
-        fetch_symbols=FETCH_SYMBOLS)
-    cmd = [CONTAINER_RUNTIME, "run", "--rm", "--network=none",
-           "-v", f"{image_local_path}:/image/{os.path.basename(image_local_path)}:ro",
-           "-v", f"{host_folder}:/reports", "-w", "/opt/ir-toolkit/playbooks",
-           analysis_image, *analyzer]
-    try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-    except Exception as e:  # noqa: BLE001 — read whatever the analyzer wrote
-        logger.warning("memory analyzer container error: %s", e)
-    return _read_findings(host_folder), _read_status(host_folder)
+class SeenLedger:
+    """Bundle ids already published, so re-delivery is idempotent.
 
+    A projection's id is the hash of its payload, so the platform republishing a run — a
+    retried dispatch, a re-mounted drop — yields the same id and produces no second
+    enrichment. Persisted, because a restart is exactly when re-delivery happens.
+    """
 
-def _read_findings(host_folder: str) -> list:
-    matches = sorted(glob.glob(os.path.join(host_folder, "Memory_Findings_*.json")))
-    if not matches:
-        return []
-    try:
-        with open(matches[-1], encoding="utf-8-sig", errors="replace") as fh:
-            data = json.load(fh)
-        return data if isinstance(data, list) else data.get("findings", [])
-    except (OSError, json.JSONDecodeError):
-        return []
-
-
-def _read_status(host_folder: str) -> dict:
-    try:
-        with open(os.path.join(host_folder, "_status.json"), encoding="utf-8-sig",
-                  errors="replace") as fh:
-            return json.load(fh)
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _archive_record(s3, incident_id: str, host: str, findings: list, status: dict) -> None:
-    """Write the adjudicated findings + status to the WORM record (COMPLIANCE).
-    The image is already in WORM — the gateway streamed it on verified upload."""
-    for kind, body in (("findings", json.dumps(findings).encode()),
-                       ("status", json.dumps(status).encode())):
-        s3.put_object(Body=body, **ma.s3_object_lock_params(
-            ARCHIVE_BUCKET, ma.archive_key(incident_id, host, kind),
-            RETAIN_DAYS, KMS_KEY_ID, kind=kind))
-
-
-async def handle_intake(handle: dict, *, s3, publish) -> dict:
-    """Process one verified intake handle → published enrichment. `s3` (get_object/
-    put_object) and `publish(subject, bytes)` are injected for testability."""
-    desc = ei.parse_handle(handle)
-    incident_id, host, os_family = desc["incident_id"], desc["host"], desc["os_family"]
-
-    body = _pull_object(s3, desc["s3_key"])
-    ok, reason = ei.verify_pulled_object(body, handle)
-    if not ok:
-        logger.error("evidence custody check failed for %s (%s) — refusing analysis",
-                     incident_id, reason)
-        raise ei_custody_error(reason)
-
-    local = _write_temp(body, desc["s3_key"])
-    host_folder = tempfile.mkdtemp(prefix=f"nexus-mem-{incident_id}-")
-    try:
-        findings, status = run_memory_analyzer(os_family, local, host_folder)
+    def __init__(self, path: str):
+        self.path = path
+        self.ids = set()
         try:
-            _archive_record(s3, incident_id, host, findings, status)
-        except Exception as e:  # noqa: BLE001 — archival must not block the verdict
-            logger.error("WORM record write failed (non-fatal to enrichment): %s", e)
-        enrichment = ma.to_enrichment(incident_id, host, os_family, findings, status)
-        await publish(ei.ENRICHMENT_SUBJECT, json.dumps(enrichment).encode())
-        logger.info("memory enrichment published for %s (memory_threat=%s)",
-                    incident_id, enrichment["memory_threat"])
-        return enrichment
-    finally:
-        _cleanup(local)
-        _cleanup_dir(host_folder)
+            with open(path, encoding="utf-8") as fh:
+                self.ids = {line.strip() for line in fh if line.strip()}
+        except OSError:
+            pass
+
+    def __contains__(self, bundle_ref: str) -> bool:
+        return bundle_ref in self.ids
+
+    def add(self, bundle_ref: str) -> None:
+        self.ids.add(bundle_ref)
+        try:
+            os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+            with open(self.path, "a", encoding="utf-8") as fh:
+                fh.write(bundle_ref + "\n")
+        except OSError as e:  # noqa: BLE001 — a ledger we cannot persist still works in-process
+            logger.warning("projection ledger not persisted (%s): %s", self.path, e)
 
 
-async def handle_operator_cleanup(event: dict, *, s3, audit) -> dict:
-    """Operator-gated purge of the GOVERNANCE-locked RAM image once the
-    investigation is concluded. Records a tamper-evident audit line. The COMPLIANCE
-    findings/status/custody record is never touched. Never autonomous."""
-    incident_id = str(event.get("incident_id", ""))
-    host = str(event.get("host", ""))
-    operator = str(event.get("operator", ""))
-    if not operator:
-        raise PermissionError("operator identity required to purge a memory image")
-    if not ma.cleanup_eligible(event.get("investigation_status", "")):
-        raise PermissionError("investigation not concluded — image purge refused")
-    key = ma.archive_key(incident_id, host, "image")
-    s3.delete_object(**ma.operator_delete_image_params(ARCHIVE_BUCKET, key))
-    record = ma.deletion_audit_record(incident_id, host, key, operator)
-    await audit(json.dumps(record).encode())
-    logger.warning("operator %s purged memory image %s (incident %s)", operator, key, incident_id)
-    return record
+async def handle_projection(raw: bytes, *, publish, dlq=None, seen=None,
+                            hmac_key: str = None, allow_unsealed: bool = None) -> dict | None:
+    """Process one projection → published enrichment.
 
-
-def ei_custody_error(reason: str) -> Exception:
-    return ValueError(f"evidence custody: {reason}")
-
-
-def _pull_object(s3, key: str) -> bytes:
-    return s3.get_object(Bucket=ARCHIVE_BUCKET, Key=key)["Body"].read()
-
-
-def _write_temp(body: bytes, key: str) -> str:
-    suffix = "." + ma.image_format(key) if ma.image_format(key) else ".raw"
-    fd, path = tempfile.mkstemp(prefix="nexus-mem-", suffix=suffix)
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(body)
-    return path
-
-
-def _cleanup(path: str) -> None:
+    Returns the enrichment, or None when the bundle was already published. Raises
+    `contract.ProjectionError` when the bundle is refused, after routing it to the DLQ —
+    the caller decides whether to acknowledge the source, and a refused bundle should not
+    be acknowledged away without a record of why.
+    """
+    key = HMAC_KEY if hmac_key is None else hmac_key
+    unsealed_ok = ALLOW_UNSEALED if allow_unsealed is None else allow_unsealed
     try:
-        os.remove(path)
-    except OSError:
-        pass
+        bundle = contract.decode(raw)
+        bundle_ref = contract.accept(bundle, key, allow_unsealed=unsealed_ok)
+    except contract.ProjectionError as e:
+        logger.error("projection refused: %s", e)
+        if dlq is not None:
+            await dlq(DLQ_SUBJECT, json.dumps({
+                "source": "dfir_platform_projection",
+                "reason": str(e),
+                "bytes": len(raw or b""),
+            }).encode())
+        raise
+
+    if seen is not None and bundle_ref in seen:
+        logger.info("projection %s already published — skipping", bundle_ref[:12])
+        return None
+
+    desc = contract.descriptor(bundle)
+    findings = contract.to_toolkit_findings(bundle)
+    status = contract.to_status(bundle)
+
+    enrichment = ma.to_enrichment(desc["incident_id"], desc["host"], desc["os_family"],
+                                  findings, status)
+    # Provenance the swarm's grounding controls key on: which platform run this came from,
+    # and whether that run's custody seal verified on the platform side. A finding whose
+    # chain of custody did not verify is still reportable, but it is not the same claim.
+    enrichment["projection_id"] = bundle_ref
+    enrichment["platform_run_id"] = desc["run_id"]
+    enrichment["run_kind"] = desc["run_kind"]
+    enrichment["custody_verified"] = desc["custody_verified"]
+
+    await publish(ENRICHMENT_SUBJECT, json.dumps(enrichment).encode())
+    if seen is not None:
+        seen.add(bundle_ref)
+    logger.info("memory enrichment published for %s from platform run %s (memory_threat=%s)",
+                desc["incident_id"], desc["run_id"], enrichment["memory_threat"])
+    return enrichment
 
 
-def _cleanup_dir(path: str) -> None:
-    import shutil
-    shutil.rmtree(path, ignore_errors=True)
+async def drain(source, *, publish, dlq=None, seen=None,
+                hmac_key: str = None, allow_unsealed: bool = None) -> int:
+    """Consume everything the source currently holds. Returns the number published.
+
+    A bundle is acknowledged only after its enrichment is on the bus, so a crash between
+    the two leaves it held rather than lost. A refused bundle is acknowledged too — it has
+    been recorded in the DLQ, and leaving it in place would refuse it again on every poll.
+    """
+    published = 0
+    for ref, raw in source.poll():
+        try:
+            if await handle_projection(raw, publish=publish, dlq=dlq, seen=seen,
+                                       hmac_key=hmac_key,
+                                       allow_unsealed=allow_unsealed) is not None:
+                published += 1
+        except contract.ProjectionError:
+            source.ack(ref)
+            continue
+        except Exception as e:  # noqa: BLE001 — a publish failure must not consume the bundle
+            logger.error("projection %s not published (%s) — leaving it held", ref, e)
+            continue
+        source.ack(ref)
+    return published
 
 
 async def _run() -> None:
-    """IO loop: subscribe to the verified intake + operator-cleanup subjects and
-    dispatch to the handlers. Heavy clients imported lazily (kept off the test path)."""
+    """IO loop: poll the configured projection source, publish enrichment. Heavy clients
+    imported lazily (kept off the test path)."""
+    import asyncio
+
     import nats
-    import boto3
+
+    source = transport.from_env()
+    seen = SeenLedger(STATE_PATH)
 
     nc = await nats.connect(os.getenv("NATS_URL", "nats://nats:4222"))
     js = nc.jetstream()
-    s3 = boto3.client("s3", endpoint_url=os.getenv("S3_ENDPOINT_URL") or None)
 
     async def _publish(subject, body):
         await js.publish(subject, body)
 
-    async def _audit(body):
-        await js.publish("nexus.memory.cleanup.audit", body)
-
-    async def _on_intake(msg):
-        await handle_intake(json.loads(msg.data), s3=s3, publish=_publish)
-        await msg.ack()
-
-    async def _on_cleanup(msg):
-        await handle_operator_cleanup(json.loads(msg.data), s3=s3, audit=_audit)
-        await msg.ack()
-
-    await js.subscribe(ei.INTAKE_SUBJECT, durable="worker_memory_intake", cb=_on_intake)
-    await js.subscribe("nexus.memory.cleanup", durable="worker_memory_cleanup", cb=_on_cleanup)
-    logger.info("worker_memory online: %s + nexus.memory.cleanup", ei.INTAKE_SUBJECT)
-    import asyncio as _a
-    await _a.Event().wait()
+    logger.info("worker_memory online: %s every %ss → %s",
+                type(source).__name__, POLL_INTERVAL, ENRICHMENT_SUBJECT)
+    while True:
+        try:
+            await drain(source, publish=_publish, dlq=_publish, seen=seen)
+        except transport.TransportError as e:
+            logger.warning("projection source unavailable: %s", e)
+        await asyncio.sleep(POLL_INTERVAL)
 
 
 if __name__ == "__main__":

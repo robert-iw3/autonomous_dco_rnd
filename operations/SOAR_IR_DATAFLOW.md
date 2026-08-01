@@ -106,22 +106,27 @@ agent reports outcome on **`nexus.soar.callback`**.
 
 ---
 
-## Stage 5 — Collection → verified evidence ingress → memory analysis → enrichment
+## Stage 5 — The DFIR platform's findings → projection → enrichment
 
-Memory/IR evidence is its **own data class** — routed, verified, stored, and called
-distinctly from telemetry (Parquet) and detonation artifacts. It enters through the
-**same Zero-Trust gateway**, never a side channel.
+Memory/IR evidence is its **own data class**, and this stack does not hold it. The DFIR
+platform collects the RAM image, seals it, stores it in its enclave and adjudicates it with
+the toolkit both projects share. What crosses into the swarm is a **projection**: adjudicated
+findings and their run context, sealed and allow-listed. The image never leaves the platform,
+so nothing here has to be trusted with it — and there is no path from here into the platform's
+enclave, only a pull from its DMZ edge.
+
+The wire format, the direction, and what may never appear in a bundle are specified in
+[`integrations/dfir_platform/PROJECTION-CONTRACT.md`](../integrations/dfir_platform/PROJECTION-CONTRACT.md).
 
 | Step | Where | Data |
 |---|---|---|
-| RAM capture | `00_collect_forensics` / `Invoke-IRCollection --capture-memory` | `.aff4` / `.raw` / `.lime` image + `reports/<host>/` |
-| Verified ingress | agent streams image to **`core_ingress POST /api/v1/evidence`** — JWT + HMAC(body) + **SHA-256 custody** (`evidence_custody.py` seal) | verified before bytes touch the store |
-| Stream to WORM | gateway `put`s the image to the **GOVERNANCE-locked** image bucket (operator-purgeable; the record is COMPLIANCE) | `memory/<incident>/<host>/image` |
-| Handle | gateway publishes **`nexus.memory.intake`** `{incident_id, host, os_family, kind, sha256, s3_key}` | small verified handle (no bytes on NATS) |
-| Analyze | `worker_memory.handle_intake` pulls the WORM object, **re-checks custody sha256** (`evidence_intake.verify_pulled_object`), spins an ephemeral network-less container running the EXISTING `Analyze-Memory{.ps1,-Linux.sh} --adjudicate` (routed by `analysis_engine`: `.aff4`→MemProcFS, else Volatility 3) | `Memory_Findings_<stamp>.json` (shared schema) + `_status.json` |
-| Archive record | `_archive_record` → `s3_object_lock_params(kind=findings/status)` (COMPLIANCE/WORM + KMS) | findings + status, immutable |
-| Enrich | `to_enrichment` (TP-class via verdict ladder; `memory_threat` from TP-class or `tp_count`) → **`nexus.memory.enrichment`** | advisory evidence, `source=memory_forensics` |
-| Cleanup (operator) | on conclusion, `handle_operator_cleanup` purges the GOVERNANCE image (`BypassGovernanceRetention`) + audit line — never autonomous; the COMPLIANCE record persists | `deletion_audit_record` → custody log |
+| RAM capture | the platform's collector / `Invoke-IRCollection --capture-memory` | `.aff4` / `.raw` / `.lime` image + `reports/<host>/`, sealed |
+| Ingress, storage, analysis | **the platform**: one-way ingest into its enclave, its object store, `Analyze-Memory{.ps1,-Linux.sh} --adjudicate` | `Memory_Findings_<stamp>.json` (shared schema) + `_status.json` |
+| Projection published | the platform writes a sealed bundle outward to its DMZ edge | run context + adjudicated findings; no image bytes, no object keys |
+| Pull + verify | `worker_memory` pulls from the dispatcher (or a media drop) and checks the **HMAC-SHA256 seal first**, then the allow-list — flat, bounded, verdicts on the shared ladder (`dfir_platform.contract`) | refusal → **`nexus.dlq.memory_projection`** with the reason |
+| Enrich | `to_enrichment` (TP-class via verdict ladder; `memory_threat` from TP-class or `tp_count`) → **`nexus.memory.enrichment`**, carrying `projection_id` + `platform_run_id` + `custody_verified` | advisory evidence, `source=memory_forensics` |
+| Re-delivery | a bundle's id is the hash of its payload, so a republished run yields no second enrichment | idempotent by construction |
+| Retention, legal hold, purge | **the platform's**, along with the audit record of each | not this stack's duty |
 
 The swarm re-ingests the enrichment; `response_agent` reads
 `state["memory_enrichment"]` → `build_playbook_plan(..., memory_enriched=True,

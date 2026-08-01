@@ -1,0 +1,112 @@
+{
+  "backend_verdicts": [
+    "False Positive",
+    "Likely False Positive",
+    "Indeterminate",
+    "Likely True Positive",
+    "True Positive"
+  ],
+  "models": {
+    "CollectionRun": [
+      "baseline_run",
+      "collected_at",
+      "compromised",
+      "custody_summary",
+      "custody_verified",
+      "host",
+      "investigation",
+      "overall_status",
+      "run_kind",
+      "stamp",
+      "status_json",
+      "toolkit_version",
+      "tp_count",
+      "validation_result"
+    ],
+    "Finding": [
+      "confidence",
+      "finding_type",
+      "mitre",
+      "raw",
+      "run",
+      "source",
+      "subject_path",
+      "target",
+      "tier",
+      "verdict"
+    ],
+    "Host": [
+      "clock_context",
+      "hostname",
+      "machine_id",
+      "platform"
+    ],
+    "Investigation": [
+      "incident_id",
+      "name",
+      "notes",
+      "operator",
+      "severity",
+      "status"
+    ],
+    "MemoryFinding": [
+      "analysis",
+      "detail",
+      "evidence",
+      "finding_type",
+      "offset",
+      "promoted_finding",
+      "severity"
+    ]
+  },
+  "routes": [
+    "",
+    "admin/component-health/",
+    "admin/mesh-health/",
+    "admin/metrics/",
+    "admin/remediation/",
+    "admin/remediation/<int:pk>/",
+    "admin/remediation/queue/",
+    "admin/symbols/",
+    "admin/symbols/requisites/",
+    "audit/",
+    "audit/export/",
+    "auth/token/",
+    "brokered-sessions/",
+    "captures/<int:capture_id>/diff/",
+    "captures/<int:capture_id>/legal-hold/",
+    "captures/<int:capture_id>/purge/",
+    "captures/<int:capture_id>/reanalyze/",
+    "component-health/report/",
+    "correlation/",
+    "facets/",
+    "findings",
+    "findings/<int:finding_id>/reclassify/",
+    "findings/bulk-verdict/",
+    "findings/export/",
+    "health/",
+    "hosts",
+    "ingest/",
+    "investigations",
+    "ioc-search/",
+    "me/",
+    "memory-findings",
+    "notes",
+    "region-analyses",
+    "regions",
+    "rescans/",
+    "runs",
+    "stats/",
+    "summary/",
+    "tasks/",
+    "users/",
+    "version/"
+  ],
+  "toolkit_verdicts": [
+    "False Positive",
+    "Likely False Positive",
+    "Indeterminate",
+    "Likely True Positive",
+    "True Positive"
+  ]
+}

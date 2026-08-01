@@ -1,13 +1,15 @@
-"""worker_memory — bridges the proven IR memory workflow to the agentic stack.
-
-Proves: image-format routing; drives the EXISTING analyzer with --adjudicate;
-consumes shared-schema findings + _status.json (TP-class via the verdict ladder)
-into swarm enrichment; the WORM archive (GOVERNANCE for the privacy-sensitive image
-so an operator can purge it, COMPLIANCE for the record); verified intake from the
-gateway (custody re-check before analysis); and operator-gated image deletion.
-Pure (stdlib only).
 """
-import asyncio
+worker_memory — the pure cores that bridge the IR memory workflow to the agentic stack.
+
+Proves: image-format routing; the EXISTING analyzer driven with --adjudicate; shared-schema
+findings + _status.json consumed into swarm enrichment (TP-class via the verdict ladder);
+the WORM archive's lock modes (GOVERNANCE for the privacy-sensitive image so an operator can
+purge it, COMPLIANCE for the record); custody verification of a pulled object; and
+operator-gated image deletion. Pure (stdlib only).
+
+The worker's IO shell now consumes the DFIR platform's findings projection rather than
+running the analyzer itself — that path is proved in tests/lab_dfir_platform.
+"""
 import hashlib
 import sys
 from pathlib import Path
@@ -125,98 +127,3 @@ class TestEvidenceIntake:
         body, secret = b"body", "shared"
         good = __import__("hmac").new(secret.encode(), body, hashlib.sha256).hexdigest()
         assert ei.verify_hmac(secret, body, good) and not ei.verify_hmac(secret, body, "00")
-
-
-# ── orchestration: verified pull → analyze → enrich; operator cleanup ────────
-class _S3:
-    def __init__(self, objects=None):
-        self.objects = dict(objects or {})
-        self.puts, self.deletes = [], []
-
-    def get_object(self, Bucket, Key):
-        return {"Body": _Body(self.objects[Key])}
-
-    def put_object(self, **kw):
-        self.puts.append(kw)
-
-    def delete_object(self, **kw):
-        self.deletes.append(kw)
-
-
-class _Body:
-    def __init__(self, b):
-        self._b = b
-
-    def read(self):
-        return self._b
-
-
-class TestOrchestration:
-    def test_verified_intake_analyzes_and_enriches(self, monkeypatch):
-        import main as wm
-        image = b"\x00AFF4-IMAGE\x00"
-        key = "memory/INC-9/ws-7/image"
-        s3 = _S3({key: image})
-        monkeypatch.setattr(wm, "run_memory_analyzer",
-                            lambda osf, path, hf: ([_f("Injected Code", "pid:9", "True Positive", "T1055")],
-                                                   {"status": "COMPLETED", "tp_count": 1}))
-        published = []
-
-        async def _pub(s, b):
-            published.append((s, b))
-
-        handle = {"incident_id": "INC-9", "host": "ws-7", "os_family": "windows",
-                  "kind": "memory_image", "sha256": hashlib.sha256(image).hexdigest(),
-                  "s3_key": key}
-        enr = asyncio.run(wm.handle_intake(handle, s3=s3, publish=_pub))
-        assert enr["memory_threat"] is True
-        assert published[0][0] == "nexus.memory.enrichment"
-        # findings + status written to the COMPLIANCE record (image already in WORM)
-        kinds = [p["Key"].rsplit("/", 1)[-1] for p in s3.puts]
-        assert set(kinds) == {"findings", "status"}
-        assert all(p["ObjectLockMode"] == "COMPLIANCE" for p in s3.puts)
-
-    def test_tampered_object_refused(self, monkeypatch):
-        import main as wm
-        key = "memory/INC/h/image"
-        s3 = _S3({key: b"TAMPERED"})
-        handle = {"incident_id": "INC", "host": "h", "os_family": "linux",
-                  "kind": "memory_image", "sha256": hashlib.sha256(b"ORIGINAL").hexdigest(),
-                  "s3_key": key}
-
-        async def _pub(s, b):
-            pass
-
-        with pytest.raises(ValueError):
-            asyncio.run(wm.handle_intake(handle, s3=s3, publish=_pub))
-
-    def test_operator_cleanup_deletes_image_with_audit(self):
-        import main as wm
-        s3 = _S3()
-        audited = []
-
-        async def _audit(b):
-            audited.append(b)
-
-        ev = {"incident_id": "INC", "host": "h", "operator": "alice@soc",
-              "investigation_status": "closed"}
-        rec = asyncio.run(wm.handle_operator_cleanup(ev, s3=s3, audit=_audit))
-        assert s3.deletes and s3.deletes[0]["BypassGovernanceRetention"] is True
-        assert rec["action"] == "memory_image_deleted" and audited
-
-    def test_cleanup_refused_when_not_concluded_or_no_operator(self):
-        import main as wm
-        s3 = _S3()
-
-        async def _audit(b):
-            pass
-
-        with pytest.raises(PermissionError):
-            asyncio.run(wm.handle_operator_cleanup(
-                {"incident_id": "I", "host": "h", "operator": "a", "investigation_status": "investigating"},
-                s3=s3, audit=_audit))
-        with pytest.raises(PermissionError):
-            asyncio.run(wm.handle_operator_cleanup(
-                {"incident_id": "I", "host": "h", "operator": "", "investigation_status": "closed"},
-                s3=s3, audit=_audit))
-        assert not s3.deletes

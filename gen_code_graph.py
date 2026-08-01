@@ -48,6 +48,7 @@ _COMPONENTS = [
     ("middleware/src", "middleware", "rust"),
     ("operations/agent", "on_host_agent", "python"),
     ("operations/playbooks", "ir_playbooks", "mixed"),
+    ("integrations/dfir_platform", "dfir_platform", "python"),
     ("mlops/scripts", "mlops_pipeline", "python"),
     ("det_chamber", "det_chamber", "python"),
     ("infrastructure/nats", "nats_streams", "shell"),
@@ -384,15 +385,17 @@ def build_graph() -> dict:
 
     # -- deploy / build / test wiring per component ---------------------------
     site = ROOT / "infrastructure/ansible/site.yml"
-    deploy = ansible_deploy(site.read_text(errors="replace")) if site.exists else {}
+    deploy = ansible_deploy(site.read_text(errors="replace")) if site.exists() else {}
     rt = ROOT / "tests/run_tests.sh"
-    _secs, triggers = parse_sections(rt.read_text(errors="replace")) if rt.exists else ({}, [])
+    _secs, triggers = parse_sections(rt.read_text(errors="replace")) if rt.exists() else ({}, [])
     for name, c in components.items():
         c["deploy"] = deploy.get(name, {})
         c["test_section"] = section_for(c["paths"][0], triggers) if c["paths"] else ""
         df = ROOT / (c["paths"][0].split("/", 2)[0] + "/" + c["paths"][0].split("/")[1] + "/Dockerfile") \
             if c["paths"] and "/" in c["paths"][0] else None
-        c["dockerfile"] = df.relative_to(ROOT).as_posix() if df and df.exists else ""
+        # `Path.exists` is a bound method and always truthy — call it, or every component
+        # is credited with a Dockerfile whether or not one is there.
+        c["dockerfile"] = df.relative_to(ROOT).as_posix() if df and df.exists() else ""
 
     # -- HTTP endpoint callers ------------------------------------------------
     for path_, ep in http_endpoints.items():

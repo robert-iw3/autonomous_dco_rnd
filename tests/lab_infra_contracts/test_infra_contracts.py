@@ -213,8 +213,23 @@ class TestMemoryEvidenceAutomation:
         assert role.exists(), "memory_worker role must exist"
         rt = role.read_text()
         assert "services/worker_memory/" in rt, "role builds from the service's own dir (context)"
-        assert "podman.sock" in rt, "worker needs the host runtime to spawn the analyzer container"
-        assert "NEXUS_MEMORY_ARCHIVE_BUCKET" in rt, "evidence bucket env must be passed"
+        assert "integrations/dfir_platform/" in rt, \
+            "the projection contract package must ship with the worker"
+
+    def test_worker_memory_holds_neither_runtime_nor_evidence_store(self):
+        """The worker consumes the DFIR platform's findings projection; it does not analyze
+        evidence and does not store it. Both capabilities are therefore absent by design — a
+        runtime socket in a service that parses external input is a container-escape path,
+        and object-store credentials it has no use for are credentials it can leak."""
+        rt = (PROJECT_ROOT / "infrastructure/ansible/roles/memory_worker/tasks/main.yml").read_text()
+        assert "podman.sock" not in rt, \
+            "the worker no longer spawns an analyzer container — it must not hold the runtime"
+        assert "NEXUS_MEMORY_ARCHIVE_BUCKET" not in rt, \
+            "the platform holds the evidence; the worker needs no object store"
+        assert "NEXUS_PROJECTION_HMAC_KEY" in rt, \
+            "the seal key is what makes a projection trustworthy — it must be passed"
+        assert "NEXUS_PROJECTION_DIR" in rt or "NEXUS_PROJECTION_URL" in rt, \
+            "a projection source must be configured"
 
     def test_worker_memory_dockerfile_is_service_local(self):
         df = (PROJECT_ROOT / "services/worker_memory/Dockerfile").read_text()

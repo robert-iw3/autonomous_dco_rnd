@@ -48,7 +48,7 @@
       ],
       "controls": [],
       "deploy": {},
-      "dockerfile": "det_chamber/agents/Dockerfile",
+      "dockerfile": "",
       "language": "python",
       "mentions": [
         "nexus.acquire.request",
@@ -83,11 +83,30 @@
       ],
       "test_section": "detchamber"
     },
+    "dfir_platform": {
+      "calls": [],
+      "controls": [],
+      "deploy": {},
+      "dockerfile": "",
+      "language": "python",
+      "mentions": [],
+      "paths": [
+        "integrations/dfir_platform/__init__.py",
+        "integrations/dfir_platform/contract.py",
+        "integrations/dfir_platform/platform_drift.py",
+        "integrations/dfir_platform/transport.py"
+      ],
+      "publishes": [],
+      "rust_deps": [],
+      "serves": [],
+      "subscribes": [],
+      "test_section": "memory"
+    },
     "ir_playbooks": {
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "operations/playbooks/Dockerfile",
+      "dockerfile": "",
       "language": "mixed",
       "mentions": [],
       "paths": [
@@ -515,7 +534,7 @@
         "SEC-ENDPOINT-ID"
       ],
       "deploy": {},
-      "dockerfile": "libs/lib_siem_core/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [
         "nexus.dlq",
@@ -674,7 +693,7 @@
       ],
       "controls": [],
       "deploy": {},
-      "dockerfile": "middleware/src/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -702,7 +721,7 @@
         "SEC-TRAINING-HYGIENE"
       ],
       "deploy": {},
-      "dockerfile": "mlops/scripts/Dockerfile",
+      "dockerfile": "",
       "language": "python",
       "mentions": [
         "nexus.alerts.baseline",
@@ -794,7 +813,7 @@
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "services/model_steward/Dockerfile",
+      "dockerfile": "",
       "language": "python",
       "mentions": [
         "nexus.models.promote",
@@ -854,7 +873,7 @@
       ],
       "controls": [],
       "deploy": {},
-      "dockerfile": "operations/agent/Dockerfile",
+      "dockerfile": "",
       "language": "python",
       "mentions": [],
       "paths": [
@@ -871,7 +890,7 @@
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "middleware/src/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -898,8 +917,7 @@
       "dockerfile": "services/worker_memory/Dockerfile",
       "language": "python",
       "mentions": [
-        "nexus.memory.cleanup",
-        "nexus.memory.cleanup.audit",
+        "nexus.dlq.memory_projection",
         "nexus.memory.enrichment",
         "nexus.memory.intake"
       ],
@@ -909,22 +927,18 @@
         "services/worker_memory/memory_analysis.py"
       ],
       "publishes": [
-        "nexus.memory.cleanup.audit",
         "nexus.memory.enrichment"
       ],
       "rust_deps": [],
       "serves": [],
-      "subscribes": [
-        "nexus.memory.cleanup",
-        "nexus.memory.intake"
-      ],
+      "subscribes": [],
       "test_section": "memory"
     },
     "worker_nexus": {
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "middleware/src/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -1073,7 +1087,7 @@
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "middleware/src/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -1092,7 +1106,7 @@
       "calls": [],
       "controls": [],
       "deploy": {},
-      "dockerfile": "middleware/src/Dockerfile",
+      "dockerfile": "",
       "language": "rust",
       "mentions": [],
       "paths": [
@@ -2712,7 +2726,6 @@
       "corpus_utils"
     ],
     "services/worker_memory/main.py": [
-      "evidence_intake",
       "memory_analysis"
     ]
   },
@@ -2933,6 +2946,14 @@
       ],
       "streams": []
     },
+    "nexus.dlq.memory_projection": {
+      "consumers": [],
+      "mentioned_by": [
+        "worker_memory"
+      ],
+      "producers": [],
+      "streams": []
+    },
     "nexus.hud.telemetry": {
       "consumers": [],
       "mentioned_by": [
@@ -2951,26 +2972,6 @@
       "producers": [],
       "streams": []
     },
-    "nexus.memory.cleanup": {
-      "consumers": [
-        "worker_memory"
-      ],
-      "mentioned_by": [
-        "worker_memory"
-      ],
-      "producers": [],
-      "streams": []
-    },
-    "nexus.memory.cleanup.audit": {
-      "consumers": [],
-      "mentioned_by": [
-        "worker_memory"
-      ],
-      "producers": [
-        "worker_memory"
-      ],
-      "streams": []
-    },
     "nexus.memory.enrichment": {
       "consumers": [],
       "mentioned_by": [
@@ -2985,9 +2986,7 @@
       ]
     },
     "nexus.memory.intake": {
-      "consumers": [
-        "worker_memory"
-      ],
+      "consumers": [],
       "mentioned_by": [
         "core_ingress",
         "nats_streams",
