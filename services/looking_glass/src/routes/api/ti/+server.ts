@@ -8,7 +8,7 @@
  *   GET    /api/ti/status    SSE stream of nexus.ti.status NATS events
  */
 
-import { connect, StringCodec } from 'nats';
+import { connect } from '@nats-io/transport-node';
 import type { RequestEvent } from '@sveltejs/kit';
 
 const TI_INGEST_URL = process.env.TI_INGEST_URL || 'http://worker-ti-ingest:8010';
@@ -114,14 +114,13 @@ function statusStream() {
 
             try {
                 nc = await connect({ servers: NATS_URL });
-                const sc  = StringCodec();
                 const sub = nc.subscribe('nexus.ti.status');
 
                 (async () => {
                     for await (const msg of sub) {
                         if (closed) break;
                         try {
-                            const data = JSON.parse(sc.decode(msg.data));
+                            const data = msg.json<Record<string, unknown>>();
                             enqueue({ type: 'ti_status', ...data, ts: Date.now() });
                         } catch { /* non-JSON */ }
                     }

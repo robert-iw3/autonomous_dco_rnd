@@ -26,4 +26,8 @@ prometheus-client>=0.20.0
 # ── Embeddings (RAG memory) ────────────────────────────────────────
 # Pulls torch; must build on a glibc base (see Dockerfile). The model itself is
 # pre-baked into the image so no network fetch occurs at air-gapped runtime.
-sentence-transformers==2.7.0
+# Matches services/worker_ti_ingest (3.3.1) so the hunter's query embeddings and
+# the TI corpus embeddings come from the same model version and stay comparable.
+# 2.7.0 predates it; the SentenceTransformer/CrossEncoder API used here is stable
+# across both.
+sentence-transformers==3.3.1

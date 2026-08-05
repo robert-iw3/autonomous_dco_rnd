@@ -6,8 +6,9 @@ authors = ["Robert Weber"]
 
 [dependencies]
 # Runtime
-tokio   = { workspace = true }
-futures = { workspace = true }
+tokio       = { workspace = true }
+futures     = { workspace = true }
+async-trait = { workspace = true }
 
 # Messaging
 async-nats = { workspace = true }
@@ -31,3 +32,6 @@ zstd = { workspace = true }
 
 # Allocator
 tikv-jemallocator = { workspace = true }
+
+# Internal -- start_durable_worker / SiemAdapter / WorkerConfig
+lib_siem_core = { workspace = true }

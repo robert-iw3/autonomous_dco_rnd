@@ -56,6 +56,18 @@
         for (const f of Array.from(e.dataTransfer?.files ?? [])) tiUploadFile(f);
     }
 
+    // Svelte only preprocesses TypeScript inside <script>, so any handler needing
+    // a type assertion lives here rather than inline in the markup.
+    function tiOpenFilePicker() {
+        const input = document.getElementById('ti-file-input') as HTMLInputElement | null;
+        input?.click();
+    }
+
+    function tiHandleFileInput(e: Event) {
+        const files = (e.target as HTMLInputElement).files;
+        if (files) for (const f of Array.from(files)) tiUploadFile(f);
+    }
+
     async function tiDeleteDoc(doc_id: string) {
         if (!confirm('Remove this document from the TI corpus?')) return;
         try {
@@ -750,8 +762,8 @@
                     on:dragover|preventDefault={() => tiDragOver = true}
                     on:dragleave={() => tiDragOver = false}
                     on:drop={tiHandleDrop}
-                    on:keydown={(e) => e.key === 'Enter' && (document.getElementById('ti-file-input') as HTMLInputElement)?.click()}
-                    on:click={() => (document.getElementById('ti-file-input') as HTMLInputElement)?.click()}
+                    on:keydown={(e) => e.key === 'Enter' && tiOpenFilePicker()}
+                    on:click={tiOpenFilePicker}
                 >
                     <input
                         id="ti-file-input"
@@ -759,10 +771,7 @@
                         class="hidden"
                         multiple
                         accept=".pdf,.json,.jsonl,.yaml,.yml,.csv,.txt"
-                        on:change={(e) => {
-                            const files = (e.target as HTMLInputElement).files;
-                            if (files) for (const f of Array.from(files)) tiUploadFile(f);
-                        }}
+                        on:change={tiHandleFileInput}
                     />
                     {#if tiUploading}
                         <div class="text-cyan-400 text-sm">Uploading...</div>

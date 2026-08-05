@@ -79,9 +79,11 @@ tower-http  = { version = "0.6", features = ["limit"] }
 reqwest     = { version = "0.12", features = ["json", "rustls-tls"] }
 jsonwebtoken = "9.2"
 
-# -- Storage -- security pin: object_store 0.11 fixes RUSTSEC-2024-0358 ---------
+# -- Storage -- security pin: object_store >=0.11 fixes RUSTSEC-2024-0358, and
+# >=0.12 is required to pull quick-xml >=0.41 (RUSTSEC-2026-0175/0176, 7.5 high;
+# object_store parses S3 XML responses through it).
 redis        = { version = "0.27", features = ["tokio-comp"] }
-object_store = { version = "0.11", features = ["aws"] }
+object_store = { version = "0.14", features = ["aws"] }
 qdrant-client = "1.13"
 # tiberius 0.12.3 is the current latest. 0.12.x carries rustls 0.21 → rustls-webpki 0.101.7
 # (RUSTSEC-2026-{0097,0098,0099,0104}). Upstream has not released a 0.13 that upgrades

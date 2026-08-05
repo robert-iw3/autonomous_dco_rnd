@@ -13,7 +13,11 @@ numpy==2.1.3
 
 # -- Embeddings + reranking ----------------------------------------------------
 sentence-transformers==3.3.1   # BGE-M3 embed + CrossEncoder reranker
-# torch is a transitive dep of sentence-transformers; pin matches training container
+# torch is a transitive dep of sentence-transformers, used for CPU embedding and
+# reranking only -- this service has no GPU path. Held at 2.5.1: mlops runs 2.11.0
+# for the GPU training/serving stack, but the two are separate containers with
+# separate wheels, so they do not have to match. Bump only with a runtime test of
+# BGE-M3 embed + CrossEncoder rerank.
 torch==2.5.1
 
 # -- BM25 keyword search -------------------------------------------------------

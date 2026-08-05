@@ -24,7 +24,9 @@ use chrono::Utc;
 use lib_siem_core::{start_durable_worker, SiemAdapter, WorkerConfig};
 use metrics::{counter, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
-use object_store::{aws::AmazonS3Builder, ObjectStore};
+// object_store 0.13 moved the `put` convenience method off the ObjectStore trait
+// onto the ObjectStoreExt extension trait; both must be in scope.
+use object_store::{aws::AmazonS3Builder, ObjectStore, ObjectStoreExt};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn, Level};

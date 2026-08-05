@@ -159,8 +159,27 @@ def _norm(img: str) -> str:
     return img  # 3+ components (registry/org/image) -- leave as-is
 
 
+MANIFEST_SECTIONS = ("runtime_images", "build_base_images", "custom_images")
+
+
+def strip_manifest_comments(manifest: dict) -> dict:
+    """Drop the `_comment`-only pseudo-entries used to annotate the JSON lists.
+
+    They carry no `repo`/`name`/`save_as` keys, so every section loop has to
+    ignore them or it reads a comment as an image entry.
+    """
+    for sec in MANIFEST_SECTIONS:
+        entries = manifest.get(sec)
+        if isinstance(entries, list):
+            manifest[sec] = [
+                e for e in entries
+                if isinstance(e, dict) and not all(k.startswith("_") for k in e)
+            ]
+    return manifest
+
+
 def manifest_image_set(manifest: dict, section: str) -> set:
-    return { _norm(e["repo"]) for e in manifest.get(section, []) }
+    return { _norm(e["repo"]) for e in manifest.get(section, []) if "repo" in e }
 
 
 def manifest_all_images(manifest: dict) -> set:
@@ -229,20 +248,37 @@ def check_dockerfile_from_coverage(report: Report, manifest: dict):
                 aliases.add(m.group(1).lower())
         return aliases
 
+    # `FROM alpine:${ALPINE_VERSION}` is fully determined when the Dockerfile
+    # declares `ARG ALPINE_VERSION=3.23` above it. Resolve those defaults so the
+    # concrete image is checked against the manifest instead of the raw string.
+    def _collect_arg_defaults(df_text: str) -> dict:
+        args = {}
+        for line in df_text.splitlines():
+            m = re.match(r"^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\S+)", line, re.IGNORECASE)
+            if m:
+                args[m.group(1)] = m.group(2).strip().strip('"').strip("'")
+        return args
+
+    def _expand(raw: str, args: dict) -> str:
+        def sub(m):
+            return args.get(m.group(1) or m.group(2), m.group(0))
+        return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)", sub, raw)
+
     for root in DOCKERFILE_ROOTS:
         if not root.exists():
             continue
         for df in root.rglob("Dockerfile"):
             text = df.read_text()
             stage_aliases = _collect_stage_aliases(text)
+            arg_defaults  = _collect_arg_defaults(text)
 
             for line in text.splitlines():
                 m = re.match(r"^\s*FROM\s+(\S+)", line, re.IGNORECASE)
                 if not m:
                     continue
-                raw = m.group(1).strip()
-                # Skip ARG-based FROM placeholders like ${repo}/${base_image}
-                if raw.startswith("$"):
+                raw = _expand(m.group(1).strip(), arg_defaults)
+                # Still unresolved (no ARG default) -- nothing concrete to check
+                if "$" in raw:
                     continue
                 # Skip internal multi-stage references (FROM <alias_defined_in_same_file>)
                 raw_lower = raw.split(":")[0].lower()
@@ -271,11 +307,14 @@ def check_custom_image_dockerfiles(report: Report, manifest: dict):
     for entry in manifest.get("custom_images", []):
         ctx_rel  = entry.get("build_context", "")
         ctx_path = REPO / ctx_rel
-        df_path  = ctx_path / "Dockerfile"
+        # `dockerfile` overrides the default when the build file is not named
+        # `Dockerfile` or sits outside the build context root.
+        df_rel   = entry.get("dockerfile", "Dockerfile")
+        df_path  = ctx_path / df_rel
         if not ctx_path.exists():
             missing.append(f"{entry['name']}: build_context {ctx_rel}/ not found")
         elif not df_path.exists():
-            missing.append(f"{entry['name']}: Dockerfile missing in {ctx_rel}/")
+            missing.append(f"{entry['name']}: {df_rel} missing in {ctx_rel}/")
         else:
             found.append(entry["name"])
 
@@ -521,44 +560,134 @@ def check_makefile_stage_scripts(report: Report):
 
 # -- Check 9: Python requirements aggregation ----------------------------------
 
+# Every file that declares direct Python dependencies for a deployed component.
+# python_requirements.txt is the sole input to offline wheel download and to
+# GuardDog scanning, so anything declared here and absent there is both a missing
+# wheel on the air-gapped target and an unscanned package.
+COMPONENT_REQS = [
+    "mlops/requirements.in",
+    "analytics/llm_hunter/requirements.in",
+    "infrastructure/ansible/roles/nexus_hunter/files/requirements.in",
+    "deployment_prep/scan/requirements.txt",
+    "services/model_steward/requirements.txt",
+    "services/worker_memory/requirements.txt",
+    "services/worker_ti_ingest/requirements.txt",
+]
+
+
+def _canonical_pkg(name: str) -> str:
+    """PEP 503 normalisation -- `PyMuPDF`, `rank_bm25` and `rank-bm25` unify."""
+    return re.sub(r"[-_.]+", "-", name).strip().lower()
+
+
+def _declared_packages(path: Path) -> set:
+    pkgs = set()
+    for line in path.read_text().splitlines():
+        line = line.split("#")[0].strip()
+        if not line or line.startswith("-"):
+            continue
+        m = re.match(r"([A-Za-z0-9_\-\.]+)", line)
+        if m:
+            pkgs.add(_canonical_pkg(m.group(1)))
+    return pkgs
+
+
 def check_python_reqs_aggregation(report: Report):
     """
-    Verify that top-level package names from mlops/requirements.in
-    appear in deployment_prep/python_requirements.txt
+    Verify that every package declared by any component appears in the canonical
+    deployment_prep/python_requirements.txt.
     """
-    mlops_in = REPO / "mlops/requirements.in"
-    dp_reqs  = PREP / "python_requirements.txt"
-
-    if not mlops_in.exists():
-        report.fail("mlops/requirements.in exists", "Not found")
-        return
+    dp_reqs = PREP / "python_requirements.txt"
     if not dp_reqs.exists():
         report.fail("deployment_prep/python_requirements.txt exists", "Not found")
         return
 
-    def _pkg_name(line: str) -> Optional[str]:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            return None
-        m = re.match(r"([A-Za-z0-9_\-\.]+)", line)
-        return m.group(1).lower() if m else None
+    canonical = _declared_packages(dp_reqs)
+    missing_by_component = {}
+    total_declared = set()
 
-    mlops_pkgs = set()
-    for line in mlops_in.read_text().splitlines():
-        n = _pkg_name(line)
-        if n:
-            mlops_pkgs.add(n)
+    for rel in COMPONENT_REQS:
+        path = REPO / rel
+        if not path.exists():
+            report.fail("Python reqs aggregation", f"Component requirements file missing: {rel}")
+            return
+        declared = _declared_packages(path)
+        total_declared |= declared
+        gap = sorted(declared - canonical)
+        if gap:
+            missing_by_component[rel] = gap
 
-    dp_pkg_text = dp_reqs.read_text().lower()
-    missing = [p for p in sorted(mlops_pkgs) if p not in dp_pkg_text]
-
-    if missing:
-        report.fail("Python reqs aggregation (mlops.in → deployment_prep/python_requirements.txt)",
-                    f"{len(missing)} top-level package(s) from requirements.in not in aggregated reqs:\n" +
-                    "\n".join(f"    • {x}" for x in missing))
+    if missing_by_component:
+        detail = "\n".join(
+            f"    • {rel}: {', '.join(pkgs)}"
+            for rel, pkgs in sorted(missing_by_component.items())
+        )
+        n = len({p for v in missing_by_component.values() for p in v})
+        report.fail(
+            "Python reqs aggregation (all components → python_requirements.txt)",
+            f"{n} package(s) declared by a component but absent from the canonical list "
+            f"-- these get no wheel staged and are never GuardDog-scanned:\n" + detail,
+        )
     else:
         report.ok("Python reqs aggregation",
-                  f"All {len(mlops_pkgs)} mlops top-level packages present in aggregated requirements")
+                  f"All {len(total_declared)} packages across {len(COMPONENT_REQS)} "
+                  f"component files are present in the canonical list")
+
+
+# -- Check 9b: cross-component pin consistency ---------------------------------
+
+# Files that are maintained as byte-identical copies. The ansible role ships the
+# hunter's dependency set to the deployed node, so a change to one that misses
+# the other deploys a different environment than the one that was tested.
+MIRRORED_REQS = [
+    ("analytics/llm_hunter/requirements.in",
+     "infrastructure/ansible/roles/nexus_hunter/files/requirements.in"),
+    ("analytics/llm_hunter/requirements.txt",
+     "infrastructure/ansible/roles/nexus_hunter/files/requirements.txt"),
+]
+
+
+# Component locks whose wheels must be staged by 03_download_python_deps.sh.
+# Components pinning different versions of the same package is FINE -- wheels/ is
+# a flat pool of wheel files and each container installs against its own lock via
+# --find-links. What is not fine is a component absent from the download list: it
+# then gets only whatever the aggregated list resolved, which will not match.
+DOWNLOAD_SCRIPT = PREP / "scripts/03_download_python_deps.sh"
+
+
+def check_python_pin_consistency(report: Report):
+    """Mirrored requirement copies stay identical, and every component lock is staged."""
+    problems = []
+
+    for a_rel, b_rel in MIRRORED_REQS:
+        a, b = REPO / a_rel, REPO / b_rel
+        if not a.exists() or not b.exists():
+            problems.append(f"mirrored pair missing on disk: {a_rel} / {b_rel}")
+        elif a.read_text() != b.read_text():
+            problems.append(f"mirrored copies have drifted: {a_rel} != {b_rel}")
+
+    if not DOWNLOAD_SCRIPT.exists():
+        problems.append(f"missing {DOWNLOAD_SCRIPT.relative_to(REPO)}")
+    else:
+        script = DOWNLOAD_SCRIPT.read_text()
+        for rel in COMPONENT_REQS:
+            # .in files are inputs to pip-compile; the .txt lock is what gets staged
+            lock = rel[:-3] + ".txt" if rel.endswith(".in") else rel
+            # The script builds paths from ${REPO_ROOT}/${PREP_DIR}, so the
+            # repo-relative prefix never appears literally -- match the tail.
+            tail = "/".join(lock.split("/")[-2:])
+            if tail not in script:
+                problems.append(f"{lock} is not downloaded by 03_download_python_deps.sh")
+
+    if problems:
+        report.fail(
+            "Python component lock staging + mirror sync",
+            f"{len(problems)} issue(s):\n" + "\n".join(f"    • {p}" for p in problems),
+        )
+    else:
+        report.ok("Python component lock staging + mirror sync",
+                  f"All {len(COMPONENT_REQS)} component locks are staged for offline "
+                  f"install; {len(MIRRORED_REQS)} mirrored pair(s) in sync")
 
 
 # -- Check 10: deploy.sh argument coverage -------------------------------------
@@ -754,7 +883,7 @@ def main():
         report.print()
         sys.exit(1)
 
-    manifest = json.loads(manifest_path.read_text())
+    manifest = strip_manifest_comments(json.loads(manifest_path.read_text()))
 
     print("\nRunning validation checks...\n")
 
@@ -768,6 +897,7 @@ def main():
     check_scan_config_coverage(report, manifest)
     check_makefile_stage_scripts(report)
     check_python_reqs_aggregation(report)
+    check_python_pin_consistency(report)
     check_deploy_sh(report)
     check_manifest_uniqueness(report, manifest)
     check_inference_deploy_offline(report)

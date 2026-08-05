@@ -48,10 +48,19 @@ download_reqs() {
 
 log_info "=== Phase 3: Download Python Wheels ==="
 
+# Every deployed component's own pinned lock must be listed here. wheels/ is a
+# flat pool of wheel FILES, not a resolved environment, so components pinning
+# different versions of one package coexist fine -- each install resolves against
+# its own requirements file via --find-links. A component that is missing here
+# gets only whatever the aggregated list happens to resolve, which will not match
+# its pins on the air-gapped target.
 download_reqs "deployment_prep aggregated"    "${PREP_DIR}/python_requirements.txt"
 download_reqs "mlops (full pinned)"           "${REPO_ROOT}/mlops/requirements.txt"
 download_reqs "llm_hunter agents"             "${REPO_ROOT}/analytics/llm_hunter/requirements.txt"
 download_reqs "nexus_hunter agent tools"      "${REPO_ROOT}/infrastructure/ansible/roles/nexus_hunter/files/requirements.txt"
+download_reqs "ti_ingest worker"              "${REPO_ROOT}/services/worker_ti_ingest/requirements.txt"
+download_reqs "model_steward"                 "${REPO_ROOT}/services/model_steward/requirements.txt"
+download_reqs "worker_memory"                 "${REPO_ROOT}/services/worker_memory/requirements.txt"
 download_reqs "scan tooling"                  "${PREP_DIR}/scan/requirements.txt"
 
 TOTAL=$(ls "${WHEELS_DIR}"/*.whl 2>/dev/null | wc -l)

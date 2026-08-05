@@ -1,4 +1,4 @@
-import { connect, StringCodec } from 'nats';
+import { connect } from '@nats-io/transport-node';
 
 const NATS_URL = process.env.NATS_URL || 'nats://nats:4222';
 
@@ -30,7 +30,6 @@ export async function GET() {
         });
     }
 
-    const sc = StringCodec();
     let closed = false;
 
     const stream = new ReadableStream({
@@ -54,7 +53,7 @@ export async function GET() {
                     for await (const msg of sub) {
                         if (closed) break;
                         try {
-                            const raw = sc.decode(msg.data);
+                            const raw = msg.string();
                             const data = JSON.parse(raw);
                             enqueue({
                                 type: 'nats_event',

@@ -244,8 +244,8 @@
     },
     {
       "name": "node-builder",
-      "repo": "docker.io/library/node:22-alpine",
-      "save_as": "node_22-alpine.tar.gz",
+      "repo": "docker.io/library/node:24-alpine",
+      "save_as": "node_24-alpine.tar.gz",
       "notes": "Looking Glass SvelteKit frontend build"
     },
     {
@@ -283,6 +283,31 @@
       "repo": "mcr.microsoft.com/windows/servercore:ltsc2022",
       "save_as": "servercore_ltsc2022.tar.gz",
       "notes": "Det Chamber Windows detonation-engine base. Large; requires a Windows host to save/load. Pair with detchamber_assets.json for the analysis toolset + YARA rules."
+    },
+    {
+      "repo": "docker.io/library/alpine:3.24",
+      "save_as": "alpine_3.24.tar.gz",
+      "notes": "worker_memory base"
+    },
+    {
+      "repo": "docker.io/library/alpine:3.23",
+      "save_as": "alpine_3.23.tar.gz",
+      "notes": "playbooks tooling + tf_validate base (ARG ALPINE_VERSION default)"
+    },
+    {
+      "repo": "docker.io/library/python:3.13-slim",
+      "save_as": "python_3.13-slim.tar.gz",
+      "notes": "worker_ti_ingest base"
+    },
+    {
+      "repo": "docker.io/apache/spark:4.1.2",
+      "save_as": "spark_4.1.2.tar.gz",
+      "notes": "Spark analytics base (ARG SPARK_VERSION default)"
+    },
+    {
+      "repo": "docker.io/apache/airflow:3.3.0",
+      "save_as": "airflow_3.3.0.tar.gz",
+      "notes": "Airflow scheduler base (ARG AIRFLOW_VERSION default)"
     }
   ],
   "custom_images": [

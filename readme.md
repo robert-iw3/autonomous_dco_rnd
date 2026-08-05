@@ -139,25 +139,39 @@ Model selection is fully configurable via `mlops/model_config.toml` and `NEXUS_M
 
 **How to switch:** Update `[models.b]`, `[models.c]`, or `[models.d]` in `mlops/model_config.toml` and re-run `make train-all`. No other file needs changing. For Model C, also update `hidden_dim` if switching to a different architecture family.
 
+**Hardware tiers.** Every candidate below is annotated with the minimum hardware tier it requires. Tiers are defined in [§4 Hardware and Computational Topology](#4-hardware-and-computational-topology):
+
+| Tier | Platform | Aggregate VRAM | Unlocks |
+|------|----------|----------------|---------|
+| **T1** | 4x A100 80GB NVLink (current) | 320 GB | Everything marked *Active default* today |
+| **T2** | 8x H200 141GB or 8x B200 192GB | 1.1–1.5 TB | Dense 70B at bf16, MoE up to ~400B, FP8 KV cache (B200 only) |
+| **T3** | GB300 NVL72 (72x B300, 288GB each) | 20.7 TB unified | Frontier-scale MoE (Kimi K3 class), 1M context, on-site LoRA of 2.8T models |
+
+A model's tier is set by **total** parameters, not active ones — an MoE must hold every expert resident even when only a fraction activate per token.
+
 ---
 
 #### Model B Candidates -- Network Adversarial Pattern Classifier
 
-**Hard requirements:** Genuine 128k+ context for L7 session arrays · vLLM compatible · QLoRA fine-tunable · Fits 2xA100 80GB
+**Hard requirements:** Genuine 128k+ context for L7 session arrays · vLLM compatible · QLoRA fine-tunable · Fits the deployed tier's Model B partition
 
-| Model | Params | Context | Key strength for this role | Key weakness | Status |
-|-------|--------|---------|---------------------------|--------------|--------|
-| **Llama 4 Scout** | 17B active / 109B MoE | 10M | Effectively unlimited context for session arrays; only 17B active params/token; broad MoE coverage | Served 4-bit to fit 2xA100; adapter targets must be re-verified against MoE attention names | **Active default** |
-| Mistral Small 3.1 24B | 24B | 128k | GQA-backed long-context (improved over Nemo SWA), strong structured JSON, 24B reasoning depth | Larger than Nemo -- more VRAM per inference slot | Previous default |
-| Mistral-Nemo 12B (Jul 2024) | 12B | 128k SWA | Lighter, fast inference | SWA degrades effective recall past ~32k -- Track 4 windows often exceed this | Previous default |
-| Gemma 3 27B (Mar 2025) | 27B | 128k | Google post-training quality, excellent structured output | 3B larger than Small 3.1, slightly tighter VRAM budget at 128k | Alternative |
-| Qwen2.5-14B (Sep 2024) | 14B | 128k | Best-in-class RULER long-context score at weight class, excellent JSON fidelity | Smaller than Nemo at same task complexity | Alternative |
+| Model | Params | Context | Tier | Key strength for this role | Key weakness | Status |
+|-------|--------|---------|------|---------------------------|--------------|--------|
+| **Llama 4 Scout** | 17B active / 109B MoE | 10M | T1 (4-bit) / T2 (bf16) | Effectively unlimited context for session arrays; only 17B active params/token; broad MoE coverage | Served 4-bit to fit 2xA100; adapter targets must be re-verified against MoE attention names | **Active default** |
+| Mistral Small 3.1 24B | 24B | 128k | T1 | GQA-backed long-context (improved over Nemo SWA), strong structured JSON, 24B reasoning depth | Larger than Nemo -- more VRAM per inference slot | Previous default |
+| Mistral-Nemo 12B (Jul 2024) | 12B | 128k SWA | T1 | Lighter, fast inference | SWA degrades effective recall past ~32k -- Track 4 windows often exceed this | Previous default |
+| Gemma 3 27B (Mar 2025) | 27B | 128k | T1 | Google post-training quality, excellent structured output | 3B larger than Small 3.1, slightly tighter VRAM budget at 128k | Alternative |
+| Qwen2.5-14B (Sep 2024) | 14B | 128k | T1 | Best-in-class RULER long-context score at weight class, excellent JSON fidelity | Smaller than Nemo at same task complexity | Alternative |
+| Llama-3.3-70B | 70B | 128k | T2 | Dense 70B reasoning depth on full-session forensics without MoE routing variance | ~140 GB at bf16 -- needs a dedicated H200/B200 pair, no longer shares the node | T2 upgrade |
+| **Kimi K3** | 104B active / 2.8T MoE | 1M | **T3** | Frontier reasoning over whole-campaign session arrays; Kimi Delta Attention cuts long-context inference cost ~6x; native multimodal (PCAP graphs, screenshots) | 1.4 TB of MXFP4 weights; MXFP4 needs Blackwell-class FP4 silicon; not QLoRA-tunable on-site below T3 | See §3b |
 
 ---
 
 #### Model C Candidates -- Spatial Endpoint Expert
 
 **Hard requirements:** HF Transformers `inputs_embeds` path (no vLLM) · `hidden_dim` must match `model_c_hidden_dim` in config · QLoRA fine-tunable
+
+> **Model C is constrained by architecture, not hardware.** The SpatialProjector injects UEBA vectors through `inputs_embeds`, which requires the HF Transformers path and a base whose `hidden_size` matches the projector's `output_dim`. No hardware tier relaxes this. Frontier MoE models (Kimi K3 and peers) are not candidates for this role at any budget — a projector rebuild plus full retrain is a training project in its own right, and MoE routing makes the injected-vector path unproven. Scaling Model C means moving up the `hidden_dim` ladder below and budgeting the projector retrain.
 
 | Model | Params | Context | `hidden_dim` | Projector change? | Key strength | Status |
 |-------|--------|---------|--------------|-------------------|--------------|--------|
@@ -174,6 +188,8 @@ Model selection is fully configurable via `mlops/model_config.toml` and `NEXUS_M
 
 **Hard requirements:** DPO/IPO alignable · Shares GPU 2-3 with Model C -- smaller = more headroom · Deterministic 3-class output
 
+> **Bigger is not better here.** Model D emits one of three tokens (`CONFIRM`/`MANUAL_REVIEW`/`DISMISS`) over a 4k window. Its quality ceiling is set by DPO alignment on the blast-radius preference set, not by base-model scale. Frontier models are a poor fit for this role regardless of budget: they add latency to the containment gate — the one path where a human is waiting — and cannot be DPO-aligned on-site at T3 scale. Spend a larger hardware budget on Model B and on the preference corpus, not on this slot.
+
 | Model | Params | Context | VRAM @bf16 | Key strength | Key weakness | Status |
 |-------|--------|---------|-----------|--------------|--------------|--------|
 | Gemma-3-4B | 4B | 128k | ~8 GB | Smallest viable option -- frees ~8 GB vs 8B models on shared GPU; Google instruction quality is strong at 4B | Edge-case blast-radius reasoning at 4B is weaker than larger models | Previous default |
@@ -185,9 +201,71 @@ Model selection is fully configurable via `mlops/model_config.toml` and `NEXUS_M
 
 ---
 
+### 3b. Frontier-Scale Models (Kimi K3 Class) -- Unconstrained Budget
+
+This section answers a specific question: *if cost is not a constraint and maximum reasoning and training capacity is the goal, what changes?* The short answer is that the hardware ceiling moves, the **architectural** constraints do not, and the right place to spend is narrower than it first appears.
+
+#### The reference frontier model
+
+**Kimi K3** (Moonshot AI, open weights July 2026) is the current ceiling for a self-hostable model: 2.8T total / 104B active MoE, 1M-token context, native multimodal, Modified MIT license. Weights ship MXFP4 at roughly 1.4 TB. Kimi Delta Attention is the architectural advance that makes million-token serving tractable rather than theoretical.
+
+Two properties matter more than the benchmark scores:
+
+* **Total, not active, params set the memory floor.** 104B activate per token, but all 2.8T must be resident. This is the same rule that already governs Llama-4 Scout on T1 — it just lands 25x further out.
+* **MXFP4 is silicon-dependent.** FP4 microscaling has native tensor-core support on Blackwell (B200/B300) and MI350X/MI355X. On Ampere and Hopper there is no native FP4 path, so the weights dequantize to bf16 and the 1.4 TB footprint balloons past 5 TB. **A100s cannot run this model at any quantization.** T3 is a silicon-generation requirement, not only a capacity one.
+
+#### Serving topologies
+
+Published vLLM and SGLang reference topologies for K3, all landing in the 2.3–3.1 TB aggregate range (1.4 TB weights plus KV cache, activations, and concurrency headroom):
+
+| Topology | GPUs | Aggregate VRAM | Notes |
+|----------|------|----------------|-------|
+| B300 1x8 | 8x 288GB | 2.3 TB | Densest single-node option; native FP4 |
+| MI355X 1x8 | 8x 288GB | 2.3 TB | AMD equivalent; ROCm vLLM path |
+| GB300 2x4 | 8x 288GB | 2.3 TB | NVLink-coherent across the pair |
+| B200 2x8 | 16x 192GB | 3.1 TB | Two nodes; needs fast inter-node fabric |
+| H200 2x8 | 16x 141GB | 2.3 TB | **No native FP4** -- dequantization cost applies |
+| H100 4x8 | 32x 80GB | 2.6 TB | Four nodes; communication-bound |
+
+For production serving under real concurrency the practical floor is **64+ accelerators** — enough to form a communication domain that sustains throughput rather than merely loading the weights. A single **GB300 NVL72** (72x B300, 20.7 TB unified NVLink domain at 130 TB/s) is the cleanest fit: it holds K3 with room left over to co-resident Models B, C, and D on the same coherent fabric, eliminating the hard GPU partition that T1 requires.
+
+#### What an unlimited budget does *not* buy
+
+Three constraints survive T3, and they are the ones that actually shape the architecture:
+
+1. **You still cannot fine-tune K3 on-site in any meaningful sense.** LoRA against a resident 2.8T base is feasible on an NVL72. A *full* fine-tune is a multi-rack, multi-week job — the domain adaptation that makes Models B and D valuable does not transfer to this scale. The fine-tuned 17B–70B models are not a compromise you escape by spending more; they are where the domain knowledge lives.
+2. **Model C is closed to frontier models permanently** (see the note in §3a) — `inputs_embeds` injection is an architectural requirement, not a capacity one.
+3. **Air-gap discipline is unchanged.** K3's permissive license allows sovereign self-hosting, but the model must be staged offline with SHA-384 manifests like every other base. Reaching for a hosted K3 API to avoid the hardware bill breaks the zero-egress invariant and is not an option this architecture supports.
+
+#### Recommended T3 architecture
+
+Do **not** substitute K3 into the B/C/D slots. Adopt it as a fifth role and keep the fine-tuned specialists:
+
+* **Model E -- Campaign Reasoner (new).** K3 serving the LLM Hunter swarm's top-level orchestration: cross-investigation correlation, whole-campaign narrative synthesis over 1M-token windows spanning weeks of telemetry, and multimodal review of PCAP visualizations and analyst screenshots. This is work no current model in the swarm can do at all, rather than work they do less well.
+* **Models B/C/D stay fine-tuned and specialized**, promoted to their T2 variants (Llama-3.3-70B for B, the `hidden_dim=8192` projector rebuild for C). They remain the latency-sensitive hot path.
+* **K3 as offline teacher.** The highest-leverage use even before T3 hardware lands: run K3 on rented Blackwell capacity *outside* the enclave to generate labeled reasoning traces, then carry the **dataset** across the air gap — never the model — via `05_synthetic_data_gen.py`. This upgrades B and D on existing T1 hardware and preserves zero-egress.
+
+#### Training tier
+
+Maximum training capacity is a separate budget from inference. The analytics node currently doubles as the training node (CPU-only); at T2 and above this must split:
+
+| Workload | T1 (current) | T2 | T3 |
+|----------|--------------|----|----|
+| Model A (BiLSTM-AE) | CPU, analytics node | unchanged | unchanged |
+| Model B/D QLoRA | 2x A100 80GB, shared with serving | 8x H200 dedicated training node | 8x B300, or a partition of the NVL72 |
+| Model C + projector retrain | not budgeted | 8x H200 (`hidden_dim=8192` rebuild) | same |
+| K3 LoRA | not possible | not possible | GB300 NVL72, weeks-scale |
+| K3 full fine-tune | not possible | not possible | **out of scope at single-site scale** |
+
+Serving and training must not share GPUs above T1 — a training run that evicts a serving KV cache takes the containment gate offline mid-investigation.
+
+---
+
 ### 4. Hardware and Computational Topology
 
 The quad-model architecture runs across two physically separate compute tiers. Strict GPU-to-model allocation prevents VRAM contention and ensures each model's latency budget is met under concurrent investigation load.
+
+The specifications below describe **Tier 1**, the deployed baseline. T2 and T3 upgrade paths are in [§4a](#4a-hardware-tier-upgrade-paths); the model capabilities each tier unlocks are in [§3a](#3a-candidate-model-reference) and [§3b](#3b-frontier-scale-models-kimi-k3-class----unconstrained-budget).
 
 #### The Inference Cluster Specifications
 
@@ -212,7 +290,39 @@ The quad-model architecture runs across two physically separate compute tiers. S
   * **Workload:** Air-gapped OpenCTI 6.8 + Elasticsearch 8.19 + RabbitMQ 4.1 + MinIO. Runs permanently alongside core infra -- not ephemeral.
   * **Access:** Analytics agents query `http://10.0.90.10:8080/graphql` (HAProxy-proxied) using the read-only `OPENCTI_AGENT_TOKEN`. No external network access required after initial MITRE ATT&CK bundle import.
 
-#### 5. Security & Isolation Controls
+### 4a. Hardware Tier Upgrade Paths
+
+Three provisioning targets. T1 is deployed; T2 and T3 are specified so a budget decision maps directly onto a model roster rather than a vague "more GPUs".
+
+| | **T1 -- Baseline (deployed)** | **T2 -- Performance** | **T3 -- Frontier** |
+|---|---|---|---|
+| **Accelerators** | 4x A100 80GB SXM4 | 8x H200 141GB or 8x B200 192GB | GB300 NVL72 (72x B300 288GB) |
+| **Aggregate VRAM** | 320 GB | 1.1 TB (H200) / 1.5 TB (B200) | 20.7 TB unified |
+| **Interconnect** | NVLink, 600 GB/s bidirectional | NVLink 4/5 within node | NVLink 5, 130 TB/s, 72-GPU coherent domain |
+| **FP4 native** | No | B200 only | Yes |
+| **Power (GPU only)** | 1.6 kW | ~5.6 kW (H200) / ~8 kW (B200) | ~120 kW per rack |
+| **Cooling** | DLC recommended | DLC required | **DLC mandatory**, facility-level |
+| **Serving/training split** | Shared (training evicts serving) | Separate training node required | Partitioned within the NVL72 domain |
+| **Model B** | Llama-4 Scout @ 4-bit | Llama-3.3-70B @ bf16 or Scout @ bf16 | Llama-3.3-70B @ bf16 (hot path) |
+| **Model C** | Llama-3.1-8B (`hidden_dim` 4096) | Llama-3.3-70B + projector rebuild (8192) | same as T2 |
+| **Model D** | Gemma-3-9B, shared GPUs | Gemma-3-9B, dedicated slice | same as T2 |
+| **Model E** | n/a | n/a | **Kimi K3** -- campaign reasoner, 1M context |
+| **Frontier LoRA** | No | No | Yes (weeks-scale) |
+
+**Facility prerequisites above T1.** These are the constraints that actually gate a T3 build, and they are not procurement line items:
+
+* **Power.** A GB300 NVL72 rack draws ~120 kW. Standard enterprise cabinets are provisioned for 5–15 kW. This is a datacenter electrical project with a lead time measured in quarters, not a hardware order.
+* **Cooling.** Direct liquid cooling is mandatory at T3 — air cooling cannot remove 120 kW from a single rack. Requires facility water loop, CDUs, and leak detection.
+* **Floor loading.** A populated NVL72 exceeds 1,400 kg in a single rack footprint.
+* **Air-gap unchanged.** Every tier keeps the sovereign posture from §5: offline weight staging with SHA-384 manifests, `TRANSFORMERS_OFFLINE=1`, no outbound calls at runtime. Larger hardware does not relax any control — it enlarges the attack surface that those controls cover.
+
+**Recommended sequencing.** If the budget is genuinely unconstrained, the ordering that produces capability soonest is *not* buying T3 first:
+
+1. **Rent Blackwell capacity off-site now** and run K3 as an offline teacher (§3b). This improves Models B and D on the existing T1 cluster within one training cycle, with no facility work.
+2. **Provision T2** as a dedicated training node, unblocking the Model C projector rebuild and the Llama-3.3-70B promotion — both of which are currently listed as unbudgeted.
+3. **Commission T3** in parallel with the facility work, on the understanding that its unique contribution is Model E, a capability the swarm does not have today, rather than a faster version of what it already does.
+
+### 5. Security & Isolation Controls
 
 * **Prompt Injection Defense:** All adversary-controlled strings (command lines, DNS queries, file paths) retrieved from S3/Qdrant are HTML-escaped and wrapped in `<untrusted_payload>` tags by the DuckDB and Qdrant tools before reaching any LLM prompt. Every system prompt explicitly forbids obeying instructions found inside those tags. A per-investigation canary token is injected into agent prompts as a leak tripwire -- detection halts the SOAR pipeline.
 * **Containerized Air-Gap:** All inference ports bind strictly to the `deepnet` overlay network. `TRANSFORMERS_OFFLINE=1` and `HF_DATASETS_OFFLINE=1` are set in every inference container -- no model can initiate outbound network calls at runtime.

@@ -1,4 +1,4 @@
-FROM docker.io/node:22-alpine AS builder
+FROM docker.io/node:24-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 RUN npm prune --production
 
-FROM docker.io/node:22-alpine
+FROM docker.io/node:24-alpine
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -5,7 +5,13 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Sentinel Nexus -- Operations HUD</title>
-		<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+		<!--
+			No external font fetch. The enclave is zero-egress, so a request to
+			fonts.googleapis.com cannot succeed here; it only stalls first paint and
+			signals an outbound attempt from an isolated network. Type falls back to
+			the platform monospace stack below. To restore the exact typeface, vendor
+			the IBM Plex Mono woff2 files into static/ and @font-face them locally.
+		-->
 		%sveltekit.head%
 		<style>
 			body { background-color: #050505; color: #e2e8f0; overflow: hidden; }

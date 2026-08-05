@@ -13,7 +13,9 @@ use dashmap::DashMap;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use metrics::counter;
 use metrics_exporter_prometheus::PrometheusBuilder;
-use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore};
+// object_store 0.13 moved the `put` convenience method off the ObjectStore trait
+// onto the ObjectStoreExt extension trait; both must be in scope.
+use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore, ObjectStoreExt};
 use opentelemetry::propagation::Injector;
 use serde::{Deserialize, Serialize};
 use std::{net::{IpAddr, SocketAddr}, sync::Arc, time::{Duration, Instant}};
