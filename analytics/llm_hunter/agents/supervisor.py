@@ -178,7 +178,7 @@ DETERMINISTIC ROUTING LOGIC (STRICT):
 2. If ANY entity has a status of 'pending' or 'investigating', you MUST route to the appropriate expert to clear it.
 3. If ALL entities have a status of 'cleared' or 'malicious', the investigation is complete. You MUST set next_agent to 'FINISH' and generate a VerdictSchema. Do not loop back to the experts if the board is clear. A FINISH issued while any entity is still 'pending' or 'investigating' is REJECTED by a deterministic gate and re-routed to an expert -- verdicts are only accepted over a fully resolved board.
 4. SOURCE-TYPE ROUTING:
-   - source_type in {sysmon_sensor, windows_deepsensor, linux_sentinel, macos_sensor, trellix_ens} → route to 'host_expert'.
+   - source_type in {{sysmon_sensor, windows_deepsensor, linux_sentinel, macos_sensor, trellix_ens}} → route to 'host_expert'.
    - source_type starts with 'aws_', 'azure_', 'gcp_', or 'vmware_' → route to 'cloud_expert'.
    - source_type is 'network_tap' → route to 'nettap_expert'.
    - source_type is 'suricata_eve', 'linux_c2', or 'windows_c2' → route to 'net_expert'.

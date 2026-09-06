@@ -81,6 +81,13 @@ read -p "Enter Integrity HMAC Secret (Press Enter to use generated: ${HMAC_GEN})
 HMAC_SECRET=${USER_HMAC:-$HMAC_GEN}
 echo "INTEGRITY_HMAC_SECRET=${HMAC_SECRET}" >> "$ENV_FILE"
 
+# SOAR containment signing key. worker_soar refuses to start when this is unset or
+# empty, and n8n verifies X-Nexus-Signature against the same value.
+NEXUS_HMAC_GEN=$(openssl rand -base64 32)
+read -p "Enter SOAR Containment HMAC Secret (Press Enter to use generated: ${NEXUS_HMAC_GEN}): " USER_NEXUS_HMAC
+NEXUS_HMAC_SECRET=${USER_NEXUS_HMAC:-$NEXUS_HMAC_GEN}
+echo "NEXUS_HMAC_SECRET=${NEXUS_HMAC_SECRET}" >> "$ENV_FILE"
+
 read -p "Enter Integrity Ban Threshold (Default: 5): " BAN_THRESH
 echo "INTEGRITY_BAN_THRESHOLD=${BAN_THRESH:-5}" >> "$ENV_FILE"
 

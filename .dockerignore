@@ -1,0 +1,20 @@
+# Applies to build contexts rooted at THIS repo: audit.sh, middleware/deploy/podman/
+# and tests/lab_{qdrant_pipeline,nats_ingress}/docker-compose.yml -- the last two use
+# `COPY . .`, so without this they upload target/ and .git/ to the daemon.
+# Nothing below is ever COPYed: the images rebuild their own artefacts.
+.git
+target
+**/target
+__pycache__
+**/__pycache__
+*.pyc
+**/*.pyc
+.pytest_cache
+**/.pytest_cache
+tests/reports
+
+# NOTE: tests/run_tests.sh builds with the PARENT of this repo as its context,
+# because every tests/Dockerfile.* COPYs autonomous_dco_rnd/<path>. This file does
+# NOT apply there. run_tests.sh writes that context its own .dockerignore on first
+# use (deny-all, then re-admit only the trees the Dockerfiles COPY) and aborts only
+# if that write fails -- see require_context_ignore() in tests/run_tests.sh.

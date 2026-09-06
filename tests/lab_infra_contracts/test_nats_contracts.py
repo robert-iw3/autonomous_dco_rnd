@@ -26,7 +26,10 @@ def _user_section(conf: str, user: str) -> str:
     idx = conf.find(f'user: "{user}"')
     assert idx >= 0, f"user {user} missing from nats-server.conf.j2"
     nxt = conf.find("user:", idx + 10)
-    return conf[idx: nxt if nxt > 0 else len(conf)]
+    sect = conf[idx: nxt if nxt > 0 else len(conf)]
+    # Comments in this template name the very subjects the assertions look for, so a
+    # raw slice would match the rationale rather than the allow-list entry.
+    return "\n".join(l for l in sect.splitlines() if not l.lstrip().startswith("#"))
 
 
 # ── C1: authorization allowlists cover the code's subjects ───────────────────
@@ -45,8 +48,11 @@ class TestNatsAuthorizationCoversCode:
             assert subj in sect, f"worker_node subscribe allow missing {subj}"
 
     def test_swarm_subjects(self):
+        # nexus.memory.enrichment: worker_memory connects as swarm_node, so the
+        # subject it publishes has to be in this account's allowlist.
         sect = _user_section(_conf(), "swarm_node")
-        for subj in ("nexus.soar.execute", "nexus.hud.telemetry", "nexus.alerts.>"):
+        for subj in ("nexus.soar.execute", "nexus.hud.telemetry", "nexus.alerts.>",
+                     "nexus.memory.enrichment"):
             assert subj in sect, f"swarm_node allow missing {subj}"
 
     def test_middleware_user_exists(self):

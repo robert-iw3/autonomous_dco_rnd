@@ -26,6 +26,7 @@ audit record of each. Removing that duty from this stack is the point of the arr
 not an omission from it.
 
 Configuration:
+  NATS_URL / NATS_USER / NATS_PASS              swarm_node NATS account
   NEXUS_PROJECTION_DIR / NEXUS_PROJECTION_URL   where projections come from (transport.py)
   NEXUS_PROJECTION_HMAC_KEY                     the shared seal key; required
   NEXUS_PROJECTION_ALLOW_UNSEALED               lab-only opt-out, default off
@@ -171,7 +172,12 @@ async def _run() -> None:
     source = transport.from_env()
     seen = SeenLedger(STATE_PATH)
 
-    nc = await nats.connect(os.getenv("NATS_URL", "nats://nats:4222"))
+    # Central NATS runs default-deny authorization — authenticate with the
+    # swarm_node credentials the memory_worker quadlet provisions.
+    user = os.getenv("NATS_USER", "")
+    password = os.getenv("NATS_PASS", "")
+    auth = {"user": user, "password": password} if user and password else {}
+    nc = await nats.connect(os.getenv("NATS_URL", "nats://nats:4222"), **auth)
     js = nc.jetstream()
 
     async def _publish(subject, body):

@@ -423,11 +423,15 @@ async fn handle_binary_telemetry(
     let payload_size = body.len();
     counter!("nexus_ingress_requests_total").increment(1);
 
-    // 1. JWT
-    if validate_token(&headers, &state.jwt_secret).is_err() {
-        counter!("nexus_ingress_auth_failures_total").increment(1);
-        return StatusCode::UNAUTHORIZED;
-    }
+    // 1. JWT -- the subject is the only authenticated identity in the request; it
+    // is what integrity failures are charged to (headers below are sensor-supplied).
+    let claims = match validate_token(&headers, &state.jwt_secret) {
+        Ok(c) => c,
+        Err(_) => {
+            counter!("nexus_ingress_auth_failures_total").increment(1);
+            return StatusCode::UNAUTHORIZED;
+        }
+    };
 
     // 2. Content-Type
     let content_type = headers
@@ -454,6 +458,11 @@ async fn handle_binary_telemetry(
             return StatusCode::BAD_REQUEST;
         }
     };
+    // Counted, not rejected: forwarders today present one subject for many sensor
+    // ids, so this is the measure of how far the fleet is from a hard binding.
+    if sensor_id != claims.sub {
+        counter!("nexus_ingress_sensor_id_principal_mismatch_total").increment(1);
+    }
     let batch_sequence: u64 = match hdr_str(&headers, HDR_BATCH_SEQUENCE).and_then(|s| s.parse().ok()) {
         Some(seq) => seq,
         None => {
@@ -476,15 +485,16 @@ async fn handle_binary_telemetry(
         }
     };
 
-    // 5. Schema introspection -- cached per sensor_id (parse once, reuse forever)
-    let parquet_columns = match state.schema_cache.get(sensor_id) {
-        Some(cached) => cached.clone(),
+    // 5. Schema introspection -- cached per sensor_id (parse once, reuse forever).
+    // The cache is written only after the batch verifies (below): an unverified body
+    // must not define the columns a later batch from that sensor is judged against.
+    let cached_columns = state.schema_cache.get(sensor_id).map(|c| c.value().clone());
+    let schema_was_cached = cached_columns.is_some();
+    let parquet_columns = match cached_columns {
+        Some(cols) => cols,
         None => {
             match extract_parquet_column_names(&body) {
-                Ok(cols) => {
-                    state.schema_cache.insert(sensor_id.to_string(), cols.clone());
-                    cols
-                }
+                Ok(cols) => cols,
                 Err(e) => {
                     counter!("nexus_ingress_parquet_parse_failures_total").increment(1);
                     error!(sensor_id, error = %e, "Unreadable Parquet");
@@ -506,6 +516,7 @@ async fn handle_binary_telemetry(
         sensor_type,
         batch_hmac,
         &parquet_columns,
+        &claims.sub,
     ) {
         log_violation(&violation, sensor_id, batch_sequence, sensor_type);
         return match violation {
@@ -516,6 +527,10 @@ async fn handle_binary_telemetry(
     }
 
     counter!("nexus_ingress_integrity_verified_total").increment(1);
+
+    if !schema_was_cached {
+        state.schema_cache.insert(sensor_id.to_string(), parquet_columns);
+    }
 
     // 6b. Adaptive per-sensor ingest baseline (F-16). Verified telemetry is never
     // dropped on volume -- a surge may mean the estate is under attack -- but an

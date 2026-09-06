@@ -18,6 +18,10 @@ ELF_MAGIC = b"\x7fELF"
 _CLASS = {1: 32, 2: 64}
 _ENDIAN = {1: "little", 2: "big"}
 
+# YARA is tri-state: a scan that could not run has NOT produced a verdict, so a
+# tool failure is `error` with an EMPTY match list -- never a match.
+YARA_NOT_RUN, YARA_OK, YARA_ERROR = "not_run", "ok", "error"
+
 
 def parse_elf(path: str) -> dict:
     """Safe, execution-free parse of the ELF header. {is_elf:false} for non-ELF."""
@@ -34,7 +38,8 @@ def parse_elf(path: str) -> dict:
 
 
 def _static(sample_path, tools_dir, yara_rules, mock):
-    result = {"file": sample_path, "elf": {}, "capa": {}, "yara_matches": []}
+    result = {"file": sample_path, "elf": {}, "capa": {}, "yara_matches": [],
+              "yara_status": YARA_NOT_RUN}
     try:
         result["elf"] = parse_elf(sample_path)
     except Exception as e:
@@ -51,9 +56,16 @@ def _static(sample_path, tools_dir, yara_rules, mock):
     try:  # pragma: no cover
         proc = subprocess.run(["yara", "-p", "4", yara_rules, sample_path],
                               capture_output=True, text=True, timeout=60)
-        result["yara_matches"] = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+        if proc.returncode != 0:   # yara exits non-zero only when it could not scan
+            result["yara_status"] = YARA_ERROR
+            result["yara_error"] = (proc.stderr or "").strip()[:2000] or \
+                f"yara exited {proc.returncode}"
+        else:
+            result["yara_matches"] = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+            result["yara_status"] = YARA_OK
     except Exception as e:
-        result["yara_matches"] = [f"Error: {e}"]
+        result["yara_status"] = YARA_ERROR
+        result["yara_error"] = str(e)
     return result
 
 

@@ -73,6 +73,7 @@ def fetch_version(model_id: str, version: str, dest_dir, s3=None,
     s3 = s3 or _s3_client()
     prefix = f"{model_id}/{version}/"
     dest_dir = Path(dest_dir)
+    base = dest_dir.resolve()
     pulled = 0
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -80,7 +81,12 @@ def fetch_version(model_id: str, version: str, dest_dir, s3=None,
             rel = obj["Key"][len(prefix):]
             if not rel:
                 continue
-            target = dest_dir / rel
+            # A registry key is untrusted input, and this process writes as root on
+            # the serving node: normalize the destination and refuse anything that
+            # does not land strictly under dest_dir.
+            target = (base / rel).resolve()
+            if base not in target.parents:
+                raise ValueError(f"registry key escapes the model store: {obj['Key']!r}")
             target.parent.mkdir(parents=True, exist_ok=True)
             s3.download_file(bucket, obj["Key"], str(target))
             pulled += 1

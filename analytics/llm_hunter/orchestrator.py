@@ -741,13 +741,27 @@ async def stack_lifecycle_monitor():
             logger.error(f"[LIFECYCLE] Monitor error: {e}")
 
 
+# nats-py validates connection callbacks at connect() time and raises
+# InvalidCallbackTypeError for anything that is not a coroutine function.
+async def _nats_reconnected():
+    logger.warning("[NATS] Reconnected to JetStream broker")
+
+
+async def _nats_disconnected():
+    logger.warning("[NATS] Disconnected from JetStream broker -- will retry")
+
+
+async def _nats_error(e: Exception):
+    logger.error(f"[NATS] Connection error: {e}")
+
+
 async def _connect_nats_with_retry(url: str, max_attempts: int = 0) -> NATS:
     """
     H-F4 fix: NATS connection with exponential backoff reconnect loop.
     Previously a connection drop caused orchestrator exit -> swarm dark until container restart.
     max_attempts=0 means infinite retry (appropriate for a long-running service).
     """
-    nc = NATS
+    nc = NATS()
     attempt = 0
     backoff = 2.0
     # C2: central NATS runs default-deny authorization - authenticate as the
@@ -759,9 +773,9 @@ async def _connect_nats_with_retry(url: str, max_attempts: int = 0) -> NATS:
         try:
             await nc.connect(
                 url,
-                reconnected_cb=lambda: logger.warning("[NATS] Reconnected to JetStream broker"),
-                disconnected_cb=lambda: logger.warning("[NATS] Disconnected from JetStream broker -- will retry"),
-                error_cb=lambda e: logger.error(f"[NATS] Connection error: {e}"),
+                reconnected_cb=_nats_reconnected,
+                disconnected_cb=_nats_disconnected,
+                error_cb=_nats_error,
                 max_reconnect_attempts=-1,   # nats.py built-in reconnect (-1 = infinite)
                 reconnect_time_wait=2,
                 **auth_kwargs,
@@ -785,7 +799,7 @@ async def main():
 
     # H-F4 fix: use reconnect-aware connect helper
     nc = await _connect_nats_with_retry(os.getenv("NATS_URL", "nats://nats:4222"))
-    js = nc.jetstream
+    js = nc.jetstream()
 
     # Construct the async checkpointer inside the running loop and set up its
     # Redis indices before compiling the graph (the original passed a raw client
@@ -803,9 +817,9 @@ async def main():
             reactive_alert_consumer(js, nc, graph),
             soar_callback_listener(js),
             detonation_enrichment_listener(js),
-            stack_lifecycle_monitor,
+            stack_lifecycle_monitor(),
         )
 
 
 if __name__ == "__main__":
-    asyncio.run(main)
+    asyncio.run(main())

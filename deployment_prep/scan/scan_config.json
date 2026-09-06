@@ -165,72 +165,86 @@
     {
       "repo": "nexus-local/nexus-ingress:prep",
       "name": "nexus_ingress",
-      "local": true
+      "local": true,
+      "save_as": "nexus_ingress_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-worker-qdrant:prep",
       "name": "nexus_worker_qdrant",
-      "local": true
+      "local": true,
+      "save_as": "nexus_worker_qdrant_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-worker-rules:prep",
       "name": "nexus_worker_rules",
-      "local": true
+      "local": true,
+      "save_as": "nexus_worker_rules_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-worker-s3-archive:prep",
       "name": "nexus_worker_s3",
-      "local": true
+      "local": true,
+      "save_as": "nexus_worker_s3_archive_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-worker-soar:prep",
       "name": "nexus_worker_soar",
-      "local": true
+      "local": true,
+      "save_as": "nexus_worker_soar_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-worker-rlhf:prep",
       "name": "nexus_worker_rlhf",
-      "local": true
+      "local": true,
+      "save_as": "nexus_worker_rlhf_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-hunter:prep",
       "name": "nexus_hunter",
-      "local": true
+      "local": true,
+      "save_as": "nexus_hunter_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-n8n:prep",
       "name": "nexus_n8n",
-      "local": true
+      "local": true,
+      "save_as": "nexus_n8n_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-looking-glass:prep",
       "name": "nexus_looking_glass",
-      "local": true
+      "local": true,
+      "save_as": "nexus_looking_glass_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-mlops:prep",
       "name": "nexus_mlops",
-      "local": true
+      "local": true,
+      "save_as": "nexus_mlops_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-nats:prep",
       "name": "nexus_nats",
-      "local": true
+      "local": true,
+      "save_as": "nexus_nats_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-qdrant:prep",
       "name": "nexus_qdrant",
-      "local": true
+      "local": true,
+      "save_as": "nexus_qdrant_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-haproxy:prep",
       "name": "nexus_haproxy",
-      "local": true
+      "local": true,
+      "save_as": "nexus_haproxy_local.tar.gz"
     },
     {
       "repo": "nexus-local/nexus-redis:prep",
       "name": "nexus_redis",
-      "local": true
+      "local": true,
+      "save_as": "nexus_redis_local.tar.gz"
     },
     {
       "repo": "docker.io/library/alpine:3.24",

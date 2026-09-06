@@ -175,17 +175,28 @@ impl ContainmentStep {
     }
 }
 
+/// The containment signing key. HMAC accepts ANY key length, so an unset or empty
+/// NEXUS_HMAC_SECRET would still yield a valid signature -- under a publicly known
+/// key. Fail closed: refuse to run rather than sign with it.
+fn hmac_secret() -> String {
+    let secret = std::env::var("NEXUS_HMAC_SECRET").unwrap_or_default();
+    assert!(
+        !secret.is_empty(),
+        "FATAL: NEXUS_HMAC_SECRET is unset or empty -- refusing to sign containment with an empty key"
+    );
+    secret
+}
+
 /// HMAC-SHA256 hex of a rendered body keyed by NEXUS_HMAC_SECRET. This is the
 /// signature the n8n containment webhooks verify on inbound, so a deepnet-reachable
 /// attacker cannot drive containment without the secret.
 fn sign_payload(body: &str) -> String {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
-    let secret = std::env::var("NEXUS_HMAC_SECRET").unwrap_or_default();
-    match Hmac::<Sha256>::new_from_slice(secret.as_bytes()) {
-        Ok(mut mac) => { mac.update(body.as_bytes()); hex::encode(mac.finalize().into_bytes()) }
-        Err(_) => String::new(),
-    }
+    let mut mac = Hmac::<Sha256>::new_from_slice(hmac_secret().as_bytes())
+        .expect("HMAC accepts any key length");
+    mac.update(body.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
 }
 
 /// Reject a target that would traverse or redirect a provider URL when templated
@@ -234,6 +245,12 @@ impl TimedDedup {
         }
         self.entries.insert(key.to_string(), Instant::now());
         false
+    }
+
+    /// Drop a key's entry. A claim is released when the attempt that made it
+    /// FAILED, so the redelivery of that attempt is executed, not suppressed.
+    fn release(&mut self, key: &str) {
+        self.entries.remove(key);
     }
 
     fn evict_expired(&mut self) {
@@ -319,6 +336,10 @@ impl SiemAdapter for SoarAdapter {
         let failure_counter = Arc::new(std::sync::atomic::AtomicU32::new(0));
         let total_targets = Arc::new(std::sync::atomic::AtomicU32::new(0));
         let mut n8n_failures = 0u32;
+        // Dedup claims are provisional until the payload completes: a claim whose
+        // own attempt failed is released below, so the retry we ourselves request
+        // is not suppressed as a duplicate and silently ACKed.
+        let mut dedup_claims: Vec<(String, Arc<std::sync::atomic::AtomicU32>)> = Vec::new();
 
         for payload_bytes in raw_payloads {
             let payload: ContainmentPayload = match serde_json::from_slice(payload_bytes) {
@@ -338,6 +359,9 @@ impl SiemAdapter for SoarAdapter {
                     continue;
                 }
             }
+            // Failures attributable to THIS payload. Non-zero releases the claim above.
+            let payload_failures = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            dedup_claims.push((dedup_key, Arc::clone(&payload_failures)));
 
             info!(
                 action = %payload.action_type,
@@ -535,6 +559,7 @@ impl SiemAdapter for SoarAdapter {
                                         error!(error = %e, host = %host, action = %action,
                                                "failed to publish agent task");
                                         n8n_failures += 1;   // → batch retained for retry
+                                        payload_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                     }
                                 }
                             }
@@ -587,6 +612,7 @@ impl SiemAdapter for SoarAdapter {
                                     error!(error = %e, host = %host, action = %st.action,
                                            "failed to publish protocol agent task");
                                     n8n_failures += 1;
+                                    payload_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 }
                             }
                         }
@@ -604,20 +630,42 @@ impl SiemAdapter for SoarAdapter {
                     execution_steps: steps,
                 };
 
-                let n8n_start = Instant::now();
-                match self.http_client.post(&self.n8n_webhook_url).json(&plan).send().await {
-                    Ok(resp) if resp.status().is_success() => {
-                        histogram!("nexus_soar_n8n_latency_seconds")
-                            .record(n8n_start.elapsed().as_secs_f64());
-                        info!(incident = %plan.incident_id, "ExecutionPlan dispatched to n8n");
-                    }
-                    Ok(resp) => {
-                        warn!(status = %resp.status(), "n8n webhook rejected payload");
-                        n8n_failures += 1;
+                // F-2: the master workflow's first node rejects any unsigned request,
+                // so send the serialized body and sign those exact bytes.
+                match serde_json::to_string(&plan) {
+                    Ok(plan_body) => {
+                        let signature = sign_payload(&plan_body);
+                        let n8n_start = Instant::now();
+                        match self.http_client
+                            .post(&self.n8n_webhook_url)
+                            .header("Content-Type", "application/json")
+                            .header("X-Nexus-Signature", signature)
+                            .body(plan_body)
+                            .send()
+                            .await
+                        {
+                            Ok(resp) if resp.status().is_success() => {
+                                histogram!("nexus_soar_n8n_latency_seconds")
+                                    .record(n8n_start.elapsed().as_secs_f64());
+                                info!(incident = %plan.incident_id, "ExecutionPlan dispatched to n8n");
+                            }
+                            Ok(resp) => {
+                                warn!(status = %resp.status(), "n8n webhook rejected payload");
+                                n8n_failures += 1;
+                                payload_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to reach n8n webhook");
+                                n8n_failures += 1;
+                                payload_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
                     }
                     Err(e) => {
-                        error!(error = %e, "Failed to reach n8n webhook");
+                        error!(error = %e, incident = %plan.incident_id,
+                               "Failed to serialize ExecutionPlan -- not dispatched");
                         n8n_failures += 1;
+                        payload_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
             }
@@ -627,6 +675,21 @@ impl SiemAdapter for SoarAdapter {
             // each target to its correct executor, so this blunt per-target isolate
             // would double-act.
             let native_targets = if protocol_mode { Vec::new() } else { payload.targets };
+            // Same action gate as the provider dispatch above: an action the active
+            // provider does not declare is not an auto-containment order. Isolating
+            // on manual_review_required / monitor_subnet / restore would walk this
+            // blunt per-target quarantine straight past the human-in-the-loop
+            // circuit breaker that demoted the action in the first place.
+            let native_allowed = self
+                .containment_config
+                .providers
+                .get(active_provider_key)
+                .is_some_and(|p| p.actions.contains_key(&payload.action_type));
+            if !native_allowed && !native_targets.is_empty() {
+                warn!(action = %payload.action_type, incident = %payload.incident_id,
+                      "action not declared by the active provider -- native isolate suppressed");
+            }
+            let native_targets = if native_allowed { native_targets } else { Vec::new() };
             for target_ip in native_targets {
                 let client = self.http_client.clone();
                 let edr_url = format!("{}/api/v1/isolate", self.edr_url);
@@ -634,6 +697,7 @@ impl SiemAdapter for SoarAdapter {
                 let token = self.auth_token.clone();
                 let action = payload.action_type.clone();
                 let fail_count = Arc::clone(&failure_counter);
+                let payload_fail = Arc::clone(&payload_failures);
 
                 containment_tasks.push(tokio::spawn(async move {
                     let req_body = serde_json::json!({
@@ -660,6 +724,7 @@ impl SiemAdapter for SoarAdapter {
 
                     if failed {
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        payload_fail.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }));
             }
@@ -674,13 +739,26 @@ impl SiemAdapter for SoarAdapter {
             }
         }
 
+        // Release the dedup claim of every payload whose own attempt failed, so the
+        // retry this batch is about to request is executed rather than suppressed as
+        // a duplicate (which would ACK it and lose the containment order for good).
+        {
+            let mut dedup = self.dedup.write().await;
+            for (key, fails) in &dedup_claims {
+                if fails.load(std::sync::atomic::Ordering::Relaxed) > 0 {
+                    dedup.release(key);
+                }
+            }
+        }
+
         let failures = failure_counter.load(std::sync::atomic::Ordering::Relaxed);
         let expected = total_targets.load(std::sync::atomic::Ordering::Relaxed);
 
         // Any failure in containment execution → Err → lib_siem_core retries → DLQ.
         // Returning Ok(()) on partial failure ACKs the message and permanently loses
         // the containment action for the failed targets (H-F2 fix).
-        // Safety: TimedDedup prevents double-execution on retry within the TTL window.
+        // Safety: TimedDedup prevents double-execution on retry within the TTL window
+        // for payloads that SUCCEEDED; the claim of a failed one is released above.
         if failures > 0 || n8n_failures > 0 {
             counter!("nexus_soar_partial_failures_total").increment(1);
             Err(format!(
@@ -698,6 +776,10 @@ impl SiemAdapter for SoarAdapter {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+
+    // Fail closed at startup: every outbound containment body is HMAC-signed, and
+    // an empty key signs just as happily as a real one. Refuse to start without it.
+    let _ = hmac_secret();
 
     let metrics_port: u16 = std::env::var("METRICS_PORT")
         .ok().and_then(|v| v.parse().ok()).unwrap_or(9003);

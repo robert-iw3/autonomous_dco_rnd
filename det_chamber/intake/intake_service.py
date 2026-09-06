@@ -10,13 +10,21 @@ Flow (one message on nexus.detonation.intake):
   parse manifest -> fetch artifact -> VERIFY CHAIN OF CUSTODY -> route by os_family
   -> run engine (single file) -> publish result on nexus.alerts.detonation.
 
+Two producers publish that subject: core_ingress (PRIMARY -- manifest in NATS
+headers, packaged artifact in the body) and the acquire_worker SSH fallback
+(`{artifact_ref, manifest}` JSON). A message matching neither shape is logged as
+an error and counted, never dropped quietly.
+
 If custody verification fails the service NEVER detonates; it emits a
 `custody_failed` result (acked + surfaced, never silently dropped) instead.
 """
 
+import io
 import json
 import logging
 import os
+import zipfile
+from datetime import datetime, timezone
 from typing import Callable
 
 from manifest import CustodyError, manifest_from_dict, verify_custody
@@ -48,6 +56,45 @@ def _inc(status: str):
 # os_family -> analyzer label. The Linux analyzer becomes real in Phase 3; the
 # routing contract is fixed here so the rest of the pipeline can rely on it.
 _ANALYZER_BY_OS = {"windows": "windows_engine", "linux": "linux_sandbox"}
+
+
+# NATS header -> manifest field, as core_ingress relays them
+# (services/core_ingress/src/main.rs handle_artifact_upload).
+_HDR_TO_FIELD = {
+    "x-incident-id": "incident_id",
+    "x-sensor-id": "host",
+    "x-src-path": "src_path",
+    "x-artifact-filename": "filename",
+    "x-artifact-sha256": "sha256",
+    "x-artifact-size": "size",
+    "x-os-family": "os_family",
+    "x-acquired-at": "acquired_at",
+}
+
+
+def is_relayed_artifact(headers) -> bool:
+    """True when the message carries the ingress relay shape (manifest in headers)."""
+    return any(str(k).lower() in _HDR_TO_FIELD for k in (headers or {}))
+
+
+def manifest_from_headers(headers, *, received_at: str) -> dict:
+    """Rebuild the manifest core_ingress relays as NATS headers."""
+    d = {_HDR_TO_FIELD[str(k).lower()]: v for k, v in (headers or {}).items()
+         if str(k).lower() in _HDR_TO_FIELD}
+    if not d.get("acquired_at"):
+        # The ingress does not forward an acquisition timestamp yet; record the
+        # intake receipt time so the provenance field is never silently blank.
+        d["acquired_at"] = received_at
+        logger.warning("no X-Acquired-At on the relayed artifact -- stamping intake "
+                       "receipt time %s", received_at)
+    return d
+
+
+def unpackage(blob: bytes, name: str) -> bytes:
+    """Original bytes out of the packaged (zipped) artifact the ingress relays.
+    Mirrors acquire_core.unpackage -- the intake image ships without agents/."""
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        return z.read(name)
 
 
 def select_analyzer(os_family: str) -> str:
@@ -129,11 +176,30 @@ def _real_main():  # pragma: no cover - exercised in the live dockerized topolog
         nc = await nats.connect(nats_url, **auth)
 
         async def _cb(msg):
+            body = bytes(msg.data or b"")
             try:
-                req = json.loads(msg.data.decode())
+                if is_relayed_artifact(msg.headers):
+                    # PRIMARY path: manifest in headers, packaged artifact in the body.
+                    received = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    manifest = manifest_from_headers(msg.headers, received_at=received)
+                    req = {"artifact_ref": None, "manifest": manifest}
+                    name = manifest.get("filename", "")
+
+                    def fetch(_ref, _blob=body, _name=name):
+                        return unpackage(_blob, _name)
+                else:
+                    req = json.loads(body.decode())
+                    fetch = fetch_artifact
+                manifest_from_dict(req["manifest"])   # reject a bad manifest loudly, here
+            except Exception as e:
+                logger.error("UNPARSEABLE intake message DROPPED -- %d body bytes, "
+                             "headers=%s: %s", len(body), sorted(msg.headers or {}), e)
+                _inc("unparseable")
+                return
+            try:
                 await asyncio.to_thread(
                     handle_intake, req,
-                    fetch_artifact=fetch_artifact, run_engine=run_engine,
+                    fetch_artifact=fetch, run_engine=run_engine,
                     publish=lambda subj, ev: asyncio.run(nc.publish(subj, json.dumps(ev).encode())),
                 )
                 await msg.ack()

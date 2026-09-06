@@ -177,6 +177,16 @@ fn persist_ban_list(banned: &HashSet<String>) {
     }
 }
 
+/// Failure/ban accounting key: the authenticated JWT subject bound to the sensor
+/// id it claims. `X-Sensor-Id` alone is unauthenticated, so charging it lets any
+/// holder of a valid ingress JWT ban any named sensor; binding the subject in front
+/// means a failure can only ever be charged to the caller that produced it. The
+/// sensor id stays in the key so one bad stream cannot ban everything a forwarder
+/// carries.
+fn accounting_key(principal: &str, sensor_id: &str) -> String {
+    format!("{principal}|{sensor_id}")
+}
+
 pub struct IntegrityVerifier {
     shared_secret: Vec<u8>,
     /// Per-sensor state with DashMap for lock-free per-shard concurrency.
@@ -217,11 +227,15 @@ impl IntegrityVerifier {
         sensor_type: &str,
         claimed_hmac_hex: &str,
         parquet_columns: &[String],
+        principal: &str,
     ) -> Result<(), IntegrityViolation> {
+        // Everything charged below is charged here, never to the raw X-Sensor-Id.
+        let accounting_id = accounting_key(principal, sensor_id);
+
         // 0. Ban check (read lock -- uncontended fast path)
         {
             let banned = self.banned_sensors.read().unwrap_or_else(|e| e.into_inner());
-            if banned.contains(sensor_id) {
+            if banned.contains(&accounting_id) || banned.contains(sensor_id) {
                 return Err(IntegrityViolation::SensorBanned {
                     sensor_id: sensor_id.into(),
                 });
@@ -242,7 +256,9 @@ impl IntegrityVerifier {
             .map_err(|_| IntegrityViolation::HmacDecodeError)?;
 
         if !constant_time_eq(&expected_bytes, &claimed_bytes) {
-            self.record_failure(sensor_id);
+            // A failed HMAC proves nothing about who sent the batch, so the claimed
+            // sensor id is not the party that can be charged for it.
+            self.record_failure(&accounting_id);
             return Err(IntegrityViolation::HmacMismatch);
         }
 
@@ -257,7 +273,9 @@ impl IntegrityVerifier {
             server_ts - timestamp
         };
         if delta > MAX_CLOCK_SKEW_SECS {
-            self.record_failure(sensor_id);
+            // Drift is an operational condition, not an integrity attack: the batch
+            // is rejected but never counted toward the ban threshold, which would
+            // otherwise permanently ban an honest sensor whose clock slipped.
             return Err(IntegrityViolation::TemporalDrift {
                 batch_ts: timestamp,
                 server_ts,
@@ -296,6 +314,13 @@ impl IntegrityVerifier {
             state.consecutive_failures = 0;
         }
 
+        // 3b. A verified batch clears the caller's own failure streak -- that is a
+        // different entry from the per-sensor one above whenever a forwarder carries
+        // an id that is not its subject, and it must stay "consecutive", not lifetime.
+        if let Some(mut acct) = self.sensor_states.get_mut(&accounting_id) {
+            acct.consecutive_failures = 0;
+        }
+
         // 4. Cross-OS column collision
         if let Some(forbidden) = self.os_exclusion_rules.get(sensor_type) {
             let offenders: Vec<String> = parquet_columns
@@ -326,15 +351,17 @@ impl IntegrityVerifier {
         }
     }
 
-    fn record_failure(&self, sensor_id: &str) {
+    /// `key` is an accounting key (see `accounting_key`), not a bare sensor id --
+    /// only an authenticated caller may accumulate failures toward a ban.
+    fn record_failure(&self, key: &str) {
         let mut state = self
             .sensor_states
-            .entry(sensor_id.to_string())
+            .entry(key.to_string())
             .or_insert_with(SensorState::new);
         state.consecutive_failures += 1;
         if state.consecutive_failures >= self.ban_threshold {
             drop(state);
-            self.ban_sensor(sensor_id);
+            self.ban_sensor(key);
         }
     }
 }

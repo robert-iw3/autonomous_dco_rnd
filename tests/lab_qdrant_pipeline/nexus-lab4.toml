@@ -22,6 +22,7 @@ deepsensor_math = 4
 trellix_math    = 4
 cloud_flow      = 5
 network_tap     = 8
+falco_math      = 4
 
 [schema_mappings.linux_c2]
 identifier_column  = "outbound_ratio"
@@ -180,3 +181,36 @@ timestamp_column   = "timestamp"
 sensor_id_column   = "sensor_id"
 vector_columns     = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score"]
 context_columns    = ["process_name", "dst_ip", "event_type", "description"]
+
+[schema_mappings.suricata_eve]
+identifier_column  = "community_id"
+vector_name        = "c2_math"
+primary_key_column = "community_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+context_columns = [
+    "src_ip", "dest_ip", "src_port", "dest_port", "proto",
+    "signature_id", "signature", "severity", "category",
+    "alert_action", "flow_id", "mitre_tactic", "mitre_technique"
+]
+
+[schema_mappings.falco_runtime]
+identifier_column  = "rule"
+vector_name        = "falco_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "priority_score", "container_scope_score",
+    "network_activity_score", "privileged_score",
+]
+context_columns = [
+    "rule", "output", "priority", "hostname",
+    "container_id", "container_name", "container_image",
+    "proc_name", "proc_cmdline", "user_name",
+    "evt_type", "fd_name", "fd_sip", "fd_dip"
+]

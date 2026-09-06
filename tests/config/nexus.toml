@@ -17,6 +17,12 @@ tls_enabled = false
 tls_cert = "certs/server.pem"
 tls_key = "certs/server-key.pem"
 
+[redis]
+# Deterministic-alert handoff: worker_rules LPUSHes onto alert_queue_key, the
+# hunter orchestrator BLPOPs the same key. The two MUST stay in sync.
+url = "redis://redis:6379/0"
+alert_queue_key = "nexus:deterministic:alerts"
+
 [qdrant]
 grpc_url = "http://qdrant:6334"
 http_url = "http://qdrant:6333"
@@ -31,6 +37,7 @@ deepsensor_math = 4   # windows_deepsensor 4D
 trellix_math    = 6   # trellix_ens 6D: +entropy_score +frequency_score
 cloud_flow      = 5
 network_tap     = 8
+falco_math      = 4   # falco_runtime 4D
 
 [hunter]
 active_provider = "internal_sovereign"
@@ -112,6 +119,21 @@ accepted_ids = ["linux-sentinel-prod", "linux-sentinel-dmz"]
 sentinel_stream = "Sentinel_Telemetry"
 sentinel_subject = "nexus.sentinel.telemetry"
 max_payload_mb = 10
+
+# ==============================================================================
+# SOAR Containment (worker_soar native-API fallback)
+# ==============================================================================
+# Base URLs only -- worker_soar appends "/api/v1/isolate". Hosts match the
+# custom_edr_v1 / custom_fw_v1 providers in operations/infra/containment.toml,
+# which is the primary (n8n / ExecutionPlan) path; these two are the blunt
+# per-target fallback used when no tailored step was synthesized.
+
+[soar]
+edr_api_url = "https://api.internal-edr.local"
+firewall_api_url = "https://firewall.local"
+# Bearer token for the two fallback calls above. Env reference, same convention
+# as the containment.toml provider headers -- no secret lives in this file.
+simulated_auth_token = "${NEXUS_SOAR_API_TOKEN}"
 
 # ==============================================================================
 # Dynamic Parquet Schema Mappings
@@ -323,6 +345,39 @@ vector_columns = ["interval", "cv", "outbound_ratio", "packet_size_mean", "score
 context_columns = [
     "process_name", "dst_ip", "dst_port", "mitre_tactic", "mitre_technique",
     "process_hash", "reasons", "event_type", "description",
+]
+
+[schema_mappings.suricata_eve]
+identifier_column = "community_id"
+vector_name = "c2_math"
+primary_key_column = "community_id"
+timestamp_column = "timestamp"
+sensor_id_column = "sensor_id"
+vector_columns = [
+    "outbound_ratio", "packet_size_mean", "packet_size_std",
+    "interval", "cv", "entropy", "cmd_entropy", "score"
+]
+context_columns = [
+    "src_ip", "dest_ip", "src_port", "dest_port", "proto",
+    "signature_id", "signature", "severity", "category",
+    "alert_action", "flow_id", "mitre_tactic", "mitre_technique"
+]
+
+[schema_mappings.falco_runtime]
+identifier_column  = "rule"
+vector_name        = "falco_math"
+primary_key_column = "sensor_id"
+timestamp_column   = "timestamp"
+sensor_id_column   = "sensor_id"
+vector_columns = [
+    "priority_score", "container_scope_score",
+    "network_activity_score", "privileged_score",
+]
+context_columns = [
+    "rule", "output", "priority", "hostname",
+    "container_id", "container_name", "container_image",
+    "proc_name", "proc_cmdline", "user_name",
+    "evt_type", "fd_name", "fd_sip", "fd_dip"
 ]
 
 # ==============================================================================

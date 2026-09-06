@@ -87,11 +87,15 @@ COUNTERPARTS = {
         execution="a malicious flow pattern with real volume/cadence, not a single connection -- "),
 }
 
+# Two-pass template: `domain`/`axes` are static text filled by str.format here;
+# `verdict` and `siem_evidence` stay escaped so they survive as LangChain variables
+# and are bound at invoke time -- baking them in would let a brace in a SIEM row
+# abort the prompt render.
 _SYSTEM = (
     "You are the adversarial COUNTERPART to the {domain} expert in a SOC review board. "
     "Your sole job is to DISPROVE the finding for your domain -- argue the benign case as hard "
     "as you honestly can. The board only confirms a TRUE POSITIVE if you CANNOT disprove it.\n\n"
-    "VERDICT UNDER REVIEW (from the Supervisor):\n{verdict}\n\n{axes}\n\n{siem_evidence}"
+    "VERDICT UNDER REVIEW (from the Supervisor):\n{{verdict}}\n\n{axes}\n\n{{siem_evidence}}"
 )
 
 
@@ -163,8 +167,7 @@ async def _run_counterpart(domain: str, state: InvestigativeState, verdict: dict
     aggregator treats it as 'could not confirm' (never an auto-pass)."""
     siem_evidence = _counterpart_siem_lookup(domain, state, verdict)
     prompt = ChatPromptTemplate.from_messages([
-        ("system", _SYSTEM.format(domain=domain, verdict=verdict, axes=COUNTERPARTS[domain],
-                                  siem_evidence=siem_evidence)),
+        ("system", _SYSTEM.format(domain=domain, axes=COUNTERPARTS[domain])),
         MessagesPlaceholder(variable_name="messages"),
     ])
     for provider_name, llm_instance in LLM_FAILOVER_CHAIN:
@@ -172,7 +175,8 @@ async def _run_counterpart(domain: str, state: InvestigativeState, verdict: dict
             continue
         try:
             chain = prompt | llm_instance.with_structured_output(RebuttalSchema)
-            rebuttal = await chain.ainvoke({"verdict": verdict, "messages": state["messages"]})
+            rebuttal = await chain.ainvoke({"verdict": verdict, "siem_evidence": siem_evidence,
+                                            "messages": state["messages"]})
             record_call_success(provider_name)
             rebuttal.domain = domain
             return rebuttal

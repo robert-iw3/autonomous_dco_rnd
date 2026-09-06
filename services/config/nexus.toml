@@ -17,6 +17,12 @@ tls_enabled = false
 tls_cert = "certs/server.pem"
 tls_key = "certs/server-key.pem"
 
+[redis]
+# Deterministic-alert handoff: worker_rules LPUSHes onto alert_queue_key, the
+# hunter orchestrator BLPOPs the same key. The two MUST stay in sync.
+url = "redis://redis:6379/0"
+alert_queue_key = "nexus:deterministic:alerts"
+
 [qdrant]
 grpc_url = "http://qdrant:6334"
 http_url = "http://qdrant:6333"
@@ -114,6 +120,21 @@ accepted_ids = ["linux-sentinel-prod", "linux-sentinel-dmz"]
 sentinel_stream = "Sentinel_Telemetry"
 sentinel_subject = "nexus.sentinel.telemetry"
 max_payload_mb = 10
+
+# ==============================================================================
+# SOAR Containment (worker_soar native-API fallback)
+# ==============================================================================
+# Base URLs only -- worker_soar appends "/api/v1/isolate". Hosts match the
+# custom_edr_v1 / custom_fw_v1 providers in operations/infra/containment.toml,
+# which is the primary (n8n / ExecutionPlan) path; these two are the blunt
+# per-target fallback used when no tailored step was synthesized.
+
+[soar]
+edr_api_url = "https://api.internal-edr.local"
+firewall_api_url = "https://firewall.local"
+# Bearer token for the two fallback calls above. Env reference, same convention
+# as the containment.toml provider headers -- no secret lives in this file.
+simulated_auth_token = "${NEXUS_SOAR_API_TOKEN}"
 
 # ==============================================================================
 # Dynamic Parquet Schema Mappings
